@@ -11,7 +11,7 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 - `gamedata/`、`bilingual/` 与 RPFM 工具目录只读使用；不修改、不格式化、不清理、不移动。
 - 具体 MOD 源文件默认维护在 `mod_files/<MOD名>/`；图片素材在 `assets/image/`，由用户维护；`.pack` 输出在 `mod_output/`；Workshop 发布文件在 `workshop_release/`。
 - 需要打包时先问用户：手动用 RPFM 打包，还是由 Codex 自动打包。默认先准备源文件，不直接自动打包。
-- Workshop 文本描述使用 Steam BBCode 作为最终发布格式。
+- Workshop 文本描述使用 Steam BBCode 作为最终发布格式；发布包应写清依赖、加载顺序、改动内容和兼容性，缩略图优先复用 MOD 源目录中已确认的 `thumbnail.png` 或用户提供图片。
 
 ## Reference 路由
 
@@ -36,7 +36,8 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 5. TSV 保持“列名行 -> 元数据行 -> 数据行”，并匹配目标表版本、列名、列数和列顺序。
 6. 用 RPFM diagnostics 排查 invalid reference、missing loc、schema、banned table、datacore 等问题。
 7. 进游戏验证 UI、数值、动画、模型、射界、porthole、日志。
-8. 用户反馈可复用错误、diagnostics 或实测结果时，同步更新本指南和 `CHANGELOG.md`。
+8. 生成 Workshop 发布材料时，在 `workshop_release/` 准备 `.pack`、同名 `.png`、`description.bbcode.txt`、必要的发布说明和上传清单；生成物默认不纳入 git。
+9. 用户反馈可复用错误、diagnostics、发布流程或实测结果时，同步更新本指南和 `CHANGELOG.md`。
 
 ## 高风险禁区
 

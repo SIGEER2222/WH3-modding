@@ -2,6 +2,19 @@
 
 本版根据原始 `SKILL.md` 与 5 个 reference 的冲突点、RPFM/WH3 Lua 文档、TW Modding 教程核对后整理。
 
+## 2026-07-09 流程补充：Workshop release 可上传清单
+
+1. 根据阿瓦隆龙骑士威力加强补丁的发布整理，补充 Workshop release 清单：发布目录包含 `.pack`、同名 `.png`、`description.bbcode.txt`、可选 `release_notes.bbcode.txt`、`UPLOAD_FILES.txt` 与 zip。
+2. 记录 thumbnail 复用规则：优先复制 MOD 源目录中已确认的 `thumbnail.png` 或用户指定图片，不擅自整理 `assets/`。
+3. 记录发布说明要求：submod/patch 必须写清依赖主 MOD、加载顺序、改动内容、语言/本地化关系和兼容性；生成后核对 pack、thumbnail 哈希与 zip 条目。
+4. 明确版本管理边界：`workshop_release/` 与 `mod_output/` 默认仍作为生成/发布产物忽略，除非用户明确要求归档。
+
+## 2026-07-09 流程补充：覆盖式 DB 补丁 diagnostics
+
+1. 根据阿瓦隆龙骑士威力加强补丁的 RPFM 打包校验，补充覆盖式 DB 补丁判断：补丁 pack 故意包含主 MOD 同 key 最小覆盖行时，`DuplicatedCombinedKeys` 可作为预期提示处理。
+2. 限定适用条件：重复 key 必须是计划覆盖目标，诊断列为主键列，且没有 invalid reference、missing file、type mismatch、schema/version 或 TSV 导入错误。
+3. 要求补丁文档说明依赖主 MOD，并记录按项目约定放在主 MOD 前面加载以覆盖同 key 行 `[实测/需随版本复查]`。
+
 ## 2026-07-09 项目结构重组：mod_files、输出目录与 Workshop BBCode
 
 1. 根据当前工作区结构调整，将具体 MOD 源文件目录从旧示例 `mod/<MOD名>/` 统一为 `mod_files/<MOD名>/`，图片素材归入 `assets/image/`，打包输出归入 `mod_output/`，Workshop 发布材料归入 `workshop_release/`。

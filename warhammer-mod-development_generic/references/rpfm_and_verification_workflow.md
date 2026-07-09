@@ -47,6 +47,17 @@
 4. 对中文 Loc 不只看 `decode_packed_file` 的 JSON 转义输出；必要时用 RPFM `export_tsv` 反导出后检查中文是否仍正确、旧文本是否仍存在。
 5. 执行完临时反导出检查后删除校验文件，避免后续误打包。
 
+### 覆盖式补丁 diagnostics
+
+制作类似汉化补丁的覆盖式 DB 补丁时，补丁 pack 会故意包含与主 MOD 相同 key 的最小覆盖行。RPFM diagnostics 在主包作为依赖/上下文打开后仍可能报告 `DuplicatedCombinedKeys`，这类提示只有在以下条件同时满足时才可视为预期 `[实测/需随版本复查]`：
+
+1. 重复 key 正是本轮计划覆盖的主 MOD key。
+2. 诊断列为主键列，例如 `key` 或 `unit`。
+3. 没有同时出现 invalid reference、missing file、type mismatch、schema/version 或 TSV 导入错误。
+4. 补丁文档中说明该 pack 依赖主 MOD，并记录需要按项目约定放在主 MOD 前面加载以覆盖同 key 行。
+
+如果 `DuplicatedCombinedKeys` 出现在非计划覆盖的表、非目标 key，或伴随其他诊断，应按普通冲突继续排查，不要一概忽略。
+
 ### Workshop 发布文本
 
 Steam Workshop 的最终描述文本使用 BBCode，默认放在 `workshop_release/<MOD名>/description.bbcode.txt`。
@@ -64,6 +75,18 @@ Steam Workshop 的最终描述文本使用 BBCode，默认放在 `workshop_relea
 ```
 
 Markdown 可以作为草稿，但发布前应转换为 Steam 支持的 BBCode，避免标题、列表和链接在 Workshop 页面显示为原始 Markdown。
+
+### Workshop 发布清单
+
+生成 Workshop release 时，按可上传目录整理发布材料 `[实测/需随版本复查]`：
+
+1. 目录默认放在 `workshop_release/<release_version>/<workshop_item_name>/`，其中 `<release_version>` 可沿用项目已有批次目录。
+2. 上传文件至少包含 `<pack_name>.pack` 与同名 `<pack_name>.png`。缩略图优先复制 MOD 源目录中已确认的 `thumbnail.png` 或用户指定图片，不从 `assets/` 擅自整理、改名或清理素材。
+3. 文案使用 `description.bbcode.txt`，可另放 `release_notes.bbcode.txt` 与 `UPLOAD_FILES.txt`。说明中至少写清：依赖项、加载顺序、主要改动、语言/本地化关系、兼容性和冲突风险。
+4. 对汉化补丁、威力加强补丁等 submod/patch，说明必须明确它不是完整主 MOD，并写明需要主 MOD；若它通过同 key 覆盖生效，应记录项目约定的加载顺序。
+5. 需要分发压缩包时，可在 release 版本目录生成 `<workshop_item_name>.zip`；压缩包应只包含上传所需文件和说明，不包含源 TSV、README、临时导出或 `_source/`。
+6. 生成后核对 `.pack` 与 `mod_output/` 来源文件哈希一致、`.png` 与选定 thumbnail 哈希一致，并检查 zip 条目。
+7. `workshop_release/` 与 `mod_output/` 属于生成/发布产物，默认不纳入 git；除非用户明确要求归档发布产物，否则只提交 `mod_files/` 源文件与指南更新。
 
 ### TSV 导入/导出
 

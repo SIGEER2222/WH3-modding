@@ -101,11 +101,11 @@ Workshop 发布材料默认放：
 workshop_release/
 └── <MOD名>/
     ├── description.bbcode.txt
-    ├── preview.png
+    ├── <pack_name>.png
     └── release_notes.bbcode.txt
 ```
 
-Steam Workshop 文本描述使用 Steam BBCode。Markdown 可以作为草稿，但最终发布文本应转换为 BBCode。
+Steam Workshop 文本描述使用 Steam BBCode。Markdown 可以作为草稿，但最终发布文本应转换为 BBCode。若按发布批次整理，可使用 `workshop_release/<release_version>/<workshop_item_name>/`；其中 `.pack`、同名 `.png`、上传清单和 `.zip` 仍视为发布产物，默认不纳入版本管理。
 
 ## 文件归属规则
 
