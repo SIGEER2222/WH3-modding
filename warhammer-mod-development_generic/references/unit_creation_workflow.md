@@ -123,6 +123,9 @@
 - `projectiles_tables.projectile_number`、`shots_per_volley`、`burst_size`、`burst_shot_delay` 属于不同层级，需按动画实测。
 - 普通弓箭/骑射动画可能不明显表现 `shots_per_volley` 散布；可测试 `shots_per_volley=1` 配合提高 `projectile_number` `[实测/需随版本复查]`。
 - `base_reload_time` 过低可能被 UI、战斗引擎或动画周期限制；本项目曾出现设为 2 秒但游戏显示仍接近 4 秒的情况 `[实测/需随版本复查]`。
+- 制作可切换弹药时，可参考亚雷鸣炮链路：`unit_missile_weapon_junctions_tables` 给单位追加可切换 missile weapon，`missile_weapons_to_projectiles_tables` 把该 missile weapon 指向替换 projectile；若再用 `effect_bonus_value_missile_weapon_junctions_tables` 的 `enable` bonus 绑定 effect，则该切换弹药会变成科技/效果解锁。若希望自用 MOD 默认可切换，可先测试只追加 ungated junction `[已查原版 DB / 需游戏内复查]`。
+- 调 projectile 弹道时先区分 `trajectory_sight`：本地 schema 说明 `muzzle_velocity` 与 `max_elevation` 在 fixed trajectory 下不使用；`fixed` 可强制高抛但弹速可能不按设定生效，`dual_low_fixed` 可能在无遮挡目标上优先走低平分支，不等于强制曲射。`gravity=-1` 是使用默认/正常重力的特殊值，不应按 `-2=两倍重力` 理解；需要额外下坠时使用正数并按游戏内轨迹复查。在同一弹速、重力和距离存在两组抛物线解时，可把 `low` / `high` 理解为取低角解/高角解；`high` 在高速重炮测试中会强制或倾向最大角/高角分支，近距离目标可能几乎垂直向上发射，但能保留更远的理论射程；需要“曲射且弹速参与”时优先测试非 fixed 的分支，并进战斗实测 `[实测/需随版本复查]`。
+- 若要指定某个距离的发射角度，可用 `gravity = velocity^2 * sin(2 * angle) / range` 反推；`low` 与 `high` 都使用同一公式，只是取低角解或高角解。随后可用 `range = velocity^2 * sin(2 * angle) / gravity` 估算某个仰角对应的可解距离，用 45 度估算理论最远射程。例：1000 弹速、45 度最远 750m 时 `gravity≈1333.33`；同一重力下 88 度约对应最近 52.32m `[实测/需随版本复查]`。
 - 调射程时同时检查 `effective_range`、`calibration_distance`、`expiry_range`，并保持各列原版格式。当前原版 `projectiles_tables` 中 `effective_range` 与 `expiry_range` 使用整数格式，`calibration_distance` 使用小数格式；若把整数列写成 `333.3333` 这类小数，RPFM 可能无法正常识别/导入该行 `[已查原版 DB / 需随版本复查]`。
 - 建筑伤害、友军伤害、建筑倍率通常在 projectile 对应字段里，先查原版同列含义。
 
@@ -185,3 +188,16 @@ Loc key 不要套单一模板：
 - [ ] 新单位 `main_units`、`land_units`、variant、attribute、ability、recruitment、unit set、Loc 链路完整。
 - [ ] RPFM diagnostics 无 banned table、invalid reference、missing loc。
 - [ ] 游戏内验证招募、单位卡、porthole、模型、骑手位置、动画、射界、移动射击、减员、阵型、武器数值。
+
+## 2026-07-10 弹药切换解锁实测补充
+
+- `[实测/需随版本复查]` 可切换弹药不一定只靠 `unit_missile_weapon_junctions_tables` + `missile_weapons_to_projectiles_tables` 就显示按钮；如果 donor 的切换弹药由科技/效果解锁，未激活 enable 效果时战役战斗 UI 可能没有切换键。
+- 参考亚雷鸣炮、震旦巨炮霰弹等链路时，若存在 `effect_bonus_value_missile_weapon_junctions_tables` 的 `bonus_value_id=enable` 行，应同步给新 `unit_missile_weapon_junctions` 建立专用 enable effect，并保证该 effect 在目标上下文生效。
+- 自用战役 MOD 想让单位开局自带切换弹药时，可创建隐藏 `effect_bundles_tables` bundle，将自定义 enable effect 以 donor 相同 force scope 挂入 `effect_bundles_to_effects_junctions_tables`，再用 `script/campaign/mod/*.lua` 在 first tick 给相关 faction 永久施加。自定义战斗是否显示仍需游戏内单独复查。
+
+## 2026-07-10 火炮 articulated entity 实测补充
+
+- `[实测/需随版本复查]` 轮式火炮/车体类单位若 `land_units_tables.articulated_record` 指向 `land_unit_articulated_vehicles_tables`，移动速度和射界可能还会读取该 articulated record 引用的 `battle_entities_tables.articulated_entity`，不只读取 `land_units.man_entity` 或 `battlefield_engines.battle_entity`。
+- 覆盖或派生火炮时，如果修改 `battle_entities_tables.walk_speed/run_speed/charge_speed/fire_arc_close` 没有生效，应检查并复制：`land_unit_articulated_vehicles_tables`、`articulation_nodes_in_land_articulated_vehicles_tables`，并让 `land_units_tables.articulated_record` 指向新的 articulated record。
+- 若火炮 `land_units_tables.mount` 仍指向原版 draught mount，移动速度还可能被 `mounts_tables.entity` 对应的牵引实体限制；需要同步复制 `mounts_tables` 与该 mount entity 的 `battle_entities_tables` 行，再让 `land_units_tables.mount` 指向新 mount。
+- 火炮直控/特殊瞄准还可同步检查 `first_person_engines_tables`；若派生了新的 `battlefield_engines_tables.key`，可复制原火炮同 key 的 first-person row 到新 engine key，并按设计调整 `half_horizontal_fire_arc`。

@@ -1,0 +1,5 @@
+land_unit_articulated_vehicle	index	max_angle	offset	radius	secondary_entity_index	docking_offset	pivot_0_target_offset	pivot_1_target_offset	pivot_2_target_offset
+#articulation_nodes_in_land_articulated_vehicles_tables;3;db/articulation_nodes_in_land_articulated_vehicles_tables/!!cthgco_grand_cannon_overwrite									
+cthgco_cth_art_grand_cannon_articulation_fast	0	45.0000	0.3000	1.7500	-1	0.0000	0	0	0
+cthgco_cth_art_grand_cannon_articulation_fast	1	45.0000	2.5000	0.2500	-1	0.0000	0	0	0
+cthgco_cth_art_grand_cannon_articulation_fast	2	45.0000	4.0000	1.2500	-1	0.0000	0	0	0

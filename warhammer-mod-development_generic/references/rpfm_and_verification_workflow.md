@@ -98,6 +98,21 @@ Markdown 可以作为草稿，但发布前应转换为 Steam 支持的 BBCode，
 - 表的内部 path 是否带扩展名、空值格式等容易因工具版本不同而有细节差异。
 - RPFM 导出的样例最接近当前工具期望格式。
 
+### 游戏版本更新后的 schema/dependencies 复查
+
+WH3 或 RPFM 更新后，不要只看 MOD 是否能被启动器加载。先把 RPFM 的 schema 与 dependencies/cache 视为两个独立状态检查 `[已查本地配置 / 需随版本复查]`：
+
+1. 记录当前 RPFM 版本、RPFM release 日期、`rpfm_ui.exe`/`rpfm_server.exe` 修改时间，以及 RPFM 配置目录中 `schemas/` 与 `dependencies/` 的最新修改时间。本地常见位置为 `%APPDATA%/FrodoWazEre/rpfm/config/schemas/` 与 `%APPDATA%/FrodoWazEre/rpfm/config/dependencies/`，但不要手工编辑这些缓存。
+2. 若 RPFM 官方 release 或 schema 源有更新，先更新 RPFM 或在 RPFM UI 中执行 schema 更新/patch 流程；具体菜单名随 RPFM 版本变化，以当前 UI 为准 `[需验证]`。
+3. 若 WH3 游戏本体更新，即使 schema 没变，也要在 RPFM 中重新加载当前 WH3 dependencies/datacore/cache；依赖缓存代表当前游戏数据，旧缓存可能掩盖 removed key、changed key 或新增 DLC 表。
+4. `gamedata/` 是本地导出的原版数据快照，不会因 RPFM 刷新 dependencies/cache 自动更新。游戏更新后，如果要继续用本地文件查 DB、脚本、UI 或 Loc，应从当前游戏 pack 重新导出相关范围；小补丁可只导出 MOD 涉及表/脚本/本地化/UI，大版本或 DLC 更新优先全量刷新或保留版本化快照 `[需随版本复查]`。
+5. 自动化脚本可以只做“检测和提醒”：比较 RPFM 工具版本、schema/dependencies 缓存时间、Steam 游戏 `data/*.pack` 修改时间、`gamedata/` 导出时间和 MOD 源 TSV 表清单；一旦任一项变新，就标记为需要打开 RPFM 刷新 schema/dependencies、必要时重导出 `gamedata/`，并跑 diagnostics。
+6. 依赖刷新后，优先用 RPFM diagnostics 判断 MOD 是否需要兼容：schema/version、type mismatch、invalid reference、missing file、missing loc、banned table、datacore 或 duplicated key 是否出现新增错误。
+7. 对 MOD 源 TSV，按表逐项和当前原版/RPFM 导出样例比对元数据行、列名、列数、列顺序和类型。表版本或列结构变了，就需要重导出模板并迁移旧数据；不要只改 metadata 版本号。
+8. 对引用原版 key 的行，重新查 donor 链路是否仍存在：单位、武器、projectile、effect、bundle、unit set、招募权限、UI 资源、Loc key、脚本 API。invalid reference 通常比启动器能加载更能说明兼容性问题。
+9. 若 RPFM diagnostics 清洁，仍需进游戏做最小回归：自定义单位是否可招募/可见、数值是否生效、头像/兵牌/模型是否正常、Lua 日志是否加载、关键 UI 文本是否显示。
+10. 若只受数据数值平衡影响、无 schema/引用/Lua/UI 错误，可在 Workshop 文案中写“已在 `<游戏版本>` 复查”；若发现结构性变化，发布兼容补丁并记录需要的加载顺序和依赖。
+
 ### Startpos / 主菜单初始军队兵牌
 
 优先区分两个目标：

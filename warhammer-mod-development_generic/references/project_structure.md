@@ -14,6 +14,8 @@
 
 `assets/`、`bilingual/`、`gamedata/`、RPFM 工具目录、`mod_output/` 与 `workshop_release/` 默认不纳入版本管理。
 
+`gamedata/` 是从游戏 pack 导出的本地原版数据快照，不会因 RPFM 刷新 dependencies/cache 自动更新。WH3 游戏更新后，如果后续仍要依赖本地搜索、表结构比对、脚本 API 或 UI 路径查证，应重新从当前游戏 pack 导出相关范围，或明确标记该目录仍是旧版本快照 `[需随版本复查]`。
+
 ## MOD 源文件目录结构
 
 ```text

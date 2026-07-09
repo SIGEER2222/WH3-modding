@@ -1,0 +1,3 @@
+key	precursor	default_projectile	audio_type	use_secondary_ammo_pool
+#missile_weapons_tables;11;db/missile_weapons_tables/!!cthdco_dragon_crossbow_overwrite				
+cthdco_cth_dragon_crossbow_ror_bolt_x3	false	cthdco_cth_dragon_crossbow_ror_bolt_x3	crossbow	false

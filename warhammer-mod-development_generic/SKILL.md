@@ -36,8 +36,9 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 5. TSV 保持“列名行 -> 元数据行 -> 数据行”，并匹配目标表版本、列名、列数和列顺序。
 6. 用 RPFM diagnostics 排查 invalid reference、missing loc、schema、banned table、datacore 等问题。
 7. 进游戏验证 UI、数值、动画、模型、射界、porthole、日志。
-8. 生成 Workshop 发布材料时，在 `workshop_release/` 准备 `.pack`、同名 `.png`、`description.bbcode.txt`、必要的发布说明和上传清单；生成物默认不纳入 git。
-9. 用户反馈可复用错误、diagnostics、发布流程或实测结果时，同步更新本指南和 `CHANGELOG.md`。
+8. 游戏或 RPFM 更新后，先复查 RPFM schema、WH3 dependencies/cache 与原版表结构，再判断 MOD 是否需要兼容性更新。
+9. 生成 Workshop 发布材料时，在 `workshop_release/` 准备 `.pack`、同名 `.png`、`description.bbcode.txt`、必要的发布说明和上传清单；生成物默认不纳入 git。
+10. 用户反馈可复用错误、diagnostics、发布流程或实测结果时，同步更新本指南和 `CHANGELOG.md`。
 
 ## 高风险禁区
 
@@ -59,6 +60,8 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 - 高画质 porthole 若要排除坐骑或多实体，通常要专用 `.csc`。
 - 360 度骑射同时核对 rider entity、battle personality、`land_units_tables.man_entity`；有坐骑时还要核对专用 mount entity 的 `fire_arc_close`。
 - 多模型骑乘单位要复查 `num_men`、`num_mounts`、`rank_depth`、`spacing`、`can_dismember`、碰撞和质量。
+- 可切换弹药若原版 donor 由科技/效果解锁，不要只加 `unit_missile_weapon_junctions`；还要查 `effect_bonus_value_missile_weapon_junctions_tables.enable`，并保证 enable effect 在战役或目标上下文中生效。
+- 轮式火炮/车体单位的速度和射界不一定只读炮身 entity；同时核对 `articulated_record`、`land_unit_articulated_vehicles_tables`、articulated entity、牵引 `mount`/mount entity，以及必要时的 `first_person_engines_tables`。
 
 ## 指南维护
 

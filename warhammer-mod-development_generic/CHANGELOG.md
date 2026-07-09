@@ -2,6 +2,27 @@
 
 本版根据原始 `SKILL.md` 与 5 个 reference 的冲突点、RPFM/WH3 Lua 文档、TW Modding 教程核对后整理。
 
+## 2026-07-10 流程补充：游戏版本更新后的 schema/dependencies 复查
+
+1. 增加 WH3/RPFM 更新后的兼容复查流程：先检查 RPFM schema、dependencies/cache 与当前游戏数据，再判断具体 MOD 是否需要更新。
+2. 记录本地 RPFM 配置缓存位置：`%APPDATA%/FrodoWazEre/rpfm/config/schemas/` 与 `dependencies/`，只用于检测时间和状态，不手工编辑缓存 `[已查本地配置 / 需随版本复查]`。
+3. 明确自动化脚本适合做检测和提醒：比较工具版本、缓存时间、游戏 `data/*.pack`、`gamedata/` 导出和 MOD TSV 表清单；真正刷新 schema/dependencies 后仍需 RPFM diagnostics 与游戏内最小回归。
+4. 补充兼容判断标准：新增 schema/version、type mismatch、invalid reference、missing file/loc、banned table、datacore、Lua 日志或 UI/资源回归问题时才需要做兼容补丁；表结构变化时应重导出模板并迁移数据。
+5. 补充 `gamedata/` 定义：它是从游戏 pack 导出的本地原版数据快照，不会因 RPFM 刷新 dependencies/cache 自动更新；游戏更新后如继续依赖本地查证，应重导出相关范围或标记为旧版本快照。
+
+## 2026-07-10 实测反馈：切换弹药按钮需要 enable 效果生效
+
+1. 根据震旦巨炮可切换爆破弹实测，补充规则：只新增 `unit_missile_weapon_junctions_tables` 与 `missile_weapons_to_projectiles_tables` 可能不会在战役战斗 UI 显示切换弹药按钮。
+2. 记录亚雷鸣炮、震旦巨炮霰弹同类链路：如果 donor 通过 `effect_bonus_value_missile_weapon_junctions_tables` 的 `bonus_value_id=enable` 绑定 effect，则新切换弹药也应建立自己的 enable effect。
+3. 记录自用战役 MOD 的直接自带方案：可用隐藏 effect bundle 承载该 enable effect，再通过 `script/campaign/mod/*.lua` first tick 永久施加给相关 faction；自定义战斗表现仍需单独实测 `[实测/需随版本复查]`。
+
+## 2026-07-10 实测反馈：火炮速度/射界还需同步 articulated entity
+
+1. 根据震旦巨炮速度和射界未随 engine/entity 修改生效的反馈，补充火炮 articulated 链路：`land_units_tables.articulated_record` 可能继续指向原版 `land_unit_articulated_vehicles_tables` 与原版 articulated `battle_entities_tables` 行。
+2. 记录修正方式：派生新的 `land_unit_articulated_vehicles_tables` key、复制对应 `articulation_nodes_in_land_articulated_vehicles_tables` 行，并让新 record 指向专用 articulated entity。
+3. 补充 draught mount 限速检查：若火炮 `land_units_tables.mount` 仍指向原版牵引 mount，也应复制 `mounts_tables` 与对应 mount entity，并让 land unit 指向新 mount。
+4. 补充直控/特殊瞄准检查项：派生新 `battlefield_engines_tables.key` 后，可同步复制 `first_person_engines_tables` 同原火炮 key 的行到新 engine key，按设计调整 `half_horizontal_fire_arc` `[实测/需随版本复查]`。
+
 ## 2026-07-09 流程补充：Workshop release 可上传清单
 
 1. 根据阿瓦隆龙骑士威力加强补丁的发布整理，补充 Workshop release 清单：发布目录包含 `.pack`、同名 `.png`、`description.bbcode.txt`、可选 `release_notes.bbcode.txt`、`UPLOAD_FILES.txt` 与 zip。
@@ -236,6 +257,16 @@
 
 1. 根据用户实测，记录在骑乘坐骑 variant 中同步降低 `variants_tables.scale` 会导致领主/英雄骑手模型也被缩小。
 2. 修正坐骑局部缩放规则：若目标是只改变坐骑体积，优先仅调整新坐骑 variant 的 `mount_scale`，并保留原版 `scale`；修改后仍需游戏内复查骑手位置、动画、选择圈和碰撞表现。
+
+## 2026-07-10 projectile 弹道与弹速反馈
+
+1. 根据巨炮 projectile 实测反馈，补充 `trajectory_sight` 调整规则：`fixed` 弹道可强制高抛但 `muzzle_velocity`/`max_elevation` 可能不按设定参与，`dual_low_fixed` 在无遮挡目标上可能仍走低平分支。
+2. 明确需要“曲射且弹速生效”时，应优先测试非 fixed donor，例如 `low` 配合较高 `max_elevation`、合适 `muzzle_velocity`/`gravity`，并以游戏内炮弹轨迹为准 `[实测/需随版本复查]`。
+3. 根据近距离目标实测，记录 `high` 会强制或倾向最大角/高角分支，可能让高速重炮近距离几乎垂直向上发射；这类需求优先测试 `low` 分支。
+4. 补充按指定最小距离和角度反推 gravity 与最大射程的公式：`gravity = velocity^2 * sin(2 * angle) / range`，最大射程约为 `floor(velocity^2 / gravity)`；高速炮若要求近距离仍有较大低角，射程会自然大幅缩短。
+5. 补充 `low` / `high` 可理解为抛物线两解中的低角解/高角解；若目标是尽量保留远射程，可测试 `high` 分支并按 `velocity^2 / target_range` 反推近似重力，但近距离会自然变得很陡 `[实测/需随版本复查]`。
+6. 补充按指定高角反推重力后，用最高仰角估算最近可解距离、用 45 度估算理论最远射程的流程；记录 900 弹速、100m 高角约 80 度的示例：`gravity≈2770.36`、88 度最近约 20.39m、45 度最远约 292.38m `[实测/需随版本复查]`。
+7. 根据亚雷鸣炮爆破弹链路补充可切换弹药流程：`unit_missile_weapon_junctions_tables` 追加可切换 missile weapon，`missile_weapons_to_projectiles_tables` 指向替换 projectile；若绑定 `effect_bonus_value_missile_weapon_junctions_tables.enable` 则由科技/效果解锁，未绑定时需游戏内复查是否默认可切换。
 
 ## 2026-07-07 RPFM 诊断反馈：custom battle set piece character
 

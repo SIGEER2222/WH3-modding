@@ -1,0 +1,3 @@
+effect_bundle_key	effect_key	effect_scope	value	advancement_stage
+#effect_bundles_to_effects_junctions_tables;3;db/effect_bundles_to_effects_junctions_tables/!!cthgco_grand_cannon_overwrite				
+cthgco_bundle_grand_cannon_explosive_ammo	cthgco_effect_enable_grand_cannon_explosive_ammo	faction_to_force_own_unseen	1.0000	start_turn_completed
