@@ -20,6 +20,14 @@
 | `docs/RPFM_USAGE.md` | RPFM 在本项目中的使用约定 |
 | `docs/DEVELOPMENT_GUIDE_UPDATE_RULES.md` | 根据需求和错误反馈更新 development 指南的规则 |
 
+## 来源与致谢
+
+本工作区维护的 `warhammer-mod-development_generic/`（Warhammer 3 MOD development skill）来源与主要贡献参考自 [scnjwyc/warhammer3-mod-development-skill](https://github.com/scnjwyc/warhammer3-mod-development-skill)。本项目内的后续修改是在该来源基础上，按当前工作区目录结构、RPFM 流程和实测反馈继续整理维护。
+
+`gamedata/` 与 `bilingual/` 的生成方式可参考同一作者发布的 Bilibili 视频：[BV1fN7D6XEBE](https://www.bilibili.com/video/BV1fN7D6XEBE)。
+
+使用、传播或二次开发本项目中的 development skill 时，应保留该来源贡献说明。
+
 ## Codex 读取顺序
 
 处理本项目任务时，优先按以下顺序读取：
