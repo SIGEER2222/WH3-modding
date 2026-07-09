@@ -1,6 +1,3 @@
-# Hidden tool/config directories.
-.*/
-
 # User-maintained art source assets.
 assets/
 
