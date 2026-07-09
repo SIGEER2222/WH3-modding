@@ -1,0 +1,7 @@
+key	campaign_key	character_skill_key	faction_key	indent	tier	subculture	points_on_creation	required_num_parents	visible_in_ui
+#character_skill_nodes_tables;6;db/character_skill_nodes_tables/!!hefps_princess_scaled_star_dragon
+hefps_skill_node_hef_princess_mod_mount_5		hefps_skill_hef_princess_mod_mount_griffon		0	2		0	0	true
+hefps_skill_node_hef_princess_mod_mount_1		hefps_skill_hef_princess_mod_mount_elven_steed		0	0		0	0	true
+hefps_skill_node_hef_princess_mod_mount_2		hefps_skill_hef_princess_mod_mount_great_eagle		0	1		0	0	true
+hefps_skill_node_hef_princess_mod_mount_3		hefps_skill_hef_princess_mod_mount_moon_dragon		0	3		0	0	true
+hefps_skill_node_hef_princess_mod_mount_4		hefps_skill_hef_princess_mod_mount_star_dragon		0	4		0	0	true

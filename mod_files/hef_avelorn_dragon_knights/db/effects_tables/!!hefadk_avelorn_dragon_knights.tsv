@@ -1,0 +1,3 @@
+effect	icon	priority	icon_negative	category	is_positive_value_good
+#effects_tables;0;db/effects_tables/!!hefadk_avelorn_dragon_knights					
+hefadk_effect_force_upkeep_avelorn_dragon_knights	military_spending.png	100	military_spending.png	campaign	false

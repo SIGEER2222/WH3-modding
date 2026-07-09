@@ -1,0 +1,7 @@
+base_unit	mounted_unit	icon_name
+#units_custom_battle_mounts_tables;1;db/units_custom_battle_mounts_tables/!!hefps_princess_scaled_star_dragon
+hefps_hef_cha_princess_mod_0	hefps_hef_cha_princess_mod_6	ui/campaign ui/mounts/mount_hef_griffon.png
+hefps_hef_cha_princess_mod_0	hefps_hef_cha_princess_mod_1	ui/campaign ui/mounts/mount_barded_ithilmar_steed.png
+hefps_hef_cha_princess_mod_0	hefps_hef_cha_princess_mod_3	ui/campaign ui/mounts/mount_great_eagle.png
+hefps_hef_cha_princess_mod_0	hefps_hef_cha_princess_mod_4	ui/campaign ui/mounts/mount_moon_dragon.png
+hefps_hef_cha_princess_mod_0	hefps_hef_cha_princess_mod_5	ui/campaign ui/mounts/mount_star_dragon.png

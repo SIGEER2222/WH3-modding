@@ -1,0 +1,3 @@
+key	generate	localised_description	localised_title	ui_image	prioritized	event_category	sound_popup_override	sound_click_override	override_icon	is_large_dilemma
+#dilemmas_tables;3;db/dilemmas_tables/!!hefadk_alarielle_opening_dilemma										
+hefadk_alarielle_opening_dragon_knights	false	At the opening of the campaign, Avelorn's dragon riders gather beneath the boughs of the Gaen Vale. The Everqueen may claim the funds reserved for their mustering, or call the warriors directly to her banner.	The Dragon Knights of Avelorn	dragon_taming	false	Event	UI_CAM_EVENT_Dilemma			false

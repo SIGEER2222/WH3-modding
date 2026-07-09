@@ -1,0 +1,14 @@
+# Hidden tool/config directories.
+.*/
+
+# User-maintained art source assets.
+assets/
+
+# Read-only reference data and local tools.
+bilingual/
+gamedata/
+rpfm*/
+
+# Generated packaging and release outputs.
+mod_output/
+workshop_release/

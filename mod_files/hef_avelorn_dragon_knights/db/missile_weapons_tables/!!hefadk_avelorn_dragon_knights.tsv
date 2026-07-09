@@ -1,0 +1,4 @@
+key	precursor	default_projectile	audio_type	use_secondary_ammo_pool
+#missile_weapons_tables;11;db/missile_weapons_tables/!!hefadk_avelorn_dragon_knights				
+hefadk_hef_longbow_arrow_avelorn_dragon_knights	false	hefadk_hef_longbow_arrow_avelorn_dragon_knights	bow	false
+hefadk_hef_longbow_arrow_eden_valley_dragon_knights	false	hefadk_hef_longbow_arrow_eden_valley_dragon_knights	bow	false

@@ -1,0 +1,4 @@
+key	use_unit_exp_level_range	min_unit_exp_level_inclusive	max_unit_exp_level_inclusive	special_category
+#unit_sets_tables;2;db/unit_sets_tables/!!hefadk_avelorn_dragon_knights				
+hefadk_hef_cav_eden_valley_dragon_knights_ror	false	-1	-1	
+hefadk_unit_set_avelorn_dragon_knights_upkeep	false	-1	-1	
