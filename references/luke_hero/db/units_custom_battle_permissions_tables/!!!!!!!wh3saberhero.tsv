@@ -1,0 +1,26 @@
+﻿faction	general_unit	unit	siege_unit_attacker	siege_unit_defender	general_portrait	general_uniform	set_piece_character	campaign_exclusive	armory_item_set	supports_upgrades
+#units_custom_battle_permissions_tables;11;db/units_custom_battle_permissions_tables/!!!!!!!wh3saberhero										
+wh3_main_cth_cathay_mp	false	saber	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh3_main_cth_cathay_mp	false	saber_1	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh3_main_ksl_kislev	false	saber	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh3_main_ksl_kislev	false	saber_1	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_emp_empire	false	saber	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_emp_empire	false	saber_1	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_dwf_dwarfs	false	saber	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_dwf_dwarfs	false	saber_1	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh2_main_hef_high_elves	false	saber	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh2_main_hef_high_elves	false	saber_1	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_brt_bretonnia	false	saber	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_brt_bretonnia	false	saber_1	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh3_main_cth_cathay_mp	true	saber_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh3_main_cth_cathay_mp	true	saber_1_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh3_main_ksl_kislev	true	saber_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh3_main_ksl_kislev	true	saber_1_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_emp_empire	true	saber_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_emp_empire	true	saber_1_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_dwf_dwarfs	true	saber_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_dwf_dwarfs	true	saber_1_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh2_main_hef_high_elves	true	saber_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh2_main_hef_high_elves	true	saber_1_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_brt_bretonnia	true	saber_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false
+wh_main_brt_bretonnia	true	saber_1_lord	true	true	ui/portraits/portholes/wh_main_brt_bretonnia/saber.png		saber	false		false

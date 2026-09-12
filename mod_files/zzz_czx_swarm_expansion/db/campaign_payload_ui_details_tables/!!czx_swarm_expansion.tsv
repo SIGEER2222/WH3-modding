@@ -1,0 +1,4 @@
+component	icon	state	sort_order
+#campaign_payload_ui_details_tables;2;db/campaign_payload_ui_details_tables/!!czx_swarm_expansion
+dummy_dilemma_czx_kerrigan_1	ui/campaign ui/effect_bundles/agent.png	positive	0
+dummy_dilemma_czx_kerrigan_2	ui/campaign ui/effect_bundles/agent.png	positive	0

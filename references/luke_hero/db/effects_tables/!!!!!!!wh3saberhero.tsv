@@ -1,0 +1,20 @@
+﻿effect	icon	priority	icon_negative	category	is_positive_value_good
+#effects_tables;3;db/effects_tables/!!!!!!!wh3saberhero					
+saber01_fengwang	general_ability.png	600	general_ability.png	battle	true
+saber02_fennu	general_ability.png	600	general_ability.png	battle	true
+saber03_chuixi	general_ability.png	600	general_ability.png	battle	true
+saber04_galiban	general_ability.png	600	general_ability.png	battle	true
+saber05_pihu	general_ability.png	600	general_ability.png	battle	true
+saber06_zhuaohuan	general_ability.png	600	general_ability.png	battle	true
+saber07_awalong	general_ability.png	600	general_ability.png	battle	true
+saber_zuoqi	mount.png	50	mount.png	both	true
+saber_kongbai	general_ability.png	1	general_ability.png	campaign	true
+saber02_enable_fennu	general_ability.png	600	general_ability.png	battle	true
+saber_qizhi	general_ability.png	600	general_ability.png	battle	true
+saber_knights	military_spending.png	1	military_spending.png	campaign	false
+saber08_shengqiang	general_ability.png	600	general_ability.png	battle	true
+saber09_huwei	general_ability.png	600	general_ability.png	battle	true
+saber_hero_name		0		campaign	true
+saber_hero_name2		0		campaign	true
+saber_hero_name3		0		campaign	true
+saber_hero_name4		0		campaign	true

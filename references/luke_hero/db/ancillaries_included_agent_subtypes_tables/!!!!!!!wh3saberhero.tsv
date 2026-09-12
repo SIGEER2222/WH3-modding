@@ -1,0 +1,10 @@
+﻿agent_subtype	ancillary
+#ancillaries_included_agent_subtypes_tables;0;db/ancillaries_included_agent_subtypes_tables/!!!!!!!wh3saberhero	
+saber	saber_galiban
+saber	saber_wangguan
+saber	saber_hujia
+saber	saber_zuoqi
+saber_lord	saber_galiban
+saber_lord	saber_wangguan
+saber_lord	saber_hujia
+saber_lord	saber_zuoqi

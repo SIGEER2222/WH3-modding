@@ -1,0 +1,6 @@
+unit	military_group
+#units_to_groupings_military_permissions_tables;0;db/units_to_groupings_military_permissions_tables/!!czx_swarm_expansion
+czx_feilong	wh_main_group_empire
+czx_feilong	wh_main_group_empire_reikland
+czx_zhanglang	wh_main_group_empire
+czx_zhanglang	wh_main_group_empire_reikland

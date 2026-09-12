@@ -1,0 +1,12 @@
+﻿effect	bonus_value_id	unit_ability
+#effect_bonus_value_unit_ability_junctions_tables;0;db/effect_bonus_value_unit_ability_junctions_tables/!!!!!!!wh3saberhero		
+saber01_fengwang	enable	saber01_fengwang
+saber02_fennu	enable	saber02_fennu
+saber03_chuixi	enable	saber03_chuixi
+saber04_galiban	enable	saber04_galiban
+saber05_pihu	enable	saber05_pihu
+saber06_zhuaohuan	enable	saber06_zhuaohuan
+saber07_awalong	enable	saber07_awalong
+saber02_enable_fennu	enable	saber02_fennu
+saber_qizhi	uses_mod	saber06_zhuaohuan
+saber08_shengqiang	enable	saber08_shengqiang

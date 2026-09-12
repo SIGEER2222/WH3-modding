@@ -1,0 +1,30 @@
+﻿image_path	key	localised_description	localised_name	unlocked_at_rank	is_background_skill	is_female_only_background_skill	is_male_only_background_skill	background_weighting	influence_cost
+#character_skills_tables;5;db/character_skills_tables/!!!!!!!wh3saber_hero									
+trait_human.png	saber_qishiwang			1	true	true	false	99999.0	0
+character_morale.png	saber_wangguan			1	false	false	false	0.0	0
+item_armour.png	saber_hujia			1	false	false	false	0.0	0
+item_weapon.png	saber_galiban			1	false	false	false	0.0	0
+item_talisman.png	saber_awalong			1	false	false	false	0.0	0
+item_enchanted_item.png	saber05_pihu			1	false	false	false	0.0	0
+wh_main_spell_heavens_wind_blast.png	saber03_chuixi			1	false	false	false	0.0	0
+mount_barded_warhorse.png	saber_zuoqi			1	false	false	false	0.0	0
+character_general_ability.png	saber_shixinwang			1	false	false	false	0.0	0
+character_magic.png	saber_duimozhe			1	false	false	false	0.0	0
+character_ward_save.png	saber_zhigan			1	false	false	false	0.0	0
+character_bonus_vs_infantry.png	saber_moli			1	false	false	false	0.0	0
+character_damage.png	saber_rongyao			1	false	false	false	0.0	0
+character_military_spending.png	saber_lingxiu			1	false	false	false	0.0	0
+character_general_ability.png	saber_kongbai			1	false	false	false	0.0	0
+wh2_dlc10_lord_abilities_mislead.png	saber01_fengwang			1	false	false	false	0.0	0
+character_army.png	saber_qizhi			1	false	false	false	0.0	0
+wh_main_spell_light_phas_protection.png	saber06_zhuaohuan			1	false	false	false	0.0	0
+battle_armour.png	saber_lord_hujia			1	false	false	false	0.0	0
+battle_magic.png	saber_lord_mokang			1	false	false	false	0.0	0
+battle_damage.png	saber_lord_weili			1	false	false	false	0.0	0
+battle_ward_save.png	saber_lord_tebao			1	false	false	false	0.0	0
+campaign_military_spending.png	saber_maoyi			1	false	false	false	0.0	0
+campaign_experience.png	saber_lord_xinmudenji			1	false	false	false	0.0	0
+campaign_military_spending.png	saber_lord_zhaomufei			1	false	false	false	0.0	0
+campaign_replenishment.png	saber_lord_buyuan			1	false	false	false	0.0	0
+campaign_army.png	saber_lord_quanjvzhaomu			1	false	false	false	0.0	0
+item_weapon.png	saber08_shengqiang			1	false	false	false	0.0	0

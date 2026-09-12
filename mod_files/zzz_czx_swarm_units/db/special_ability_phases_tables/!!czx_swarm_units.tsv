@@ -1,0 +1,7 @@
+﻿duration	effect_type	id	requested_stance	cant_move	freeze_fatigue	fatigue_change_ratio	inspiration_aura_range_mod	ability_recharge_change	hp_change_frequency	damage_amount	max_damaged_entities	resurrect	mana_regen_mod	mana_max_depletion_mod	imbue_magical	imbue_ignition	imbue_contact	phase_display	phase_audio	is_hidden_in_ui	affects_allies	affects_enemies	replenish_ammo	composite_scene_group	spreading	freeze_recharge	heal_amount	barrier_heal_amount	remove_magical	execute_ratio
+#special_ability_phases_tables;44;db/special_ability_phases_tables/!!czx_swarm_units
+-1.0	positive	czx_ability_mutalisk_regeneration		false	false	0.0	0.0	0.0	1.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0010000000474974513	0.0	false	0.0
+-1.0	positive	czx_ability_roach_regenerative_tissue		false	false	0.0	0.0	0.0	1.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0010000000474974513	0.0	false	0.0
+-1.0	positive	czx_ability_zergling_adrenal_glands		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_ultralisk_frenzied		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_kerrigan_psionic_presence		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0

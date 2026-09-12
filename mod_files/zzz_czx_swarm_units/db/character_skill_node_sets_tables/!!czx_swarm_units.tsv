@@ -1,0 +1,4 @@
+﻿agent_key	campaign_key	faction_key	key	subculture	for_army	for_navy	agent_subtype_key
+#character_skill_node_sets_tables;2;db/character_skill_node_sets_tables/!!czx_swarm_units
+wizard			czx_skill_node_set_kerrigan		false	false	czx_kerrigan
+general			czx_skill_node_set_kerrigan_lord		false	false	czx_kerrigan_lord

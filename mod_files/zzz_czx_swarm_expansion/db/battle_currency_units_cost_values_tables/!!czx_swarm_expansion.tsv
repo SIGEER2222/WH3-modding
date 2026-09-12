@@ -1,0 +1,6 @@
+cost_value	currency_type	item_type
+#battle_currency_units_cost_values_tables;0;db/battle_currency_units_cost_values_tables/!!czx_swarm_expansion
+425.0	supplies_currency	czx_feilong
+1000.0	supplies_currency	czx_zhanglang
+300.0	supplies_currency	czx_kerrigan
+300.0	supplies_currency	czx_kerrigan_lord

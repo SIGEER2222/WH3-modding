@@ -1,0 +1,12 @@
+﻿attribute	attribute_group
+#unit_attributes_to_groups_junctions_tables;2;db/unit_attributes_to_groups_junctions_tables/!!czx_swarm_units
+flying	czx_zerg_fly
+causes_fear	czx_zerg_fly
+guerrilla_deploy	czx_zerg_fly
+immune_to_psychology	czx_zerg_fly
+causes_fear	czx_zerg_beast
+causes_terror	czx_zerg_beast
+hide_forest	czx_zerg_beast
+guerrilla_deploy	czx_zerg_beast
+immune_to_psychology	czx_zerg_beast
+wallbreaker	czx_zerg_beast

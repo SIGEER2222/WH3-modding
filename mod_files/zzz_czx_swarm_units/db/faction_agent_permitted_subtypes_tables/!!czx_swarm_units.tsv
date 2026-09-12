@@ -1,0 +1,12 @@
+﻿agent	faction	subtype	mod_disabled
+#faction_agent_permitted_subtypes_tables;1;db/faction_agent_permitted_subtypes_tables/!!czx_swarm_units
+wizard	wh_main_emp_empire	czx_kerrigan	false
+wizard	wh2_dlc13_emp_golden_order	czx_kerrigan	false
+wizard	wh2_dlc13_emp_the_huntmarshals_expedition	czx_kerrigan	false
+wizard	wh3_main_emp_cult_of_sigmar	czx_kerrigan	false
+wizard	wh3_dlc27_emp_empire_dm	czx_kerrigan	false
+general	wh_main_emp_empire	czx_kerrigan_lord	false
+general	wh2_dlc13_emp_golden_order	czx_kerrigan_lord	false
+general	wh2_dlc13_emp_the_huntmarshals_expedition	czx_kerrigan_lord	false
+general	wh3_main_emp_cult_of_sigmar	czx_kerrigan_lord	false
+general	wh3_dlc27_emp_empire_dm	czx_kerrigan_lord	false

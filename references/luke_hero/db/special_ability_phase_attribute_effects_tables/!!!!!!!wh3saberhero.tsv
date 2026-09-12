@@ -1,0 +1,6 @@
+﻿attribute	phase	attribute_type
+#special_ability_phase_attribute_effects_tables;1;db/special_ability_phase_attribute_effects_tables/!!!!!!!wh3saberhero		
+unbreakable	saber05_pihu01	positive
+fatigue_immune	saber05_pihu01	positive
+cannot_die	saber07_awalong01	positive
+cannot_die	saber05_pihu01	positive

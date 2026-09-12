@@ -1,0 +1,25 @@
+{mod_psw_dynamic_ex_limit	"PSW动态唯一天赋上限系统
+为魔女の祈祷模组添加动态唯一天赋上限功能，参考和泉纪愛三星卡效果。"}
+{mod_psw_dynamic_ex_limit_desc	"作者：Devin AI
+功能特性：
+- 动态增加EX天赋上限，每次+1
+- 可堆叠效果，支持多次增加
+- 集成重新抽取功能
+- 自动数据管理和初始化
+
+主要函数：
+- psw_add_ex_limit_jiefang(faction_name): 增加EX天赋上限
+- psw_enable_repick(faction_name): 启用重新抽取
+- psw_can_repick(faction_name): 检查是否可重新抽取
+- psw_get_ex_limit_count(faction_name): 获取当前上限增加数量
+
+使用方法：
+1. 将Lua脚本放入script\campaign\mod\目录
+2. 将本地化文件放入text\目录
+3. 使用第三方工具（如RPFM）打包为.pack文件
+4. 使用zzz_前缀确保最后加载
+
+技术说明：
+- 使用effect bundle系统实现可堆叠效果
+- 自动初始化玩家数据结构
+- 支持回合限制防止滥用"}

@@ -1,0 +1,9 @@
+﻿campaign_key	faction_key	image_path	level	skill_key	subculture_key	unlocked_at_rank
+#character_skill_level_details_tables;1;db/character_skill_level_details_tables/!!!!!!!wh3saberhero						
+		x	1	saber_wangguan		5
+		x	1	saber_hujia		9
+		x	1	saber_galiban		14
+		x	1	saber_awalong		19
+		x	1	saber_zuoqi		4
+		x	1	saber_maoyi		11
+		x	1	saber08_shengqiang		23

@@ -1,0 +1,4 @@
+choice_key	dilemma_key	id	payload_key	value	target_key
+#cdir_events_dilemma_payloads_tables;0;db/cdir_events_dilemma_payloads_tables/!!czx_swarm_expansion
+FIRST	dilemma_czx_kerrigan	789900021	TEXT_DISPLAY	LOOKUP[dummy_dilemma_czx_kerrigan_1]	default
+SECOND	dilemma_czx_kerrigan	789900022	TEXT_DISPLAY	LOOKUP[dummy_dilemma_czx_kerrigan_2]	default

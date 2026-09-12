@@ -1,0 +1,14 @@
+﻿invalid_usage_flag	special_ability
+#special_ability_to_invalid_usage_flags_tables;0;db/special_ability_to_invalid_usage_flags_tables/!!!!!!!wh3saberhero	
+climbing	saber02_fennu
+climbing	saber03_chuixi
+climbing	saber04_galiban
+climbing	saber06_zhuaohuan
+climbing	saber05_pihu
+manning_equipment	saber02_fennu
+manning_equipment	saber03_chuixi
+manning_equipment	saber04_galiban
+manning_equipment	saber06_zhuaohuan
+manning_equipment	saber05_pihu
+climbing	saber08_shengqiang
+manning_equipment	saber08_shengqiang

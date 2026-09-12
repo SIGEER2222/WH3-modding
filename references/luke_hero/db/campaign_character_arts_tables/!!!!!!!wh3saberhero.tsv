@@ -1,0 +1,4 @@
+﻿art_set_id	level	age	portrait	season	uniform	card	info	sea_uniform	navy_uniform	land_animation	sea_animation	navy_animation	id	land_animation_vfx_filter	sea_animation_vfx_filter	navy_animation_vfx_filter
+#campaign_character_arts_tables;0;db/campaign_character_arts_tables/!!!!!!!wh3saberhero																
+saber	0	0		none	saber			wh_main_campaign_brt_ship_heavy	wh_main_campaign_brt_ship_heavy	cam_hu1d_saber_walk	cam_heavy_ship_01	cam_heavy_ship_01	1145998	0	0	0
+saber_lord	0	0		none	saber			wh_main_campaign_brt_ship_heavy	wh_main_campaign_brt_ship_heavy	cam_hu1d_saber_walk	cam_heavy_ship_01	cam_heavy_ship_01	2214998	0	0	0

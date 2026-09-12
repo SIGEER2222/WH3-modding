@@ -1,0 +1,9 @@
+campaign_key	character_skill_key	faction_key	indent	key	tier	subculture	points_on_creation	required_num_parents	visible_in_ui
+#character_skill_nodes_tables;6;db/character_skill_nodes_tables/!!czx_swarm_expansion
+	czx_kerrigan_psionic_lash		2	czx_skill_node_kerrigan_psionic_lash	0		0	0	true
+	czx_kerrigan_psionic_storm		2	czx_skill_node_kerrigan_psionic_storm	1		0	0	true
+	czx_kerrigan_assimilation		2	czx_skill_node_kerrigan_assimilation	2		0	0	true
+	czx_kerrigan_blades		2	czx_skill_node_kerrigan_blades	3		0	0	true
+	czx_kerrigan_evolution_i		2	czx_skill_node_kerrigan_evolution_i	4		0	0	true
+	czx_kerrigan_evolution_ii		2	czx_skill_node_kerrigan_evolution_ii	5		1	0	true
+	czx_kerrigan_evolution_iii		2	czx_skill_node_kerrigan_evolution_iii	6		1	0	true

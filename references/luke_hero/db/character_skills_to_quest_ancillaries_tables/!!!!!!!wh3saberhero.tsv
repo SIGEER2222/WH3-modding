@@ -1,0 +1,7 @@
+﻿ancillary	skill	use_quest_for_prefix
+#character_skills_to_quest_ancillaries_tables;1;db/character_skills_to_quest_ancillaries_tables/!!!!!!!wh3saberhero		
+saber_wangguan	saber_wangguan	false
+saber_hujia	saber_hujia	false
+saber_galiban	saber_galiban	false
+saber_awalong	saber_awalong	false
+saber_shengqiang	saber08_shengqiang	true

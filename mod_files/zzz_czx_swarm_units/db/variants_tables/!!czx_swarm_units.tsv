@@ -1,0 +1,6 @@
+﻿variant_name	tech_folder	variant_filename	low_poly_filename	mount_scale	scale	scale_variation	super_low_poly_filename
+#variants_tables;6;db/variants_tables/!!czx_swarm_units
+czx_feilong		czx_feilong		1.0	0.5	0.05	
+czx_zhanglang		czx_zhanglang		1.0	1.0	0.0	
+czx_kerrigan		czx_kerrigan		1.0	1.15	0.05	
+czx_kerrigan_lord		czx_kerrigan		1.0	1.15	0.05	

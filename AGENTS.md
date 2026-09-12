@@ -12,7 +12,8 @@
 - `mod_files/`：MOD 打包前的可维护源文件目录。
 - `mod_output/`：打包后的 `.pack` 等输出产物；不纳入版本管理。
 - `workshop_release/`：Steam Workshop 发布用文件；文本描述默认使用 Steam BBCode。
-- `bilingual/`、`gamedata/` 与 `rpfm-v5.0.5-x86_64-pc-windows-msvc/`：只读参考资料或本地工具，默认不修改。
+- `bilingual/`、`gamedata/` 与 `rpfm-v5.0.6-x86_64-pc-windows-msvc/`：只读参考资料或本地工具，默认不修改。
+- `scratch/`：临时/实验性文件目录，默认被 `.gitignore` 忽略。一次性脚本、调试输出、截图、中间导出、`_bak`、`db_binary` 等备份/生成产物应放在这里；需要长期保留的再移入 `tools/` 或对应 MOD 源目录。
 
 ## 必读上下文
 
@@ -27,9 +28,11 @@
 
 ## 默认不要改动
 
-- 不要修改、格式化或清理 `rpfm-v5.0.5-x86_64-pc-windows-msvc/`，除非用户明确要求更新 RPFM 工具。
+- 不要修改、格式化或清理 `rpfm-v5.0.6-x86_64-pc-windows-msvc/`，除非用户明确要求更新 RPFM 工具。
 - 不要把 RPFM 的 `.dll`、`.exe`、Qt 插件或资源文件当作项目代码分析对象。
 - 不要把一次性测试 Pack、游戏日志、大型原版导出文件默认写入指南规则。
+- 启动游戏必须使用 `E:\Code\wyccc-warhammer-mod-manager`（Mod Manager），禁止直接使用 Steam 链接或绕过 Mod Manager 启动；默认加载最近战役存档直接继续游戏。
+- 能自动完成的操作不要要求用户手动执行；只有 Codex 确实无法完成的步骤才允许列出，并说明具体原因和需要用户做什么。
 
 ## MOD 开发规则
 

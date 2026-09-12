@@ -9,5 +9,8 @@
 *.lua text eol=lf
 
 *.png binary
+*.svg binary
 *.csc binary
 *.pack binary
+*.bin binary
+*.exe binary

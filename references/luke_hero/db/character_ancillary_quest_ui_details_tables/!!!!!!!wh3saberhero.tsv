@@ -1,0 +1,12 @@
+﻿agent_subtype	ancillary	rank	instant	is_quest_battle
+#character_ancillary_quest_ui_details_tables;2;db/character_ancillary_quest_ui_details_tables/!!!!!!!wh3saberhero				
+saber	saber_wangguan	5	false	true
+saber	saber_hujia	9	false	true
+saber	saber_galiban	14	false	true
+saber	saber_awalong	19	false	true
+saber	saber_shengqiang	23	false	true
+saber_lord	saber_wangguan	5	false	true
+saber_lord	saber_hujia	9	false	true
+saber_lord	saber_galiban	14	false	true
+saber_lord	saber_awalong	19	false	true
+saber_lord	saber_shengqiang	23	false	true

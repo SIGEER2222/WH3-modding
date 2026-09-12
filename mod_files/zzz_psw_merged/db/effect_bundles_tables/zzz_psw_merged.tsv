@@ -1,0 +1,22 @@
+key	localised_description	localised_title	bundle_target	priority	ui_icon	is_global_effect	show_in_3d_space	owner_only
+#effect_bundles_tables;4;db/effect_bundles_tables/zzz_psw_merged
+set_ex_shangxian_1			faction	1		true	false	true
+set_ex_shangxian_2			faction	1		true	false	true
+set_ex_shangxian_3			faction	1		true	false	true
+set_ex_shangxian_4			faction	1		true	false	true
+set_ex_shangxian_5			faction	1		true	false	true
+set_ex_shangxian_6			faction	1		true	false	true
+set_ex_shangxian_7			faction	1		true	false	true
+set_ex_shangxian_8			faction	1		true	false	true
+set_ex_shangxian_9			faction	1		true	false	true
+set_ex_shangxian_10			faction	1		true	false	true
+set_ex_shangxian_11			faction	1		true	false	true
+set_ex_shangxian_12			faction	1		true	false	true
+set_ex_shangxian_13			faction	1		true	false	true
+set_ex_shangxian_14			faction	1		true	false	true
+set_ex_shangxian_15			faction	1		true	false	true
+set_ex_shangxian_16			faction	1		true	false	true
+set_ex_shangxian_17			faction	1		true	false	true
+set_ex_shangxian_18			faction	1		true	false	true
+set_ex_shangxian_19			faction	1		true	false	true
+set_ex_shangxian_20			faction	1		true	false	true

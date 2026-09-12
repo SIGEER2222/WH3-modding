@@ -1,0 +1,6 @@
+﻿faction	primary_colour_b	primary_colour_g	primary_colour_r	secondary_colour_b	secondary_colour_g	secondary_colour_r	soldier_type	tertiary_colour_b	tertiary_colour_g	tertiary_colour_r	key	unit_variant	subculture
+#unit_variants_colours_tables;3;db/unit_variants_colours_tables/!!!!!!!wh3saberhero													
+	129	92	31	129	92	31	soldier	255	255	255	1236589	saber	
+	129	92	31	129	92	31	soldier	255	255	255	13231686	saber_1	
+	129	92	31	129	92	31	soldier	255	255	255	1226589	saber_lord	
+	129	92	31	129	92	31	soldier	255	255	255	13233686	saber_1_lord	

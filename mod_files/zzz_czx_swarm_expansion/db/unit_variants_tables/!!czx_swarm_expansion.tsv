@@ -1,0 +1,6 @@
+faction	name	unit	variant	unit_card
+#unit_variants_tables;5;db/unit_variants_tables/!!czx_swarm_expansion
+	czx_feilong	czx_feilong	czx_feilong	czx_feilong
+	czx_zhanglang	czx_zhanglang	czx_zhanglang	czx_zhanglang
+	czx_kerrigan	czx_kerrigan	czx_kerrigan	czx_kerrigan
+	czx_kerrigan_lord	czx_kerrigan_lord	czx_kerrigan_lord	czx_kerrigan_lord

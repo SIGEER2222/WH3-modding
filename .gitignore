@@ -6,6 +6,24 @@ bilingual/
 gamedata/
 rpfm*/
 
+# Local junction/symlink to the wyccc mod manager repo.
+wyccc-warhammer-mod-manager/
+
 # Generated packaging and release outputs.
 mod_output/
 workshop_release/
+
+# Temporary / experimental scratch space.
+# Put one-off scripts, dumps, screenshots, and unrelated local changes here.
+# Files in this directory are intentionally not tracked.
+scratch/
+__pycache__/
+*.pack.bak
+
+# Tools-only output / downloaded / binary / test directories.
+tools/_out/
+tools/_dl/
+tools/qtrme/
+tools/_wh3mm_test_profile/
+*.glb
+_work_kerrigan/**

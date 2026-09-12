@@ -1,0 +1,5 @@
+﻿phase	value	stat	how
+#special_ability_phase_stat_effects_tables;3;db/special_ability_phase_stat_effects_tables/!!!!!!!wh3saberhero			
+saber05_pihu01	80.0	stat_resistance_all	add
+saber01_fengwang	1.350000023841858	stat_melee_attack	mult
+saber01_fengwang	1.350000023841858	stat_melee_damage_base	mult

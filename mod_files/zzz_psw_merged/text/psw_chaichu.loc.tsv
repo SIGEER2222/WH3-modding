@@ -1,0 +1,5 @@
+key	text	tooltip
+#psw_chaichu;0;text/psw_chaichu.loc
+advice_info_text_psw_chaichu_mode_on	拆除模式已开启：点击天赋槽位里要拆除的天赋建筑。	false
+advice_info_text_psw_chaichu_mode_off	拆除模式已关闭。	false
+advice_info_text_psw_chaichu_done	已拆除该天赋。	false
