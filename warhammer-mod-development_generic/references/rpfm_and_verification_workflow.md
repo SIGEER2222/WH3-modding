@@ -110,7 +110,15 @@ WH3 或 RPFM 更新后，不要只看 MOD 是否能被启动器加载。先把 R
 6. 依赖刷新后，优先用 RPFM diagnostics 判断 MOD 是否需要兼容：schema/version、type mismatch、invalid reference、missing file、missing loc、banned table、datacore 或 duplicated key 是否出现新增错误。
 7. 对 MOD 源 TSV，按表逐项和当前原版/RPFM 导出样例比对元数据行、列名、列数、列顺序和类型。表版本或列结构变了，就需要重导出模板并迁移旧数据；不要只改 metadata 版本号。
 8. 对引用原版 key 的行，重新查 donor 链路是否仍存在：单位、武器、projectile、effect、bundle、unit set、招募权限、UI 资源、Loc key、脚本 API。invalid reference 通常比启动器能加载更能说明兼容性问题。
-9. 若 RPFM diagnostics 清洁，仍需进游戏做最小回归：自定义单位是否可招募/可见、数值是否生效、头像/兵牌/模型是否正常、Lua 日志是否加载、关键 UI 文本是否显示。
+9. **实机不可见时先核对 MOD 是否真的启用**：pack 文件存在于游戏 `data/` 不等于游戏会读取它。检查 wh3mm/当前 preset 的 `mods` 列表中是否存在目标 pack，且 `isEnabled` 不是 `false`；同时确认目标 patch 在主 MOD 之后。启用状态变更后必须重启游戏再测试。
+10. 若 RPFM diagnostics 清洁，仍需进游戏做最小回归：自定义单位是否可招募/可见、数值是否生效、头像/兵牌/模型是否正常、Lua 日志是否加载、关键 UI 文本是否显示。
+
+### RPFM Server 5.0.6 WH3 dependencies 缓存实测 `[实测/需随版本复查]`
+
+- `SetGameSelected("warhammer_3", rebuild=true)` 在当前 RPFM 5.0.6 下只会读取 `data/manifest.txt` 中的 ~233 个松散文件，`asskit_tables` 为空，vanilla `.pack` 里的 DB 表不会被解压进 dependencies 缓存。
+- `LoadAllCAPackFiles` 能把所有 CA pack 作为独立的 `CA PackFiles` 打开，可查询/导出其中文件，但当前版本 diagnostics 的 reference 解析似乎仍不把它作为依赖参考表使用。
+- 因此本环境下大量 `NoReferenceTableNorColumnFoundNoPak` 不能简单当作真正的 invalid reference；应同时用本地 `gamedata/` 和 Python 交叉验证；若 Python 验证引用存在，则判定为 RPFM 缓存假阳性。
+- 真实 `InvalidReference`、`FieldWithPathNotFound`、`DuplicatedCombinedKeys`、`OutdatedTable` 等仍有参考价值，但需结合是否为预期覆盖、资源缺失或真实错误。
 10. 若只受数据数值平衡影响、无 schema/引用/Lua/UI 错误，可在 Workshop 文案中写“已在 `<游戏版本>` 复查”；若发现结构性变化，发布兼容补丁并记录需要的加载顺序和依赖。
 
 ### Startpos / 主菜单初始军队兵牌
@@ -127,6 +135,15 @@ WH3 或 RPFM 更新后，不要只看 MOD 是否能被启动器加载。先把 R
 3. RPFM Server 5.0 提供 `build_starpos_get_campaign_ids`、`build_starpos`、`build_starpos_post`、`build_starpos_cleanup` 等工具；本地实测构建前 pack 需要位于游戏 `data/` 目录，且 pack 中需要能让工具识别 campaign id 的战役表数据 `[实测/需随版本复查]`。
 4. 若 `build_starpos_post` 在最小探测包或未改动原版数据时也失败，不要把临时生成物当作有效 startpos；应转为检查 RPFM/BOB/Assembly Kit 配置、RPFM UI 报错或 BOB 日志。
 5. 能用 Lua 实现的开局微调不应默认升级为 startpos；只有“主菜单卡位必须同步显示”“新增可选传奇领主/派系”等 startpos-bound 目标才值得承担该风险。
+
+### 新建独立可玩派系的验证顺序
+
+1. 先决定范围：第一阶段优先新 faction key + 复用已有 culture/subculture；只有需要独立种族规则时才新增 culture/subculture。当前本地 WH3 快照中，`factions_tables` 通过 `subculture` 接入规则，`cultures_subcultures_tables` 再映射到 `culture`，不能把两个 key 域混写。
+2. 先用 donor 建立 DB 最小链：`factions_tables`、`faction_to_faction_groups_junctions_tables`、`start_pos_factions_tables`、`frontend_factions_tables`、`frontend_faction_groups_to_factions_tables`、`frontend_faction_campaign_type_junctions_tables`、`frontend_faction_leaders_tables`，再补同字段 Loc。每张表都从当前原版导出样例确认版本、列顺序和引用。
+3. 对目标战役分别核对 `start_pos_factions_tables` 记录、playable/is_major、AI personality/potential、起始资金与顺序，并用 Assembly Kit/RPFM 的当前 startpos 构建流程重新生成 `campaigns/<campaign>/startpos.esf`；仅改 `start_pos_factions` 或仅改 `frontend` 都不能使一个新 faction 真正可选 `[已查原版 DB / 已查外部 startpos 资料 / 需随版本复查]`。
+4. 如果是新领主，继续核对 `agent_subtypes`、`faction_agent_permitted_subtypes`、campaign art/uniform、技能树、`faction_starting_general_effects_tables` 和 startpos 角色；如果先复用原版领主，则把新 faction 是否能正确创建、显示和招募作为第一轮验收目标。
+5. 如果是新 culture/subculture，额外查 `culture_packs_tables`、`culture_pack_ids_tables`、建筑/招募/占领/科技/agent/feature forest 等所有 culture 外键，并检查 `gamedata/script/campaign/_narrative/wh3_narrative_shared_faction_data.lua` 的 culture-to-narrative 映射。新 culture 缺映射时，原版脚本会记录 warning；不要把 warning 当作可玩性已经完整 `[已查原版脚本]`。
+6. 每次只验证一层：先能进派系选择界面，再能开新战役，再核对起始地区/领主/军队/外交，最后才加入独立单位、建筑、科技和机制。若进游戏崩溃，优先回退最近一次 startpos 变更，并查看 BOB/RPFM 日志与最新 `script_log_*.txt`。
 
 ### Loc 文本
 
@@ -233,3 +250,11 @@ core:add_listener("name", "FactionTurnStart", condition_fn, true)
 7. 新增 API 必须标明验证状态。
 8. 当用户需求或错误反馈暴露出可复用规则缺失时，同步更新 `SKILL.md` 或对应 reference，并更新 `CHANGELOG.md`。
 9. 如果反馈来自 RPFM diagnostics、游戏日志或实测结果，记录错误形态、修正方法和验证状态，不直接写成 CA 官方通用规则。
+
+## 启动即崩实测案例（2026-09-12，WH3 当前版本）
+
+实测记录 `[实测/需随版本复查]`：
+
+1. `tools/build_pack.py` 曾把 version=0 的 DB 表头部 flag 字节写成 `0x00`；对照原版 `db.pack` 与 RPFM 产出的 Pack，该字节恒为 `0x01`（version>0 的表同样在分隔标记后写 `0x01`）。flag=0 的 v0 表会导致游戏启动数秒内崩溃，且表现为"包内多张互不相干的小表分别都崩"的假象。修复后所有 v0 表正常加载。
+2. `units_to_groupings_military_permissions_tables` 中把 `czx_kerrigan` / `czx_kerrigan_lord`（agent 英雄/领主单位，`land_units.class=com`）加进全部军事编组会导致启动崩溃；原版该表只放行普通部队与 cha_ 系战斗单位行。只保留 5 个普通虫族兵种（移除这两个 agent 单位行）后整包通过。
+3. 二分定位方法：`tools/` 下按子集重打测试 Pack（PFH5），经 Mod Manager 最小 playset（仅依赖 Pack + 测试 Pack）启动，观察 `%APPDATA%\The Creative Assembly\Warhammer3\crash_report` 是否新增 .mdmp；存活约 60 秒视为通过。单表隔离测试可能因悬空外键产生假阳性，优先用"全包减一组"（leave-one-out）判定真凶。

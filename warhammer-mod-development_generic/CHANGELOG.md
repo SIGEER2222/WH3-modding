@@ -1,6 +1,68 @@
 # 修订说明
 
-本版根据原始 `SKILL.md` 与 5 个 reference 的冲突点、RPFM/WH3 Lua 文档、TW Modding 教程核对后整理。
+## 2026-09-12 实测反馈：v0 表 flag 字节错误与 agent 单位误入军事编组导致启动崩溃
+
+1. `tools/build_pack.py` 对 version=0 的 DB 表曾写 `struct.pack("<B", version)`（即 `0x00`）作为 flag 字节；经与原版 `db.pack`、Workshop `Imperial Arbiter.pack`、`!!ia_all_factions.pack` 逐字节对照，该字节恒为 `0x01`（version>0 的表在 `FCFDFEFF` 版本标记后同样写 `0x01`）。flag=0 的 v0 表使游戏启动数秒内崩溃，症状是包内多张互不相干的小表单独测试都会崩。已修正为恒写 `0x01` `[实测/需随版本复查]`。
+2. `units_to_groupings_military_permissions_tables` 中 `czx_kerrigan` / `czx_kerrigan_lord`（agent 英雄/领主单位）行已移除——agent 单位不属于军事编组语义；是否真为崩因受当时测试预言机（进程存活≠通过，见第 3 条）污染，按可疑值移除处理 `[需随版本复查]`。
+3. TSV 行与表头列数不一致会产生"invalid database record"启动报错：`projectiles_tables` 的 `czx_mutalisk_glaive` 行多一个 Tab（`placeholder` 掉出 `projectile_shot_type_display` 必填列），`unit_special_abilities_tables` 的 `czx_ability_kerrigan_psionic_presence` 行少一列。游戏此时在 `crash_report/bad_mods_report.txt` 写出 `first_invalid_database_record/table/packfile`——**判断 DB 校验是否通过应看该文件是否出现，而不是看进程是否存活**（报错对话框不退出进程）。生成/手改 TSV 后应全量扫描"每行列数==表头列数" `[实测/需随版本复查]`。
+4. 二分定位法记录：`zzz_test_bisect.pack` 按子集重打 PFH5，Mod Manager 最小 playset（Imperial Arbiter + 测试包）启动，观察 `crash_report` 新 .mdmp，存活约 60 秒视为通过；单表隔离会因悬空外键出现假阳性，"全包减一组" 更可靠。详细说明见 `references/rpfm_and_verification_workflow.md`。
+5. 新 MOD `zzz_czx_swarm_units`（源目录 `mod_files/zzz_czx_swarm_units`）替代 `zzz_czx_swarm_expansion`：5 个虫族兵种挂到全派系主要招兵建筑（解锁≥4单位的通用军事建筑链，剔除 special/rogue/outpost 等），7 个 key 进自定义战斗权限表；凯瑞甘保留原版帝国派系第 2 回合 dilemma（cdir 自动触发，Lua 只做选择处理，已修正 `context:faction()` 取实际选择派系）。
+
+## 2026-09-10 实测反馈：旧存档缺少 player_data 字段导致 nil 数值比较崩溃，以及主 MOD 同名脚本覆盖问题
+
+1. `psw_main_data.player_data[faction_name]` 在旧存档里可能缺少 `fia_main_js`、`swyh_install_jishu` 等后来新增字段，监听器/回调里任何 `local x = psw_main_data.player_data[f].x` 或 `psw_main_data.player_data[f].x + 1` 都会报 `attempt to compare/perform arithmetic on nil` `[实测/需随版本复查]`。
+2. 修复方式：在脚本顶部维护 `psw_main_default_player_data` 完整默认值表，并加 `psw_ensure_player_data(faction_name)`，在 UITrigger 按钮回调、DilemmaChoiceMadeEvent 监听器、`psw_main_pickup` 等所有读取 `player_data` 的入口统一调用；字段值缺失时回填默认值，不再逐个加 `or 0`。
+3. 补丁 pack 实测结论：`zzz_`/`!!!!`/`!!!` 前缀或 `used_mods.txt` 排序均无法保证覆盖主 MOD 同名脚本（`!!Prayer_of_star_witch.pack` 的 `psw_天赋.lua` 一直胜出）。对这类必须修复主 MOD 内脚本的场景，可靠方案是把修正后的脚本直接打进主 MOD pack，同时保留 `.pack.orig_pswfix` 备份 `[实测/需随版本复查]`。
+4. 新增 `!psw_crash_guard.lua`（v7）在加载时抹除会导致原生崩溃的坏派系；`!` 前缀脚本确实会加载，但不能解决同路径脚本覆盖优先级问题。
+
+## 2026-09-09 实测反馈：Dilemma 选择分支未处理导致抽奖分支被默认物品抽奖覆盖
+
+1. PSW 合并补丁中 25 回合后 `dilemma_tf_25hh_tf_zb_xz` 仅处理 `SECOND`（祈愿装备/物品），`FIRST`（祈愿天赋）未处理；`DilemmaChoiceMadeEvent` 中未处理分支不报错，直接透传到后续默认分支。
+2. 后续抽奖 `if/elseif` 链中“唯一物品抽奖”条件写为 `(nor_count > 4 and turn_number >= 20) or (set_25hh_qy_zb 存在)`，无条件分支在 20 回合后、玩家正常天赋数 > 4 时恒成立，导致选择天赋仍进入物品抽奖。
+3. 修复：将物品抽奖条件改为仅依赖 `set_25hh_qy_zb` 标记；`FIRST` 分支显式移除 `set_25hh_qy_zb` 并交予后续 `psw_main_pickup` 处理天赋抽取。详细规则补充到 `references/lua_api.md` 的“Dilemma 选项分支兜底”`[实测/需随版本复查]`。
+
+## 2026-09-07 实测反馈：Lua guard 无法捕获原生访问冲突
+
+1. 根据 PSW 合并补丁在 AI 战后稳定触发 `0xC0000005`、读取空对象偏移 `0x18` 的四份 minidump，补充 Lua 与原生崩溃的边界：`pcall`/`xpcall` 不能捕获游戏 C/C++ 层访问冲突。
+2. 记录 `events.CharacterPostBattleCaptureOption` 等直接写入全局 `events` 数组的回调不经过 `core:add_listener`，全局覆盖 `core.add_listener` 无法保护该路径。
+3. 补充全局 hook 风险：必须保留合法的 `condition=true` 语义；代理 `cm.callback` 时不得丢失可选名称；排除条件应先于原 condition 执行。
+4. 记录窄范围规避原则：只有在日志和 dump 已锁定原生 API 边界时，才在 Lua 包装层按明确对象与条件阻止非必要调用，并保留玩家及其他调用路径 `[实测/需随版本复查]`。
+5. 修正 `tools/build_pack.py` 对已有二进制 `text/**/*.loc` 的保留；自动重打包不能只处理 `*.loc.tsv`，否则会静默丢失旧本地化文件。
+6. 修正自动编码 DB 时的版本标记：MOD 表即使版本为 0 也显式写入 VERSION marker，保持与 RPFM 生成的旧 Pack 一致，避免无 marker 时被多版本同结构 schema 误判为其他版本。
+7. PSW v4 实测在目标 cqi 成功跳过最后一条 trait 后仍以相同原生地址崩溃，确认“最后一条 Lua→原生日志”只能定位边界，不能直接当作故障调用；针对坏对象的临时规避应前移到阻止整条战斗结算路径 `[实测/需随版本复查]`。
+8. PSW 原生崩溃最终用 v6 解决：肇事派系回合内存在坏军队对象，阻止其宣战/战斗仍不够（v5 失败），需直接抹除派系。灭派系注意：`cm:kill_faction` 不存在，正确组合是 `force_make_peace` → `kill_all_armies_for_faction` → 全部 `set_region_abandoned` → `kill_character` 清理残余人物 → `force_diplomacy("all")` 锁死；`cm:kill_character` 原版只传 2 参 `[实测/需随版本复查]`。
+9. 判别“轮到某阵营时崩”：看日志最后一个 `faction_turn_start`/`FactionTurnStart` 属于谁且之后无下一派系标记；不能以“崩溃前最后一条日志是战斗/其他事件”推断肇事者 `[实测]`。
+
+## 2026-09-06 调研补充：新建独立可玩派系与独立文化的边界
+
+1. 根据当前 `gamedata` 的 `factions_tables`、`cultures_subcultures_tables`、`start_pos_factions_tables`、frontend 派系表和原版叙事脚本，补充“新 faction key 复用已有 culture/subculture”和“真正新增 culture/subculture”两条不同工作流。
+2. 明确新增可玩派系不能只改 DB faction 行：还要核对 frontend、Loc、目标战役的 `start_pos_factions`，并重建唯一的 `startpos.esf`；startpos 与 Mixer/其他 startpos MOD 的兼容性属于高风险事项 `[已查原版 DB / 已查外部 startpos 资料 / 需随版本复查]`。
+3. 记录新 playable culture 必须检查 `wh3_narrative_shared_faction_data.lua` 的 culture-to-narrative 映射；缺失映射时原版会警告且不会加载对应种族叙事 `[已查原版脚本]`。
+4. 相关流程已写入 `references/project_structure.md` 与 `references/rpfm_and_verification_workflow.md`，并加入 `SKILL.md` 的 reference 路由。
+
+本版根据原始 `SKILL.md` 与 5 个 reference 的冲突点、RPFM/WH3 文档、TW Modding 教程核对后整理。
+
+## 2026-09-06 实现补充：自定义 unit ability phase 表需要 F64 编码支持
+
+1. 为虫群单位复制原版 regeneration/frenzy ability phase 时，`special_ability_phase_stat_effects_tables` 使用了 schema 的 `F64` 字段。
+2. `tools/build_pack.py` 原先只支持 `F32`，已补充 little-endian `F64` 编码；否则自动打包会在 effect phase 表阶段失败。
+
+## 2026-09-06 实测反馈：pack 文件存在但 wh3mm preset 未启用
+
+1. `czx_swarm_expansion.pack` 已经复制到游戏 `data/`，但实机没有出现新增单位；核对 `C:\Users\22448\AppData\Roaming\wh3mm\config.json` 后确认当前 WH3 preset 中目标 pack 的 `isEnabled=false`，所以游戏根本没有读取它。
+2. 补充验证规则：文件存在、RPFM 能打开、DB 引用正确，都不等于实机加载；实机不可见时必须检查当前 MOD 管理器 preset 的启用状态、加载顺序，并在启用后重启游戏 `[实测/需随版本复查]`。
+
+## 2026-09-06 实测/规则补充：新建英雄复用技能树不得覆盖原版 set key
+
+1. 在 `czx_swarm_expansion` 补丁诊断中发现：`character_skill_node_sets_tables` 的主键是 `key`，若新建英雄直接复用 `wh2_main_skill_node_set_def_sorceress_dark` 等原版 set key，会在 DB 合并时覆盖原版暗精女术士的技能树。
+2. 修正方式：新建独立 set key（如 `czx_skill_node_set_kerrigan`），并完整复制 `character_skill_node_set_items_tables` 中原 set 的所有 node key 到新 set；`character_skill_node_sets_tables` 指向新 set 与新的 `agent_subtype_key`。
+3. 该规则已写入 `SKILL.md`「高风险禁区」；后续新建英雄/领主复用他人技能树时按此执行。
+
+## 2026-09-06 实测反馈：RPFM 5.0.6 server 在 WH3 dependencies 缓存问题
+
+1. 通过 `rpfm_server` WebSocket 对 `czx_swarm_expansion` 跑 `DiagnosticsCheck`，发现当前 `SetGameSelected("warhammer_3", true)` 后 `asskit_tables` 为空、vanilla packed files 只有 `data/manifest.txt` 的 ~233 个松散文件，`.pack` 中的 DB 表未进入 dependencies 缓存。
+2. `LoadAllCAPackFiles` 能打开全部 CA pack，但 diagnostics 的 reference 解析仍不把它们作为依赖参考表使用。
+3. 结论：本环境下大量 `NoReferenceTableNorColumnFoundNoPak` 不能直接当作真实引用错误，应同时使用 `gamedata/` 或 Python 交叉验证；已写入 `references/rpfm_and_verification_workflow.md`。
 
 ## 2026-07-10 流程补充：游戏版本更新后的 schema/dependencies 复查
 

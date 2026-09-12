@@ -3,7 +3,7 @@
 本项目自带 RPFM：
 
 ```text
-rpfm-v5.0.5-x86_64-pc-windows-msvc/
+rpfm-v5.0.6-x86_64-pc-windows-msvc/
 ├── rpfm_ui.exe
 └── rpfm_server.exe
 ```

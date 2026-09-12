@@ -192,6 +192,55 @@ end)
 
 奖励如果需要精确操作角色军队，通常由 `DilemmaChoiceMadeEvent` 回调执行 `cm:grant_unit_to_character`、`cm:treasury_mod` 等；payload 可只负责 UI 奖励预览，Loc key 为 `campaign_payload_ui_details_description_<payload_text_key>`。
 
+### Dilemma 选项分支兜底
+
+`DilemmaChoiceMadeEvent` 监听器中，若只处理 `SECOND` 而不处理 `FIRST`，且后续 `if/elseif` 链存在默认分支（例如 `elseif 1 == 1 then`），未处理的选项会被默认分支捕获。例如 PSW 25 回合祈愿选择里 `FIRST`（祈愿天赋）未处理，导致后续抽奖默认进入“唯一物品抽奖”。
+
+处理多选弹窗时，应：
+- 每个 choice 都显式处理或显式清理对立状态；
+- 默认分支尽量不包含会覆盖未处理选项的全局逻辑；
+- 若用 effect bundle 作为状态标记，未选中项应及时 `cm:remove_effect_bundle` 移除对立 bundle。
+
+`[实测/需随版本复查]`
+
+### 抹除派系（灭国）
+
+`cm:kill_faction` **不存在**——原版脚本里的 `kill_faction()` 只是 wh3_tol 剧本的全局辅助函数。脚本层灭派系的正确组合（与原版实现等价）`[实测/需随版本复查]`：
+
+```lua
+-- 1. 先与所有交战方议和，避免清理中触发战斗
+local enemies = faction:factions_at_war_with()
+for i = 0, enemies:num_items() - 1 do
+    local enemy = enemies:item_at(i)
+    if enemy and not enemy:is_null_interface() and not enemy:is_dead() then
+        cm:force_make_peace(faction:name(), enemy:name())
+    end
+end
+
+-- 2. 杀光所有军队（连带销毁军队对象）
+cm:kill_all_armies_for_faction(faction)
+
+-- 3. 放弃全部城镇（无城无军的派系随即灭亡）
+local region_list = faction:region_list()
+for i = 0, region_list:num_items() - 1 do
+    cm:set_region_abandoned(region_list:item_at(i):name())
+end
+
+-- 4. 清理残余无军队人物；cm:kill_character 原版只传 2 参
+local char_list = faction:character_list()
+for i = 0, char_list:num_items() - 1 do
+    local char = char_list:item_at(i)
+    if not char:is_null_interface() and not char:is_wounded() then
+        cm:kill_character(char:command_queue_index(), true)
+    end
+end
+
+-- 5. 锁死外交防复活/附庸拉尸
+cm:force_diplomacy("faction:" .. faction:name(), "all", "all", false, false, true)
+```
+
+用途边界：这是解决“某派系回合内存在坏原生对象导致 `0xC0000005` 崩溃”的最终手段——Lua 的 `pcall` 拦不住原生访问冲突，阻止该派系战斗（议和/锁宣战）也不够，因为回合内对军队对象的其他处理仍会触发；只有销毁对象本体才有效。副作用是该派系从战役中永久消失。
+
 ### 存档值
 
 ```lua
@@ -281,6 +330,16 @@ end
 - 回调执行。
 - 关键 API 返回值。
 - 错误分支。
+
+## 原生崩溃与全局 hook 边界
+
+- Lua `pcall`/`xpcall` 只能捕获 Lua 错误，不能捕获 `0xC0000005` 等原生访问冲突。若 `.mdmp`/stack 只有游戏本体与系统 DLL，应先定位最后一个 Lua→原生 API 边界，不要继续扩大 `pcall` 包装。
+- `campaign_manager` 的包装函数可能先写日志、再调用 `game_interface`；日志最后停在 `force_add_trait()` 等输出，只能证明故障边界高度相关，不能单凭时间顺序证明 trait/effect 本身是唯一根因。
+- 不要全局替换 `core.add_listener` 来保护单个 MOD。第三参数合法值包括函数和 `true`；包装器若只接受函数，会静默禁用所有 `condition=true` 的 listener。
+- 如果不得不代理 listener，先执行无需调用原 condition 的排除条件，再调用原 condition；否则原 condition 中的原生 API 仍可能先崩溃。
+- 直接写入全局 `events.<EventName>` 数组的原版回调不经过 `core:add_listener`，覆盖 `core.add_listener` 无法拦截这类调用。
+- 不要全局替换 `cm.callback` 后丢弃第三个可选名称参数；命名 callback 依赖该参数执行后续取消。
+- 已确认某个非必要原生调用稳定触发崩溃时，优先在该 API 的 Lua 包装层做“明确对象 + 明确条件”的窄范围调用前拦截，并保留玩家路径和其他调用；此类规避必须标注 `[实测/需随版本复查]`。
 
 ## 常见错误对照
 

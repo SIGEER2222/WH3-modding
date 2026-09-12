@@ -20,6 +20,7 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 | 任务 | 读取 |
 |---|---|
 | 新增/派生兵种、坐骑、武器、弹药、兵牌、porthole | `references/unit_creation_workflow.md` |
+| 新建可玩派系、独立文化、startpos、前端派系选择 | `references/project_structure.md`、`references/rpfm_and_verification_workflow.md` |
 | DB/TSV、Loc TSV、表版本、列数检查 | `references/tsv_format.md` |
 | 命名前缀、`data__`、加载排序、文件名 | `references/naming_conventions.md` |
 | Lua、监听器、First Tick、日志点 | `references/lua_api.md` |
@@ -50,6 +51,7 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 - 本地化 key 必须按原版同表同字段确认；不要套单一模板。
 - Lua 监听器必须使用 `core:add_listener` 5 参数签名；读档也需要的监听器放 `cm:add_first_tick_callback`。
 - 不确定的 API、scope、表版本、Loc key、UI 路径或资源链路标注 `[需验证]`。
+- 新建英雄/领主复用他人技能树时，`character_skill_node_sets_tables` 的 `key` 是主键；**不要**直接复用原版 set key，否则会在 DB 合并时覆盖原版角色的技能树。应新建 set key，并复制对应 `character_skill_node_set_items_tables` 行。
 
 ## 新增兵种提醒
 

@@ -6,8 +6,9 @@
 
 | 路径 | 用途 |
 |---|---|
-| `rpfm-v5.0.5-x86_64-pc-windows-msvc/` | 本地 RPFM 工具目录，用于打开、编辑、诊断 `.pack` 文件 |
+| `rpfm-v5.0.6-x86_64-pc-windows-msvc/` | 本地 RPFM 工具目录，用于打开、编辑、诊断 `.pack` 文件 |
 | `warhammer-mod-development_generic/` | 战锤3 MOD 开发指南 skill 的项目内源文件 |
+| `wyccc-warhammer-mod-manager/` | 本地 junction 到 `wyccc-warhammer-mod-manager`（战锤3 MOD 管理器），供参考与开发 |
 | `mod_files/` | MOD 打包前的源文件目录 |
 | `mod_output/` | 打包生成的 `.pack` 等产物 |
 | `workshop_release/` | Steam Workshop 发布材料；文本描述使用 BBCode |
@@ -49,6 +50,12 @@
 - 需要打包时，先确认用户是手动用 RPFM 打包，还是由 Codex 自动打包。
 - Workshop 文案最终使用 Steam BBCode，不直接把 Markdown 当作发布文本。
 - 完成可测试变更前，优先使用 RPFM diagnostics 和游戏 `script_log_*.txt` 做验证。
+
+## 相关工具：Wyccc's Mod Manager
+
+`wyccc-warhammer-mod-manager/` 是本机 `E:\Code\wyccc-warhammer-mod-manager` 的目录联接（junction），项目仓库位于 Gitee（`https://gitee.com/wyccc2018/wyccc-warhammer-mod-manager.git`）。它是一款面向 Steam 版《全面战争》系列（含战锤 3）的轻量 MOD 管理器，支持播放集管理、MOD 排序、依赖检查、Steam 创意工坊订阅、缺失 MOD 自动导入、播放集分享，以及《全面战争：战锤 3》的单位规模与友军伤害动态修改等功能。
+
+架构上，前端为 Vue 3 + Pinia + Vite，桌面容器为 pywebview，后端为 Python（`backend/` 与 `api.py` RPC），持久化使用 `AtomicJsonStore` 与 SQLite。开发入口为 `main.py`，一键启动脚本为 `一键启动管理器.cmd`。该目录不是本 MOD 制作仓库的源码，而是作为本地参考/协同开发使用的外部项目。
 
 ## MOD 源文件目录
 
