@@ -263,8 +263,9 @@ def write_weighted_material(mat, vertex_type, tex_dir, textures, model_name):
     return bytes(out)
 
 
-def write_rmv2_v8(out_path, skeleton_name, mesh, donor_model):
-    """mesh: (pos, nrm, uv, tan, idx, bone_idx, weights) — positions already in RMV2 space."""
+def write_rmv2_v8(out_path, skeleton_name, mesh, donor_model, lod_levels=None):
+    """mesh: (pos, nrm, uv, tan, idx, bone_idx, weights) — positions already in RMV2 space.
+    lod_levels: cap the number of replicated LOD blocks (None = donor's count)."""
     pos, nrm, uv, tan, idx, bone_idx, weights = mesh
     n = len(pos)
 
@@ -349,6 +350,8 @@ def write_rmv2_v8(out_path, skeleton_name, mesh, donor_model):
     # replicate the mesh across the same LOD structure as the donor
     donor_lods = donor_model.get('lod_headers') or []
     lods = max(1, len(donor_lods))
+    if lod_levels:
+        lods = min(lods, lod_levels)
     fh = b'RMV2' + struct.pack('<II', 8, lods) + fix_str(skeleton_name, 128)
     lod_header_size = 28
     out = bytearray(fh)

@@ -2,16 +2,21 @@
 # import a GLB mesh, fit it to the skeleton, auto-weight bind, export skinned GLB.
 #
 # Usage:
-#   blender -b -P blender_rig.py -- <skel.json> <in.glb> <out.glb> <fit_axis>
+#   blender -b -P blender_rig.py -- <skel.json> <in.glb> <out.glb> <fit_axis> [exclude_regex]
 # fit_axis: "z" (height), "x" (width), "y" (depth), or "auto" (largest dim)
+# exclude_regex: optional bone-name regex excluded from WEIGHT BINDING
+#   (bones still exist in the armature; they just receive no vertex weights,
+#   so decoration bones like platform_*/skulls_*/cape_* can't grab mesh)
 import bpy
 import json
 import sys
+import re
 from mathutils import Vector, Quaternion
 
 argv = sys.argv[sys.argv.index('--') + 1:]
 SKEL_JSON, IN_GLB, OUT_GLB = argv[0], argv[1], argv[2]
 FIT_AXIS = argv[3] if len(argv) > 3 else 'auto'
+EXCLUDE_RE = re.compile(argv[4]) if len(argv) > 4 and argv[4] else None
 
 data = json.load(open(SKEL_JSON, encoding='utf-8'))
 bones = data['bones']
@@ -93,6 +98,21 @@ bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
 # --- bind: nearest-bone-segment weights (deterministic, no bone heat) ---
 import numpy as np
+import re
+
+# decorative/attachment bones flap wildly in clips and shred nearby mesh
+# (observed: skirt/cape/belt/platform bones tearing blade arms and shells).
+EXCLUDE = re.compile(
+    r'prop|cape|skirt|belt|sleeve|cloth|loincloth|flag|tabard|fx|icon|camera'
+    r'|weapon|shield|quiver|scabbard|plume|tassel|feather|wing|hair|beard'
+    r'|finger|thumb|attach|slot|mount|platform|antenna|eyestalk|banner|be_',
+    re.I)
+allowed_idx = [i for i, b in enumerate(bones)
+               if not EXCLUDE.search(b['name'])
+               and not (EXCLUDE_RE and EXCLUDE_RE.search(b['name']))]
+print('weightable bones:', len(allowed_idx), '/', len(bones))
+if EXCLUDE_RE:
+    print('user-excluded:', [b['name'] for b in bones if EXCLUDE_RE.search(b['name'])])
 
 mesh_bb = [Vector(c) for c in mesh.bound_box]
 print('MESH bounds after fit:',
@@ -129,6 +149,7 @@ ap = V[:, None, :] - H[None, :, :]          # (n,B,3)
 tpar = np.clip((ap * D[None, :, :]).sum(2) / dd[None, :], 0.0, 1.0)
 closest = H[None, :, :] + tpar[:, :, None] * D[None, :, :]
 dist = np.sqrt(((V[:, None, :] - closest) ** 2).sum(2))  # (n,B)
+dist[:, [i for i in range(len(bones)) if i not in allowed_idx]] = np.inf
 
 K = 4
 top = np.argpartition(dist, K, axis=1)[:, :K]            # (n,K)

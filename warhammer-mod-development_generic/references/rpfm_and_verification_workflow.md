@@ -17,14 +17,17 @@
 
 ## RPFM 工作流
 
-### 打包方式选择
+### 打包方式（默认自动，不询问）
 
-需要从源文件生成 `.pack` 时，先询问用户选择：
+需要从源文件生成 `.pack` 时，默认由 Codex 自动完成全流程：
 
-1. 手动打包：用户用 RPFM UI 导入 `mod_files/<MOD名>/`，Codex 提供源文件、导入路径和检查清单。
-2. 自动打包：Codex 调用 RPFM/脚本生成 `mod_output/<mod_name>.pack`，并执行导入、保存、diagnostics 与回归核对。
+1. `python tools/build_pack.py <mod名>` 生成 `mod_output/<mod名>.pack`（PFH5；`text/**/*.loc.tsv` 编码为二进制 loc，`db/<table>/*.tsv` 按元数据行编码，其余路径原样复制）。
+2. 复制 `.pack` 到游戏 `data\` 目录。
+3. 备份 `%APPDATA%\WycccModManager\state.db` 到 `scratch/state_db_backups/`，把 `local:data:<路径sha256[:18]>` 插入当前 playset 的 `playset_items`（重写 position 为连续序号），并同步 `app_state` 的 `enabled_order:<game_id>`。
+4. 同路径 loc 遮蔽**靠前胜出**：本地汉化/覆盖补丁必须排在被覆盖包之前。
+5. 打包后执行临时反导出检查，检查完删除校验文件，避免后续误打包。
 
-默认不直接自动打包。自动打包通常更耗时，因为需要过 RPFM diagnostics、检查旧功能 marker，并清理临时校验文件。
+仅当用户明确说要自己用 RPFM 打包时，才停在源文件并提供导入路径与检查清单。
 
 ### 新建/修改 DB
 
@@ -46,6 +49,15 @@
 3. 保存后至少核对旧功能的关键 marker：新增普通单位、精英/RoR 单位、effect/bundle、招募池、脚本入口、Loc 文本、unit card/porthole 资源。
 4. 对中文 Loc 不只看 `decode_packed_file` 的 JSON 转义输出；必要时用 RPFM `export_tsv` 反导出后检查中文是否仍正确、旧文本是否仍存在。
 5. 执行完临时反导出检查后删除校验文件，避免后续误打包。
+
+### 就地修改 workshop 目录 pack 的备份清理
+
+在 `steamapps/workshop/content/1142710/<wsid>/` 内就地改 pack 时 `[实测/需随版本复查]`：
+
+1. 游戏只加载 `.pack` 后缀文件；`.bak`/`.codex-backup`/`.disabled-*`/`.pre*`/`.orig_*`/`.broken_*` 等带额外后缀的备份不会被加载，纯占空间。
+2. 每次就地修改若都留一份同目录备份，大型 MOD 会快速积累（实测 3018964477 一个目录堆了 8 份 1.4G 快照 ≈11G）。
+3. 约定：就地修改前确需备份时，备份文件移到本工作区 `scratch/`（或验证新 pack 生效后直接删），不要长期留在 workshop 目录。
+4. 定期巡检残留：`find "<workshop>/content/1142710" -type f ! -name '*.pack' ! -name '*.png'`。
 
 ### 覆盖式补丁 diagnostics
 

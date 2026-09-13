@@ -10,7 +10,7 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 - 处理本项目任务时，先读 `.codex/project_context.md`；本工作区的可维护源副本以 `warhammer-mod-development_generic/` 为准。
 - `gamedata/`、`bilingual/` 与 RPFM 工具目录只读使用；不修改、不格式化、不清理、不移动。
 - 具体 MOD 源文件默认维护在 `mod_files/<MOD名>/`；图片素材在 `assets/image/`，由用户维护；`.pack` 输出在 `mod_output/`；Workshop 发布文件在 `workshop_release/`。
-- 需要打包时先问用户：手动用 RPFM 打包，还是由 Codex 自动打包。默认先准备源文件，不直接自动打包。
+- 需要打包时默认由 Codex 用  自动完成打包、部署 data 目录、写入 playset（备份 state.db），不询问；仅当用户明确说要自己用 RPFM 打包时才停在源文件。
 - Workshop 文本描述使用 Steam BBCode 作为最终发布格式；发布包应写清依赖、加载顺序、改动内容和兼容性，缩略图优先复用 MOD 源目录中已确认的 `thumbnail.png` 或用户提供图片。
 
 ## Reference 路由
@@ -27,6 +27,11 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 | effect/effect bundle/scope | `references/common_effect_keys.md` |
 | 工作区路径、原版 DB/脚本/本地化查证 | `references/project_structure.md` |
 | RPFM、打包、diagnostics、日志、Workshop 发布 | `references/rpfm_and_verification_workflow.md` |
+| 启动崩溃、Bad Mods 对话框、加载顺序/同名片段遮蔽、data pack 启用、排错二分 | `references/crash_and_load_order_diagnostics.md` |
+| 战役内 "Placeholder Body" 卡死弹窗、`show_advice`/`trigger_dilemma` 缺记录 | `references/ui_popup_and_event_diagnostics.md` |
+| 模型/动画预览、RMV2 骨骼绑定诊断、Skin Wrap 重绑定、AssetEditor 自动化 | `references/asseteditor_animation_workflow.md` |
+| 外部 GLB 模型 → 自造兵种端到端管线（绑骨/RMV2/DB/数值对标/验收） | `references/custom_model_unit_pipeline.md` |
+| 单位/领主/英雄语音（VO）接入、自定义 `.bnk`/`.wem`、Dialogue_Event、`vo_actor`/`vo_culture`/`vo_sel` | `references/audio_and_vo.md` |
 
 ## 默认流程
 
@@ -52,6 +57,7 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 - Lua 监听器必须使用 `core:add_listener` 5 参数签名；读档也需要的监听器放 `cm:add_first_tick_callback`。
 - 不确定的 API、scope、表版本、Loc key、UI 路径或资源链路标注 `[需验证]`。
 - 新建英雄/领主复用他人技能树时，`character_skill_node_sets_tables` 的 `key` 是主键；**不要**直接复用原版 set key，否则会在 DB 合并时覆盖原版角色的技能树。应新建 set key，并复制对应 `character_skill_node_set_items_tables` 行。
+- 同名 `db/<表>/<内部名>` 片段跨 pack 只做文件级去重、不逐行合并；实测加载顺序靠前 pack 胜出。给主 MOD 做补丁时，新增 key 优先放唯一片段名，避免被基础包同名片段遮蔽产生悬空引用（详见 `references/crash_and_load_order_diagnostics.md`）。
 
 ## 新增兵种提醒
 

@@ -134,3 +134,20 @@ db/<table_name>/!!custom_<feature>
 4. 生成唯一内部表名。
 5. 导入 RPFM 并运行 diagnostics。
 6. 游戏内验证数值、UI 或日志效果。
+
+## 克隆原版数据行 `[实测/需随版本复查]`
+
+克隆原版行（技能链、属性组等）进 MOD TSV 时，**必须按列名对齐取值**，不能按列位置从其他来源（导出版本不同的 TSV、手工粘贴串）拷贝：
+
+- 不同来源的同一表可能 schema 版本不同、列数不同。实测案例：`unit_special_abilities_tables` 某来源 74 列 vs 本 MOD 71 列，按位置粘贴导致 `voiceover_state`/`miscast_chance` 等字段整体错位。
+- 正确做法：读原版 `data__.tsv` 的列名行建 `列名→值` 映射，再按目标 TSV 自己的列名行逐列取值，缺的填空。
+- 批量向 junction 表插行时，去重键要用**整行**，不能只用第 1 列——junction 表第 1 列常是外键（技能名/属性名），多行共享同值。
+
+## 新单位数值对标法
+
+给自造单位定数值时，按"形态/骨架/定位"选 1~2 个原版供体单位逐项对标，不要凭空写：
+
+- 供体选择：`land_units.man_animation`/`man_entity` 同骨架动画集 + 同 caste（monstrous_infantry/monster/war_beast）+ 相近模型数。
+- 必对字段：`bonus_hit_points`（注意是**每模型**血量，单体巨兽的几千上万不能抄到多模型单位）、armour、ma/md/cb/morale、weapon 的 dmg/ap/bvl/bvi、`num_men`、`multiplayer_cost`/`recruitment_cost`/`upkeep_cost`。
+- 总血量粗算：HP/模型 × 模型数 ≈ 供体总血量 ±20%。
+- 自爆类单位参照 `wh2_dlc15_unit_abilities_exploding_unit`（隐藏引擎标记，死亡即爆）+ `expendable` 属性；原版自爆单位均为单模型（膨胀尸 1×1600HP/425 金，自爆蛆 1×660HP/425 金），多模型自爆单位要按"每模型都是一发炸弹"定价。

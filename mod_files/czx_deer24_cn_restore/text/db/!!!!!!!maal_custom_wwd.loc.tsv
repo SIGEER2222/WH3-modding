@@ -1,0 +1,6 @@
+key	text	tooltip
+#loc;;text/db/!!!!!!!maal_custom_wwd.loc
+effects_description_maal_bastion_unit	[[col:white]]Wardens units unlock: During the "Support the Great Bastion" event, provide the maximum amount of aid[[/col]]	1
+land_units_onscreen_name_str_nanye	Nanye Bunyo, the Green Death	0
+land_units_onscreen_name_str_xian	Xian Feng, the Peerless Warrior	0
+effects_description_maal_nanyang_unit	[[col:white]]Nan-Yang Elite Warriors unlock: Recruit the King of Nan-Yang[[/col]]	1

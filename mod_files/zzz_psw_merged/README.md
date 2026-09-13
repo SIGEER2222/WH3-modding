@@ -90,6 +90,16 @@ zzz_psw_merged.pack           ← 本补丁（更高覆盖优先级）
 | `psw_complete_fix.pack.bak` | 旧备份 | 未合并，保留备份 |
 | `psw_final_fix.pack.bak` | 旧备份 | 未合并，保留备份 |
 
+### 6. 拆除天赋提示弹窗修复（2026-09-12）
+
+`psw_06_chaichu.lua` 拆除成功后调用 `cm:show_advice("psw_chaichu_done")`，但此前包内缺少 advice DB 记录，loc 又误用 `advice_info_text_` 前缀 → 点击确认按钮弹出不可关闭的 "Placeholder Body" 模态框。
+
+修复内容（已重建部署）：
+
+- 新增 `db/advice_threads_tables/zzz_psw_chaichu.tsv`：`psw_chaichu_done` / `warhammer3`
+- 新增 `db/advice_levels_tables/zzz_psw_chaichu.tsv`：key=`1214413929`，克隆主 MOD `advice_psw_tf_ex_yhzl_1` 行（`advice_lmyx` 头像、Scripted 分类、`force_2d_portrait=true`）
+- `text/psw_chaichu.loc.tsv` 追加 `advice_levels_onscreen_text_1214413929` = `已拆除该天赋。`（advice 正文 loc 约定是 `advice_levels_onscreen_text_<levels.key>`，不是 `advice_info_text_` 前缀）
+
 ## 回滚
 
 删除 `data/zzz_psw_merged.pack` 和 `data/zzz_psw_merged.png`，把 `data/psw_old_backups/` 里的原文件移回 `data/` 即可。

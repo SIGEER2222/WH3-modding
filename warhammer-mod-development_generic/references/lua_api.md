@@ -341,6 +341,27 @@ end
 - 不要全局替换 `cm.callback` 后丢弃第三个可选名称参数；命名 callback 依赖该参数执行后续取消。
 - 已确认某个非必要原生调用稳定触发崩溃时，优先在该 API 的 Lua 包装层做“明确对象 + 明确条件”的窄范围调用前拦截，并保留玩家路径和其他调用；此类规避必须标注 `[实测/需随版本复查]`。
 
+## UI 组件操作：Cco 绑定控件的脚本化
+
+WH3 的 twui 控件常通过 `<callbacks_with_context>` 绑定 Cco（component context object），例如"技能"页签的"自动分配技能点数"复选框 `checkbox_auto_management`：
+
+```xml
+<callback_with_context callback_id="ContextCommandLeftClick"
+    context_object_id="CcoCampaignCharacterAutoManagement"
+    context_function_id="ToggleAutoManaging"/>
+<callback_with_context callback_id="ContextCommandGiverOnContextSet"
+    context_object_id="CcoCampaignCharacterAutoManagement"
+    context_function_id="self.SetSelected(this.IsAutoManaging)"/>
+```
+
+要点：
+
+- 勾选状态由引擎按角色持久化（`IsAutoManaging`），**改 twui 文件改变不了默认值**——状态不在 UI 层。
+- Lua 改状态的可靠方式：`find_uicomponent` 找到控件 → `uic:CurrentState()` 读状态 → `uic:SimulateLClick()` 模拟点击（触发 ContextCommand，等价于玩家点击；vanilla `wh_campaign_interventions.lua` 同款用法）。
+- 另一条路：`uic:GetContextObject("CcoXxx")` 拿到 context object 后 `:Call("IsAutoManaging")`/`:Call("ToggleAutoManaging")` 直接读写，绕过 UI 状态；context 类型与可用函数查 `gamedata/ui/metadata.json` `[需验证]`。
+- `PanelOpenedCampaign` 的 `context.string` 是布局名，注意 `character_panel` 与 `character_details_panel` 两种写法都出现过，监听时两者都要兼容；兜底方案是 `ComponentLClickUp` 上挂"面板是否已打开"条件 + `cm:callback` 延迟 0.1s 检查——打开面板的点击触发后回调执行时面板已建好。
+- `SimulateLClick` 会再次触发 `ComponentLClickUp`，监听器内必须做幂等检查（已勾选就不再点），避免自激循环。
+
 ## 常见错误对照
 
 | 错误 | 后果 | 修正 |

@@ -92,10 +92,11 @@ UNITS = [
          vmd_slots_extra=""),
     dict(key="czx_inf_tank", glb="inf_tank_skinned.glb",
          src_glb=r"E:\Download\被感染的坦克.glb",
-         skel=r"E:\Code\WH3-modding\tools\_skel\steamtank01.json",
+         skel=r"E:\Code\WH3-modding\scratch\skel_czx_inf_tank.json",
          donor_rmv2="emp_steam_tank_01.rigid_model_v2",
          pack_dir=r"variantmeshes\wh_variantmodels\st1\czx\czx_inf_tank",
          model_name="czx_inf_tank_01",
+         rmv2_skel_name="czx_stank01",
          audio_entity="wh_war_machine_steamtank", audio_armour="heavy_metal",
          vmd_slots_extra=""),
     dict(key="czx_dehaka", glb="dehaka_skinned.glb",
@@ -114,12 +115,13 @@ UNITS = [
          model_name="czx_inf_diamondback_01",
          audio_entity="wh2_tmb_scorpion", audio_armour="chitin",
          vmd_slots_extra=""),
-    dict(key="czx_inf_marine", glb="inf_marine_skinned.glb",
+    dict(key="czx_inf_marine", glb="marine_czx_bound.glb",
          src_glb=r"E:\Download\被感染的枪兵.glb",
-         skel=r"E:\Code\WH3-modding\tools\_skel\humanoid01.json",
+         skel=r"E:\Code\WH3-modding\scratch\skel_czx_inf_marine.json",
          donor_rmv2="emp_volkmar_body_01.rigid_model_v2",
          pack_dir=r"variantmeshes\wh_variantmodels\hu1\czx\czx_inf_marine",
          model_name="czx_inf_marine_01",
+         rmv2_skel_name="czx_marine",
          audio_entity="wh2_tmb_scorpion", audio_armour="chitin",
          vmd_slots_extra=""),
 ]
@@ -190,7 +192,7 @@ def convert():
         out_dir = MOD / u['pack_dir']
         out_dir.mkdir(parents=True, exist_ok=True)
         rmv2_path = out_dir / (u['model_name'] + '.rigid_model_v2')
-        write_rmv2_v8(rmv2_path, donor['skeleton'],
+        write_rmv2_v8(rmv2_path, u.get('rmv2_skel_name', donor['skeleton']),
                       (pos_r, nrm_r, uv, tan_r, idx, bone_idx, weights),
                       donor_model, lod_levels=1)
 
