@@ -5,3 +5,16 @@
 -1.0	positive	czx_ability_zergling_adrenal_glands		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
 -1.0	positive	czx_ability_ultralisk_frenzied		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
 -1.0	positive	czx_ability_kerrigan_psionic_presence		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_zergling_metabolic_boost		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_hydralisk_grooved_spines		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_ultralisk_chitinous_plating		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_roach_glial_reconstitution		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_mutalisk_vicious_glaive		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+35.0	positive	czx_ability_gou_swarm_frenzy		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0		wh_main_generic_buff_attack	wh_ability_positive	false	true	true	0.0			false	0.0	0.0	false	0.0
+32.0	positive	czx_ability_cishe_spine_volley		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0		wh_main_generic_buff_attack	wh_ability_positive	false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_baolongshou_primal_fury		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_inf_tank_infested_hull		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_dehaka_essence_leech		false	false	0.0	0.0	0.0	1.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0010000000474974513	0.0	false	0.0
+-1.0	positive	czx_ability_diamondback_blitz		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_marine_infested_rounds		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0	wh_main_unit_contact_poison			false	true	true	0.0			false	0.0	0.0	false	0.0
+-1.0	positive	czx_ability_baochong_explode		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0		wh2_dlc11_unit_passive_extra_powder		false	true	true	0.0			false	0.0	0.0	false	0.0

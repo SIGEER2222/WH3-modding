@@ -7,3 +7,8 @@ item_weapon.png	czx_kerrigan_blades			1	false	false	false	0.0	0
 character_magic.png	czx_kerrigan_evolution_i			1	false	false	false	0.0	0
 character_magic.png	czx_kerrigan_evolution_ii			10	false	false	false	0.0	0
 character_magic.png	czx_kerrigan_evolution_iii			20	false	false	false	0.0	0
+wh_dlc05_spell_shadow_the_penumbral_pendulum.png	czx_kerrigan_psionic_blast		Penumbral Pendulum	0	false	false	false	0.0	0
+wh_main_spell_death_spirit_leech.png	czx_kerrigan_crushing_grip		Spirit Leech	0	false	false	false	0.0	0
+wh_main_spell_light_net_of_amyntok.png	czx_kerrigan_immobilization_wave		Net of Amyntok	0	false	false	false	0.0	0
+wh_dlc05_spell_life_regrowth.png	czx_kerrigan_mend		Regrowth	0	false	false	false	0.0	0
+wh_dlc03_spell_beasts_wyssans_wildform.png	czx_kerrigan_wild_mutation		Wyssan's Wildform	0	false	false	false	0.0	0

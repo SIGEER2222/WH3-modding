@@ -18,6 +18,11 @@ def read_str(buf, off):
 
 def parse_anim(path):
     buf = Path(path).read_bytes()
+    # Some .anim payloads (e.g. animations/skeletons/*) are zstd-compressed:
+    # [u32 decompressed_size][zstd frame starting with magic 28 B5 2F FD].
+    if len(buf) > 8 and buf[4:8] == b'\x28\xb5\x2f\xfd':
+        import zstandard as _z
+        buf = _z.ZstdDecompressor().decompress(buf[4:], max_output_size=64_000_000)
     off = 0
     version, unknown0 = struct.unpack_from('<II', buf, off)
     off += 8
@@ -100,7 +105,11 @@ def world_transforms(parsed, frame_idx=0):
 if __name__ == '__main__':
     out_dir = Path(r'E:\Code\WH3-modding\tools\_skel')
     for anim in sorted(out_dir.glob('*.anim')):
-        d = parse_anim(anim)
+        try:
+            d = parse_anim(anim)
+        except Exception as e:
+            print(anim.name, '-> PARSE FAIL:', e)
+            continue
         wp, wq = world_transforms(d, 0)
         d['world_pos_frame0'] = wp
         d['world_quat_frame0'] = wq

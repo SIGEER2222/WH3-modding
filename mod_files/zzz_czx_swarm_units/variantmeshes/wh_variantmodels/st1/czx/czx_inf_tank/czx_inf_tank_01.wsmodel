@@ -1,0 +1,6 @@
+<model version="1">
+	<geometry>variantmeshes\wh_variantmodels\st1\czx\czx_inf_tank\czx_inf_tank_01.rigid_model_v2</geometry>
+		<materials>
+			<material lod_index="0" part_index="0">variantmeshes\wh_variantmodels\st1\czx\czx_inf_tank\materials\\czx_inf_tank_01_weighted4_alpha_off.xml.material</material>
+		</materials>
+</model>

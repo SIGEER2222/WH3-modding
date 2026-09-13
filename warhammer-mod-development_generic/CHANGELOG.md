@@ -1,5 +1,69 @@
 # 修订说明
 
+## 2026-09-12 新增：音频与语音（VO）接入调研
+
+新增 `references/audio_and_vo.md`，要点：
+
+1. WH3 语音走 Wwise Dialogue_Event（State 路径决策树），普通音效走 Event；语音媒体在 `audio_<lang>.pack` 的 `audio/wwise/<lang>/<id>.wem`，soundbank 在 `audio_*_bnk.pack` 的 `audio/wwise/*.bnk`。
+2. 单位战斗语音主链路：`main_units.audio_voiceover_actor_group`→`audio_vo_actor_groups`（`vo_actor_1..15`）+ `audio_voiceover_culture`；`land_units.selection_vo`=`vo_sel_*`；`land_units.man_entity`→`battle_entities`→`audio_entity_types`→`audio_entity_actors`。`.variantmeshdefinition` 的 `META_DATA` 可按模型覆写 `audio_entity_type`/`audio_actor_id`/`audio_armour_type`/`audio_melee_weapon_type`。
+3. 领主/英雄战役语音走 `agent_subtypes.audio_voiceover_actor_group`（`campaign_vo_*` 事件族）；派系兜底在 `factions.default_audio_actor_vo_group`；坐骑有 `mounts.voiceover`。Lua 可 `cm:trigger_campaign_vo`/`cm:add_character_actor_group_override`。
+4. 自定义语音：AssetEditor Audio Project Compiler 产 `.bnk` 优先；手工 Wwise 路线必须合并 vanilla Dialogue_Event 决策树否则遮蔽原版 VO。
+5. 复用原版语音只需填 DB 字段、零音频文件；实测样例 `references/luke_hero/`。
+
+## 2026-09-12 新增：AssetEditor 模型/动画预览与 Skin Wrap 重绑定工作流
+
+新增 `references/asseteditor_animation_workflow.md`，要点：
+
+1. AssetEditor（`tools/AssetEditor/`，v0.78）可不开游戏直接预览 RMV2 模型动画；流程为开 `.rigid_model_v2`（非 `.variantmeshdefinition`）进 Kitbash Editor → 底部动画面板选 `animations\skeletons\<skel>.anim` + clip → ▶ 播放看帧计数与变形。
+2. RMV2 v8 头 offset 8 存骨架名 ASCII；v7 未蒙皮文件该字段为空且无权重串，编辑器显示 No Skeleton / 0 帧——本次确认 Arbiter 包 `leishou_2`、`g` 两网格属此类，其余四虫绑定正常。
+3. 修复路径：Pin 工具 SkinWrap 模式（目标=同名选择全选坏网格，源=导入的蒙皮参考网格，应用后日志见 `SkinWrapRiggingCommand` + 顶点缓冲重建）；参考网格会落在 Editable Model 里，**保存前必须删**；同文件其他未蒙皮部件（bst_warhounds_head_02）要单独再包一次。
+4. UI 自动化细节（截图×1.58 坐标换算、scratch/ 下 `_click/_shot/_uia_*` 辅助脚本、Delete 热键=裸 Delete、对象树选中不高亮要看状态栏）已写入 reference 的"UI 自动化要点"节，后续 AI 可直接复用脚本。
+
+## 2026-09-12 实测反馈：Cco 绑定 UI 控件的默认值无法用 twui 改，需脚本模拟点击
+
+1. 人物技能页"自动分配技能点数"复选框（`checkbox_auto_management`）是**原版**控件，绑定 `CcoCampaignCharacterAutoManagement`；勾选状态按角色持久化在存档（`IsAutoManaging`），改 twui 无效。
+2. 解法：`find_uicomponent` → `CurrentState()` → `SimulateLClick()`；或 `GetContextObject("CcoXxx"):Call("...")` 直接读写 context（函数表见 `gamedata/ui/metadata.json`）。
+3. 新增小节到 `references/lua_api.md`："UI 组件操作：Cco 绑定控件的脚本化"，含 `PanelOpenedCampaign` 布局名差异（`character_panel` vs `character_details_panel`）与幂等防自激要点。
+4. 落地实例：本地包 `czx_auto_skill_manage`（mod_files 同名目录 + build_pack 构建），`PanelOpenedCampaign` + `ComponentLClickUp` 双钩子自动勾选复选框。
+
+## 2026-09-12 实测反馈：战役内 "Placeholder Body" 卡死弹窗 = `show_advice` 缺 DB 记录
+
+新增 `references/ui_popup_and_event_diagnostics.md`：
+
+1. `zzz_psw_merged.pack` 的 `psw_06_chaichu.lua` 拆除天赋后调用 `cm:show_advice("psw_chaichu_done")`，但包内无 `advice_threads`/`advice_levels` 记录、loc 又误用 `advice_info_text_` 前缀 → 点击确认按钮后弹出不可关闭的 "Placeholder Body" 模态框。
+2. `show_advice` 完整链路：`advice_threads` 行 + `advice_levels` 行（数字 key）+ loc `advice_levels_onscreen_text_<数字key>`；`advice_info_text_*` 前缀属 infotext 面板，不是 advice 正文。
+3. 修复：克隆同包已工作的 `advice_psw_tf_ex_yhzl_1` 行结构，key=`1214413929`，loc 追加 `advice_levels_onscreen_text_1214413929`；`tools/build_pack.py` 重建后部署。
+4. 通用诊断：grep 启用包内 `show_advice(`/`trigger_dilemma(` 调用点 → 反查对应 DB 记录是否存在，记录缺失即命中。
+
+## 2026-09-12 实测反馈二次修正：loc 覆盖 = 同路径文件遮蔽 + 文件名排序，守护包 v2
+
+1. 修正先前"靠前 pack 逐键胜出"的记录：loc 实为两层——同虚拟路径时靠前 pack **整文件遮蔽**（洛阳侯 SFO 汉化包即以同名 `##SFO_*.loc` 替换 SFO 英文 loc）；不同文件名同 key 时按**文件名排序**，`!`/`#` 前缀多者优先。
+2. 实证：守护包 v1 `!czx_deer24_cn_restore.pack`（单文件 `!!!czx_*.loc`）排在 `CathayENGLISH`（144 行）之前的 136 行仍被其 `!!!!!!wwd_character.loc`（6 个 `!`）击败，`wwd_miao_yin_method_*` 两行继续英文。
+3. 修复：`!!czx_deer24_cn_restore_v2.pack` 改为与 EN 包完全同名的 14 个 loc 文件（4934 行，4926 恢复中文、8 个无中文源键保留 EN），靠文件遮蔽覆盖全部 EN key——与逐键排序无关，最稳。已加入全部 preset idx0。
+4. 工具能力补记：`wyccc-warhammer-mod-manager` 的 `backend/steamworks_bridge.py` 可脚本化订阅工坊项（`subscribe_workshop_items` → `accepted:True`，实测订阅 SFO 汉化 2801517996 成功）；游戏运行时 Steam 暂停工坊下载属正常。已写入 `.codex/project_context.md`。
+5. `zzz_czx_swarm_units.pack` 此前在 data 目录为 `.DIS` 导致无 mod 行不加载，已恢复 `.pack` 并补入全部 preset。
+
+## 2026-09-12 实测反馈：loc 键"靠前 pack 胜出"方向确认与"界面显示英文"诊断
+
+1. loc 覆盖方向与 DB 同名片段遮蔽一致：`used_mods.txt` / 管理器列表中**靠前**的 pack 覆盖同 key loc 文本。实测 `CathayENGLISH.pack`（行 140）排在 `DEER24Cathay.pack`（行 160）之前，其英文 loc 全部覆盖本体中文 → DEER24 领主"叶晟·缙绅逆臣"面板中英混杂。确认 2026-07-09 记录的"汉化补丁排在主 MOD 前面"方向正确，并纠正本次会话中一度按"补丁在后"直觉给出的错误答复 `[实测/需随版本复查]`。
+2. MOD 的 `.loc` 不按客户端语言分流：原版 `local_xx.pack` 只加载对应语言，MOD loc 对所有客户端生效；EN 翻译补丁在中文客户端同样覆盖 → 中文客户端应禁用 `CathayENGLISH`（item 2860213243）。
+3. loc 二进制诊断细节：显示文本为 UTF-16LE 存储，按 UTF-8 搜会漏检；key 也可能为 UTF-16LE，建议双编码搜索。全工坊 ~19GB/395 pack 的字节级扫描可直接在脚本中完成。
+4. 详细诊断流程与案例已写入 `references/crash_and_load_order_diagnostics.md` 第九节。
+5. 防复发范式：loc-restore 守护包 `!czx_deer24_cn_restore.pack`——解析 EN 补丁全部 4933 个 loc key，从 DEER24 系本体 pack 反查中文文本重建 `.loc`（8 个键无中文源保留 EN），放入 wh3mm 全部 preset 的 **idx 0**（最高优先级）；即使 EN 包被误重新启用，守护包仍靠前覆盖回中文。wh3mm preset 中条目 `isEnabled:false` 即禁用；**修正**：`used_mods.txt` 行序的真实来源是 `%APPDATA%\WycccModManager\state.db` 的 `playset_items`（mod_id + position），不是 `config.json` 的 presets 数组——后者只管管理器 UI 预设。脚本调序须按 `steam:<wsid>:<pack>`/`local:data:<hash>` mod_id 改 position（本次已把阴阳 CN 补丁移到 `cth_yinyin_pol` 之前）。
+6. 另记录：游戏 `data` 目录中 `zzz_czx_swarm_units.pack` 等被 Mod Manager 改名 `.DIS`（禁用态）导致"补丁不生效"；`mod_output` 中构建产物仍在，重打包（含新凯瑞甘 60×130 兵牌/120×260 infopic）后已重新部署 `.pack`。
+
+## 2026-09-12 实测反馈：同名片段遮蔽致悬空引用、Bad Mods 报告解读与全量启动排查
+
+新增 `references/crash_and_load_order_diagnostics.md`，汇总本次启动崩溃排查的可复用结论 `[实测/需随版本复查]`：
+
+1. `bad_mods_report.txt` 语义：`first_invalid_database_record/table/packfile` 指向第一条无效行所在 pack；`record` 把联合主键直接拼接打印。报告指明的是悬空外键行，不等于该 pack 损坏；修复方式是补齐被引用的 key 或移除过期包。
+2. 同名 `db/<表>/<内部名>` 片段跨 pack 做文件级去重（非逐行合并），实测加载顺序靠前的 pack 胜出。`!cth_yinyin_expedition.pack` 排在基础包 `cth_yinyin_pol.pack` 之后时其 `cth_yinyin` nodes 片段被遮蔽，新节点 `wh3_main_skill_node_cth_yinyin_magic_1_5` 丢失 → 自身 set_items 行悬空报 Bad Mods。
+3. 修复范式：唯一片段名补丁包 `!czx_yinyin_expedition_fix.pack`（data 目录 + 加入 playset），复制必须生效的 nodes/links/set_items/node_sets 片段到 `zzz_yinyin_exp_fix`，与加载顺序解耦；已验证 133+ 全量通过校验。
+4. data 目录 `*.pack` 无 `mod` 行不加载，modified.log 记 `unknown file`；改名 `.DIS`/`.bak` 即禁用。
+5. 过期兼容包案例：`cth_deer24_units_TLA_warband_upgrades.pack` 引用上游已删除的 `wh3_deer24_hailongjiajun` 单位组 → 悬空；换 Pinkbee 重制兼容包后通过。
+6. PFH5/DB 片段二进制结构、Mod Manager `local:data:` 语义、二分排错纪律（badmods≠native-crash、清场要求、leave-one-out 优于孤立启用）均写入新 reference。
+7. 原生崩溃（0xc0000005 @0x1404926f0）待查：当日重建的 `zzz_czx_swarm_*` 自研包为首要嫌疑，已禁用待回归 `[需验证]`。
+
 ## 2026-09-12 实测反馈：v0 表 flag 字节错误与 agent 单位误入军事编组导致启动崩溃
 
 1. `tools/build_pack.py` 对 version=0 的 DB 表曾写 `struct.pack("<B", version)`（即 `0x00`）作为 flag 字节；经与原版 `db.pack`、Workshop `Imperial Arbiter.pack`、`!!ia_all_factions.pack` 逐字节对照，该字节恒为 `0x01`（version>0 的表在 `FCFDFEFF` 版本标记后同样写 `0x01`）。flag=0 的 v0 表使游戏启动数秒内崩溃，症状是包内多张互不相干的小表单独测试都会崩。已修正为恒写 `0x01` `[实测/需随版本复查]`。
@@ -408,3 +472,15 @@
 3. 将“已有项目”相关表述改为“用户指定的目标 MOD / 目标 Pack”，避免误导为必须沿用第三方项目。
 4. 将 Lua、DB、Loc、TSV 示例统一改为 `custom_` 命名。
 5. 保留 `custom_` 只是示例前缀的说明，真实项目可替换为 `my_` 或其他唯一前缀。
+
+## 2026-07-12 自造模型兵种管线文档化
+
+1. 新增 `references/custom_model_unit_pipeline.md`：外部 GLB → 绑骨 → RMV2 → DB → 数值对标 → 技能链克隆 → 分层验收的端到端流程，含形态→骨架对照表与坑速查。
+2. `references/tsv_format.md` 新增「克隆原版数据行」（按列名对齐、junction 整行去重）与「新单位数值对标法」（供体选择、每模型 HP、自爆单位定价）。
+3. `references/unit_creation_workflow.md` 顶部加交叉引用：外部模型先走 custom_model_unit_pipeline 再做 DB 链。
+4. `SKILL.md` 路由表与 `MANIFEST.md` 同步登记新文档。
+
+## 2026-09-13 载具单位管线补充
+
+1.  骨架表补 （Stegadon，鞍座骨撑高包围盒，fit 须用 ）与 （战争机器，25 骨含 barrel_*/wheel_*；donor 在 ）。
+2. 同文档新增「5a 载具/战争机器单位的特殊链路」：引擎单位视觉网格走 ， 是乘员 VMD（原版蒸汽坦克用 ）， 复用原版车轮关节； 主键为  列，坦克供体按  匹配。
