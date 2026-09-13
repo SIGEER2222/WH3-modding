@@ -1,5 +1,45 @@
 # 修订说明
 
+## 2026-09-13 规则新增：工作区卫生——根目录禁止丢临时文件
+
+1. 应用户要求清理根目录堆积垃圾并立约：35 个 `_tmp_*.py` 一次性脚本移入 `scratch/tmp_scripts/`，`_preview/`→`scratch/_preview/`、`_work_kerrigan/`→`scratch/_work_kerrigan/`，0 字节 `battlefield_engines.model` 移入 `scratch/`。
+2. `AGENTS.md` 新增"工作区卫生"节：根目录只允许治理文件与已登记顶级目录；`_tmp_*`、`_preview/`、`_work_*/` 只允许出现在 `scratch/` 内；`tools/` 脚本自身产物放 `tools/_<name>/`（`tools/_*/` 整体忽略）；新增顶级目录须先登记职责。
+3. `.gitignore` 同步：`/manual_edit/`（用户 .blend 修权目录，415M 二进制不入库）、`tools/_*/` 合并原逐条列出项、新增 `/_tmp_*`/`/_preview/`/`/_work_*/` 根目录兜底。
+4. `references/custom_model_unit_pipeline.md` 预览约定从根目录 `_preview/` 改为 `scratch/_preview/`；`manual_edit/README.md` 引用路径同步修正。
+
+## 2026-09-13 规则变更：打包默认自动执行 + 本地汉化补丁全流程
+
+1. 应用户要求取消"打包前询问手动/自动"规则：`AGENTS.md`、`.codex/project_context.md`、`SKILL.md`、`references/rpfm_and_verification_workflow.md` 四处统一改为默认由 Codex 用 `tools/build_pack.py` 自动打包、部署 data、写 playset，不再询问。
+2. 落地 `zzz_nanu_dynamic_rors_cn.pack`（Nanu Dynamic RoRs 全量汉化）：3260 行 loc 全翻，翻译管线为"官方 CN 精确反查 → 句式模板 → 手工词典（含 mod 笔误变体）"，0 漏翻；同路径遮蔽靠前胜出，插在本体之前。
+3. 新知记入 `references/rpfm_and_verification_workflow.md`：`local:data:<id>` = `local:data:` + `sha256(规范路径)[:18]`（规范路径=绝对路径 `\`→`/` 后 casefold），改 playset 须同步 `enabled_order:<game_id>`。
+
+## 2026-09-13 实测：中文 TTS 引擎横向对比（第二轮）
+
+1. 新跑通 **Spark-TTS-0.5B**（克隆 `clone_spark_advisor.wav` + 参数造声 `orig_spark_male.wav`）与 **IndexTTS-2**（克隆 `clone_idx_advisor.wav` + 情感文本控制 `clone_idx_advisor_angry.wav`，emo_text="怒吼，充满杀气" 被 QwenEmotion 正确解析为 angry=0.95）。
+2. **VoxCPM2 判弃用**：voxcpm 2.0.3 三种输入模式均输出幻觉语音，模型已从缓存删除。**F5-TTS 中文克隆被用户判定质量差**，产出与包已删。
+3. 当前用户试听最佳：**Qwen3-TTS-0.6B-Base 克隆**（`clone_qwen_advisor.wav`）；1.7B 克隆也已产出待对比。
+4. 新坑已记入 `references/audio_and_vo.md`：hf-mirror 大文件逐文件 curl + `x-linked-size` 校验（urllib 循环曾静默截断 3.5GB→800MB）；HF cache 移 E: + symlink 权限规避；IndexTTS-2 需补丁适配 transformers 4.57；descript-audiotools 降级 protobuf 会弄崩 onnxruntime。
+
+## 2026-09-13 清理规则：workshop 目录就地改 pack 的备份必须外移或删除
+
+1. 实测 `steamapps/workshop/content/1142710` 32G 中约 12G 是历次就地修改留下的 `.bak`/`.codex-backup`/`.pre*`/`.orig_*`/`.disabled-*`/`.broken_*` 死备份（单 3018964477 目录 ~11.2G），已全部删除。
+2. 游戏只加载 `.pack` 后缀；带额外后缀的备份文件不参与加载，删除安全。
+3. `references/rpfm_and_verification_workflow.md` 新增"就地修改 workshop 目录 pack 的备份清理"节：备份放 `scratch/` 或验证后删除，附 find 巡检命令。
+
+## 2026-09-13 实测：AI 配音管线本机跑通
+
+1. 环境 `C:\Users\22448\venvs\wh3tts`（torch 2.11.0+cpu）：F5-TTS、Qwen3-TTS（voice_clone + voice_design）、faster-whisper、edge-tts 全部实测出声；样例在 `scratch/tts_lab/out/`。
+2. 原版 wem 提取链：`tools/export_gamedata.py` 的 `iter_pack_entries` 解 pack → `scratch/tts_lab/vgmstream/vgmstream-cli.exe` wem→wav → faster-whisper 转写参考文本 → F5/Qwen 克隆。
+3. 两个坑记入 `references/audio_and_vo.md`：torchcodec↔torch ABI 强绑定（卸载 torchcodec + patch `torchaudio.load` 绕过）；HF_ENDPOINT=hf-mirror 偶发连不上需改指官方站。
+4. 英文包 `audio_en.pack` 内含 `campaign_vo_cs_proximity` 领主对白 wem，可直接作克隆参考音；中文包仅 ~1600 条顾问/叙事音。
+
+## 2026-09-13 补充：AI 配音（TTS/语音克隆）管线
+
+`references/audio_and_vo.md` 新增"AI 配音管线"节：
+
+1. 当前主流本地方案：GPT-SoVITS（微调音色最像）、IndexTTS-2/2.5（情感解耦适合战斗吼叫）、CosyVoice 3.0（最易部署）；云端 ElevenLabs 质量上限最高。
+2. 推荐链路：原版 .wem→wav（AssetExplorer/vgmstream）→ 建数据集 → 克隆生成 → wav→AssetEditor→.bnk/.wem→pack。
+
 ## 2026-09-12 新增：音频与语音（VO）接入调研
 
 新增 `references/audio_and_vo.md`，要点：
@@ -482,5 +522,16 @@
 
 ## 2026-09-13 载具单位管线补充
 
-1.  骨架表补 （Stegadon，鞍座骨撑高包围盒，fit 须用 ）与 （战争机器，25 骨含 barrel_*/wheel_*；donor 在 ）。
-2. 同文档新增「5a 载具/战争机器单位的特殊链路」：引擎单位视觉网格走 ， 是乘员 VMD（原版蒸汽坦克用 ）， 复用原版车轮关节； 主键为  列，坦克供体按  匹配。
+1. custom_model_unit_pipeline.md 骨架表补 heavyquadruped01（Stegadon，鞍座骨撑高包围盒，fit 须用 x 轴）与 steamtank01（战争机器，25 骨含 barrel_*/wheel_*；donor 在 warmachines.pack）。
+2. 同文档新增「5a 载具/战争机器单位的特殊链路」：引擎单位视觉网格走 land_units.engine -> battlefield_engines.model = VMD 名；unit_variants.variant 是乘员 VMD（原版蒸汽坦克用 wh_emp_state_troops）；articulated_record 复用原版车轮关节；main_units 主键为 unit 列，坦克供体按 land_unit 匹配。
+
+## 2026-09-13 供体权重转移管线
+
+- 新增 tools/transfer_weights.py：原版同骨架 RMV2 → 我们 GLB 的 CA 手工权重转移（bbox 归一化 + 最近面重心插值 + 面邻接平滑），取代手写几何蒙皮成为首选蒙皮方案。
+- 新增 tools/dump_donor_groundtruth.py + tools/blender_donor_render.py：原版供体真值渲染（验证渲染管线可信后再评权重）。
+- 新增 tools/rigidify_core.py：球状躯干刚性化（爆虫大球囊 → rear/spine 骨，--ymin 高度阈值）。
+- 新增 scratch/_find_hu1b_donors.py 类扫描器：按骨架名扫 CA pack 找供体 RMV2（只读 160B 头）。
+- 发现 RMV2 v32 双布局：f32 pos（兽主）vs f16x3 pos（Ghorgon，boneidx@8/bonew@12），bonew 0xFF 空槽需清零。
+- hu1b 供体要多件合并（wardancers head+torso+legs），排除披风/武器件。
+- 详见 references/custom_model_unit_pipeline.md §3a。
+

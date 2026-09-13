@@ -21,6 +21,7 @@ WH3-modding/
 ├── mod_files/
 ├── mod_output/
 ├── workshop_release/
+├── manual_edit/
 ├── gamedata/
 ├── bilingual/
 ├── tools/
@@ -46,6 +47,7 @@ WH3-modding/
 | `mod_files/` | MOD 打包前的可维护源文件 | 纳入 |
 | `mod_output/` | RPFM 或脚本打包生成的 `.pack` 等产物 | 忽略 |
 | `workshop_release/` | Steam Workshop 发布材料、预览图、BBCode 文案 | 忽略 |
+| `manual_edit/` | 用户手工 Blender 修权工作目录（`.blend` 大文件）；只引用/追加，不整理 | 忽略 |
 | `gamedata/` | 提取的游戏原版脚本、UI、DB 等数据；只读参考 | 忽略 |
 | `bilingual/` | 游戏内中英对照和本地化参考文件；只读参考 | 忽略 |
 | `references/` | 本地 MOD/英雄/美术参考样例，仅引用 | 纳入 |
@@ -53,6 +55,7 @@ WH3-modding/
 | `rpfm-v5.0.6-x86_64-pc-windows-msvc/` | RPFM 工具本体 | 忽略 |
 | `wyccc-warhammer-mod-manager/` | 本地 junction 到 `wyccc-warhammer-mod-manager` 工具仓库；MOD 管理器参考/开发入口 | 忽略 |
 | `scratch/` | 临时/实验性文件；一次性脚本、调试输出、中间导出、截图等 | 忽略 |
+| `tools/_*/` | `tools/` 下脚本自身的输出、下载物、中间体（`_out`、`_dl`、`_donor`、`_skel` 等） | 忽略 |
 | `warhammer-mod-development_generic/` | WH3 MOD development 指南源副本 | 纳入 |
 
 ## MOD 源文件结构
@@ -120,6 +123,7 @@ Steam Workshop 文本描述使用 Steam BBCode。Markdown 可以作为草稿，�
 - 项目级说明归属 `docs/` 与 `AGENTS.md`。
 - 原版数据与中英本地化参考归属 `gamedata/`、`bilingual/`，只读使用。
 - 具体 MOD 源目录中不要保留 `_bak`、`db_binary`、中间导出等生成/备份目录；这些属于临时产物，归属 `scratch/`。
+- 仓库根目录禁止新增任何临时文件/目录；`_tmp_*`、`_preview/`、`_work_*/` 等临时命名只允许出现在 `scratch/` 内。新增顶级目录必须先在本文件与 `AGENTS.md` 登记职责，详见 `AGENTS.md` "工作区卫生" 一节。
 
 ## gamedata / bilingual 重建说明（2026-09-06）
 

@@ -1,13 +1,18 @@
 # User-maintained art source assets.
 assets/
 
+# User-maintained Blender manual-editing workspace (.blend binaries, large).
+manual_edit/
+
 # Read-only reference data and local tools.
 bilingual/
 gamedata/
 rpfm*/
+tools/AssetEditor/
 
-# Local junction/symlink to the wyccc mod manager repo.
-wyccc-warhammer-mod-manager/
+# Local junction/symlink to the wyccc mod manager repo
+# (no trailing slash: it is a junction/symlink, not a real directory).
+wyccc-warhammer-mod-manager
 
 # Generated packaging and release outputs.
 mod_output/
@@ -20,10 +25,15 @@ scratch/
 __pycache__/
 *.pack.bak
 
-# Tools-only output / downloaded / binary / test directories.
-tools/_out/
-tools/_dl/
+# Tools-only output / downloaded / binary / test / intermediate directories.
+# Any tools/_<name>/ directory is a non-tracked working dir by convention.
+tools/_*/
 tools/qtrme/
-tools/_wh3mm_test_profile/
 *.glb
-_work_kerrigan/**
+
+# Root-level hygiene backstop: temp/junk must live under scratch/, not the
+# repo root. These patterns keep `git status` clean if something is still
+# created at the top level by mistake.
+/_tmp_*
+/_preview/
+/_work_*/
