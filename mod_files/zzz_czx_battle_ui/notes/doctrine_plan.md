@@ -206,3 +206,25 @@ shooter_hold_mult=1.3
   2. **逃逸窗口**（兜底）：60s 内 ≥2 次 ai-drop → `reclaimed x n`（玩家想拿稳 = 拿两次）
 - **归还**（手操→AI）：原版组 UI 再开 AI 托管 → `is_ai_controlled→true` → 清 `reclaimed`/`escape_pos`（`handed-back` 日志），单位自动回到任务层。escapes 计数保留衰减（防止 planner 掉线+归还序列误累计）
 - **发呆兜底**：非 reclaimed 的脱管单位当 tick 就 `re-delegate` 补回 planner——脱管空窗 ≤1 tick，不存在"没人管"的兵
+
+## v1.4（2026-09-19）：社区调研驱动的战术微操升级
+
+调研源：AI General III 源码（extract 自 workshop 包）+ Steam/Reddit 社区反馈 + exe 字符串。
+
+### 交接层（AI General 机制移植，替代猜测式检测）
+
+- **热键 toggle**：`ShortcutTriggered` 事件 + `camera_bookmark_save0`（游戏设置"Save Camera Bookmark 1"可改绑）。选中卡片按热键：AI 单位→玩家（记名 `reclaimed`，`planner:remove_sunits` 收回）；玩家单位→AI（清记名，`planner:add_sunits` 归还）
+- **热键临时 override**：`camera_bookmark_save6`。选中的 AI 单位立刻交还玩家微操；单位**连续闲置 10s**（宽限 20s 起算）自动归还 AI——玩家微操完不用手动还，AI General 验证过的 UX
+- **指令事件收回**（`cmd_reclaim`）：`"Attack Unit"`/`"Move Orientation Width"` 等 UI 指令事件在非任务时段落到托管单位 = 玩家点击 → 单事件立即 `reclaimed-cmd`，比指纹更快。`in_task_pass` 标志过滤我们自己的 uc 指令
+- **指令探针**（`cmd_probe`）：每种指令名前 8 次事件 dump 全字段（unit/s1/pos/b1/inpass）——验证 schema 用
+
+### 战术微操（社区痛点逐项对应）
+
+- **骑兵循环冲锋**（`cycle_charge`）：攻击令装填 `charge_state{phase="in"}`；`is_in_melee()` 持续 `charge_fight_ms`(9s) 后 `charge-out` 后撤 50m；`charge_regroup_ms`(6s) 后状态清除，下个攻击令重新装填——冲锋加成是骑兵主要伤害，站撸是浪费
+- **射手风筝**（`kite_fallback`）：近战系敌人进 `kite_threat_m`(30m) → `kite-back` 后撤 60m；`is_moving()` 判定已在撤即保持——引擎 skirmish 旗标撤太早，显式距离阈值更贴玩家手感
+- **残血后拉**（`wounded_pullout`）：lord/monster/cav `unary_hitpoints()<0.35` 且 `is_in_melee()` → 撤向 planner 中心；恢复到 0.55 归队
+- **躲技能**（`dodge`）：`"Special Ability"` 指令事件 → 敌方施法者 + `get_position()` 落点 → `dodge_radius_m`(45m) 内我方单位 `dodge` 散开 60m。`[需验证]`：敌方施法是否走指令事件、get_position 是否给落点——cmd_probe 日志先行
+
+### 克制矩阵
+
+保留 v1.3 `COUNTER_BONUS`（骑→射手+40/炮兵+50、反大→巨兽、flyer→炮兵/射手）。`anti_large` 标记沿用 unit_set AI profile。

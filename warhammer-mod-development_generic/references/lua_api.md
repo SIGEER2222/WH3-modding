@@ -420,3 +420,15 @@ WH3 的 twui 控件常通过 `<callbacks_with_context>` 绑定 Cco（component c
 - planner 持有的单位 `is_idle()` 常为 false（"驻守"也算有令在身）——`is_idle` 驱动的补刀逻辑对 planner 单位基本无效，别用它当"该发指令了"的判据。
 - `planner:add_sunits(x)` 接受单 script_unit / scriptunits 集合 / script_unit 表；`planner:count()` 返回实有数。
 - **跨 `_lib` 文件的全局捕获必须延迟解析**：`script/_lib/mod/` 按文件名字母序加载，`local X = CZX_Y` 在 Y 的注册文件之前执行则永久捕获 nil（实测 `czx_tc_assess` 的 `local Units = CZX_TC_UNITS` 全 tick 报错）。跨模块引用直接在函数内写 `CZX_Y.method()`。
+
+### 引擎指令事件 / 热键 / 单位状态（AI General 源码 + exe 字符串实锤，[需验证]=待上机）
+
+- **`bm:register_command_handler_callback(name, cb, cb_name)`**：UI 指令事件通道。exe 实锤指令名：`"Attack Unit"`、`"Move Orientation Width"`、`"Move Rotation Angle"`、`"Change Speed"`、`"Change Melee"`、`"Change Skirmish"`、`"Fire At Will"`、`"Special Ability"`、`"Attack Building"`、`"Change Formation"`、`"Shot Type"`、`"Double Click"`、`"Group Created"`、`"Battle Results"`、`"Unit Left Battlefield"`。context 访问器：`get_name()`/`get_unit()`/`get_string1()`/`get_position()`/`get_bool1()`/`get_building()`。
+- **`"Special Ability"` 指令事件**：理论上是敌我施法检测源（dodge 的前提）——`get_unit()`=施法者，`get_string1()`/`get_position()`=技能键/落点 `[需验证]`。己方 uc 的 `perform_special_ability` 可能同样触发 → 用"指令是否发生在自方 tick 任务段内"标志位过滤。
+- **玩家指令识别**：uc/planner 发的指令若也走指令事件管道，`get_unit()+is_ai_controlled()` 无法区分来源 `[需验证]`；可靠区分法=在自方下发指令的代码段内置标志（`in_task_pass`），事件到达时标志为 false 即玩家操作。
+- **`"ShortcutTriggered"` + `context.string`**：引擎对每个已绑定快捷键发脚本事件，`context.string` 是动作名（AI General 用 `camera_bookmark_save0..6` = 相机书签保存键，游戏设置里可改绑）。拿来做 mod 热键最省事，不需要自定义 UI 组件。
+- **当前选区读取**（AI General `for_each_accessible_unit_card`）：`find_uicomponent(core:get_ui_root(), "battle_orders", "cards_panel", "review_DY")` → 遍历子组件，`CallbackId()=="UnitCard"` 且 `CurrentState()` 含 `selected`；卡片 `Id()` == `unit:unique_ui_id()`。
+- **`battle_manager_unit_selection_handler` 是全局函数**：引擎每次选中/取消选中单位时调用，包裹它即可获得选区变化回调（AI General `bm_ext` 做法；需先 `bm:register_unit_selection_handler` 保底注册）。
+- **`planner:remove_sunits(x)`**：从 planner 移除单位并放回玩家控制（收回=移除+记名）；`planner:release()` 全军释放。
+- **单位状态查询**（exe 字符串实锤存在）：`unit:unary_hitpoints()`（血量分数）、`unit:is_in_melee()`、`unit:is_moving()`/`is_moving_fast()`、`unit:number_of_men_alive()`/`initial_number_of_men()`、`unit:ordered_position()`。
+- **AI General 交接模型**（社区验证的 UX）：热键"toggle 选区托管" + "临时 override"（单位闲置 N 秒后自动归还 AI）——玩家微操单位不用想着还回来，闲置即自动回托管。
