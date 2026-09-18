@@ -228,3 +228,18 @@ shooter_hold_mult=1.3
 ### 克制矩阵
 
 保留 v1.3 `COUNTER_BONUS`（骑→射手+40/炮兵+50、反大→巨兽、flyer→炮兵/射手）。`anti_large` 标记沿用 unit_set AI profile。
+
+### v1.5 社区战术情报（Steam/CA 论坛 2026-09 调研）
+
+克制共识：
+- 戟/矛兵（`anti_large` flag）同时克骑兵和巨兽——不止巨兽
+- 远程集火是巨兽第一杀手（巨兽大多无甲）——`shooter→monster` 加权 30
+- 骑兵克射手/炮兵（+40/+50），且要**追杀溃兵**防止重整（`enemies_routing` + `rundown_range_m=120`）
+- 骑射 = 骚扰兵：永远风筝、绝不站撸 → 新角色 `cav_shot`（`harass` 任务 + skirmish 行为）
+- 冲骑（`shock` flag）伤害大头是冲锋加成 → 循环冲锋已是 v1.4 机制
+- `ai_usage_group` 列是全种族可用分类法：anti_large/shock/highvalue/no_skirmish/harasser/mage 全部 baked 进 `profile_of()`
+
+对局记录（复盘数据源）：
+- `roster ally/enemy <type>/<role> x<n>`：开局双方兵种 × 角色 tally
+- `tick-stats ... hp=<ally>/<enemy>`：双方总血量和每 60s 快照
+- `outcome WIN/LOSS`：一方全溃/全灭时输出
