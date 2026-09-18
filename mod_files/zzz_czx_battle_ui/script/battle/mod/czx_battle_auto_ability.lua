@@ -55,6 +55,32 @@ local CONFIG = {
     defend_radius_m  = 120,       -- radius for defend_position
     reclaim_escapes  = 2,         -- ai-drops inside the window before we believe
     reclaim_window_ms= 60000,     --   the player actually took the unit back
+    -- hotkey handoff (AI General-style, engine ShortcutTriggered events):
+    -- bind "Save Camera Bookmark" keys in game settings, select unit cards,
+    -- press to move them between AI and player control.
+    hotkey_toggle    = "camera_bookmark_save0", -- toggle selected AI<->player
+    hotkey_override  = "camera_bookmark_save6", -- temp override; returns when idle
+    override_grace_s = 20,        -- min battle-seconds before idle can end an override
+    override_idle_s  = 10,        -- overridden unit returns after this much idle time
+    -- command-event reclaim: UI order commands landing on a delegated unit
+    -- outside our task pass can only be the player -> instant reclaim.
+    cmd_reclaim      = true,
+    cmd_probe        = true,      -- log first events per command name (schema verify)
+    -- tactical micro (community-informed)
+    cycle_charge     = true,      -- cav pulls out after engagement, re-charges
+    charge_fight_ms  = 9000,      -- stay in melee this long before pulling out
+    charge_regroup_ms= 6000,      -- regroup this long before re-charging
+    charge_pull_m    = 50,        -- pull-out distance from the target
+    kite_fallback    = true,      -- shooters retreat when a melee enemy closes in
+    kite_threat_m    = 30,        -- enemy this close triggers fallback
+    kite_dest_m      = 60,        -- fallback distance from the threat
+    wounded_pullout  = true,      -- badly hurt high-value units withdraw
+    wounded_hp       = 0.35,      -- unary_hitpoints below this = wounded
+    wounded_recover_hp = 0.55,    -- re-engage above this
+    dodge            = true,      -- scatter units out of enemy ability AoE
+    dodge_radius_m   = 45,        -- scatter if within this of the ability target
+    dodge_dest_m     = 60,        -- scatter destination distance from blast centre
+    dodge_cooldown_ms= 8000,      -- per-unit dodge order throttle
 }
 
 -- ABILITY_FLAGS[ability_key] = "mask,recharge_seconds"
@@ -2042,6 +2068,14 @@ local escape_pos = {}         -- [uid] = ordered_position snapshot at drop time
 local directive_doc = nil     -- doctrine the standing planner order was issued under
 local directive_ms = 0        -- when it was issued
 local directive_target = nil  -- enemy unit the standing attack order points at
+-- handoff / micro state
+local overridden = {}         -- [uid] = {at=ms, idle_at=ms} temp player control, auto-returns
+local charge_state = {}       -- [uid] = {phase="in"|"out", at=ms} cav cycle-charge
+local role_of = {}            -- [uid] = role, snapshot map for order arming
+local wounded_pull = {}       -- [uid] = true while a wounded unit is held out of melee
+local dodge_at = {}           -- [uid] = last dodge-order ms
+local cmd_seen = {}           -- [command name] = count, probe throttle
+local in_task_pass = false    -- true while our own uc orders are being issued
 
 -- 野战白名单：攻城/任务战不自动托管（CA 官方不建议攻城用 planner，同 v2 gate）
 local DELEGATE_TYPES = {
@@ -4919,6 +4953,10 @@ local function order_attack(su, unit, e, now_ms, tag)
         focus_count[euid] = (focus_count[euid] or 0) + 1
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
+        -- arm cycle-charge: a cavalry attack order starts the fight timer
+        if role_of[uid] == "cav" then
+            charge_state[uid] = { phase = "in", at = now_ms, target = e }
+        end
         out_log(tag .. " " .. unit:type() .. " (" .. uid .. ") -> " .. e:type())
     else
         out_log("ERROR " .. tag .. " " .. tostring(err))
@@ -4993,6 +5031,263 @@ local function kick_if_idle(su, unit, now_ms)
     end
 end
 
+---------------------------------------------------------------------------------------------
+-- handoff layer: explicit player<->AI control via hotkey + engine command events
+---------------------------------------------------------------------------------------------
+
+-- read the currently selected unit cards (AI General's for_each_accessible_unit_card
+-- approach: battle_orders -> cards_panel -> review_DY, card Id() == unique_ui_id)
+local function selected_uids()
+    local ids = {}
+    local ok_p, parent = pcall(function()
+        return find_uicomponent(core:get_ui_root(), "battle_orders", "cards_panel", "review_DY")
+    end)
+    if not (ok_p and parent) then return ids end
+    for i = 0, parent:ChildCount() - 1 do
+        local ok_c, card = pcall(function() return UIComponent(parent:Find(i)) end)
+        if ok_c and card and tostring(card:CallbackId()) == "UnitCard" then
+            local ok_s, st = pcall(function() return card:CurrentState() end)
+            if ok_s and st and tostring(st):lower():find("selected") then
+                ids[tostring(card:Id())] = true
+            end
+        end
+    end
+    return ids
+end
+
+-- hotkey toggle: selected AI units -> player (never re-delegated);
+-- selected player units -> back to the planner
+local function handoff_toggle()
+    local sel = selected_uids()
+    if next(sel) == nil then out_log("handoff: nothing selected") return end
+    local gave, took = 0, 0
+    for_each_player_unit(function(unit)
+        local uid = tostring(unit:unique_ui_id())
+        if sel[uid] then
+            local su = bm:get_scriptunit_for_unit(unit)
+            if su and su.uc then
+                if unit:is_ai_controlled() then
+                    reclaimed[uid] = true
+                    overridden[uid] = nil
+                    if planner then pcall(function() planner:remove_sunits(su) end) end
+                    took = took + 1
+                    out_log("handoff take " .. unit:type() .. " (" .. uid .. ")")
+                else
+                    reclaimed[uid] = nil
+                    overridden[uid] = nil
+                    escape_pos[uid] = nil
+                    escapes[uid] = 0
+                    if planner then pcall(function() planner:add_sunits(su) end) end
+                    gave = gave + 1
+                    out_log("handoff give " .. unit:type() .. " (" .. uid .. ")")
+                end
+            end
+        end
+    end)
+    out_log("handoff give=" .. gave .. " take=" .. took)
+end
+
+-- hotkey override: selected AI units go to the player temporarily; the tick
+-- loop hands them back once they sit idle (micro the unit, then forget it)
+local function handoff_override(now_ms)
+    local sel = selected_uids()
+    local n = 0
+    for_each_player_unit(function(unit)
+        local uid = tostring(unit:unique_ui_id())
+        if sel[uid] and unit:is_ai_controlled() then
+            local su = bm:get_scriptunit_for_unit(unit)
+            if su then
+                overridden[uid] = { at = now_ms, idle_at = nil }
+                if planner then pcall(function() planner:remove_sunits(su) end) end
+                n = n + 1
+                out_log("override " .. unit:type() .. " (" .. uid .. ")")
+            end
+        end
+    end)
+    if n > 0 then out_log("override n=" .. n) end
+end
+
+local function add_handoff_listener(name, shortcut, fn)
+    if not shortcut then return end
+    local ok, err = pcall(function()
+        core:add_listener(name, "ShortcutTriggered",
+            function(ctx) return ctx.string == shortcut end,
+            function() bm:callback(fn, 0, name .. "_cb") end,
+            true)
+    end)
+    if not ok then out_log("ERROR hotkey " .. name .. " " .. tostring(err)) end
+end
+
+-- engine command events: UI orders (Move/Attack/etc.) arriving OUTSIDE our task
+-- pass on a delegated unit are the player clicking -> instant reclaim. Our own
+-- uc orders fire inside the tick where in_task_pass filters them out.
+local function cmd_probe_log(ctx, name)
+    if not CONFIG.cmd_probe then return end
+    local n = (cmd_seen[name] or 0) + 1
+    cmd_seen[name] = n
+    if n > 8 then return end
+    local ok_u, u = pcall(function() return ctx:get_unit() end)
+    local ok_s, s1 = pcall(function() return ctx:get_string1() end)
+    local ok_p, pos = pcall(function() return ctx:get_position() end)
+    local ok_b, b1 = pcall(function() return ctx:get_bool1() end)
+    out_log("cmd " .. name .. " #" .. n
+        .. " unit=" .. (ok_u and u and u:type() or "nil")
+        .. " uid=" .. (ok_u and u and tostring(u:unique_ui_id()) or "-")
+        .. " ai=" .. tostring(ok_u and u and u:is_ai_controlled())
+        .. " s1=" .. tostring(ok_s and s1)
+        .. " pos=" .. tostring(ok_p and pos)
+        .. " b1=" .. tostring(ok_b and b1)
+        .. " inpass=" .. tostring(in_task_pass))
+end
+
+local function add_order_listener(name)
+    local ok, err = pcall(function()
+        bm:register_command_handler_callback(name, function(ctx)
+            cmd_probe_log(ctx, name)
+            if not CONFIG.cmd_reclaim or in_task_pass then return end
+            local ok_u, u = pcall(function() return ctx:get_unit() end)
+            if not (ok_u and u) then return end
+            local uid = tostring(u:unique_ui_id())
+            -- player-issued order on a unit we think is delegated = they took it
+            if was_ai[uid] and not reclaimed[uid] and not overridden[uid] then
+                reclaimed[uid] = true
+                escape_pos[uid] = nil
+                out_log("reclaimed-cmd " .. name .. " " .. u:type() .. " (" .. uid .. ")")
+            end
+        end, "czx_cmd_" .. name)
+    end)
+    if not ok then out_log("ERROR cmd " .. name .. " " .. tostring(err)) end
+end
+
+---------------------------------------------------------------------------------------------
+-- tactical micro
+---------------------------------------------------------------------------------------------
+
+-- move d's unit away from a world position (fallback / dodge / pull-out)
+local function order_flee_pos(su, unit, from_pos, dist_m, now_ms, tag)
+    local uid = tostring(unit:unique_ui_id())
+    local ok, err = pcall(function()
+        local up = unit:position()
+        local dx, dz = up:get_x() - from_pos:get_x(), up:get_z() - from_pos:get_z()
+        local len = math.sqrt(dx * dx + dz * dz)
+        if len < 1 then dx, dz, len = 0, 1, 1 end -- degenerate: flee "north"
+        local dest = v(up:get_x() + dx / len * dist_m, up:get_z() + dz / len * dist_m)
+        local ok_b, bearing = pcall(function() return unit:bearing() end)
+        local deg = (ok_b and is_number(bearing)) and bearing * 180 / math.pi or 0
+        local ok_w, width = pcall(function() return unit:ordered_width() end)
+        su.uc:goto_location_angle_width(dest, deg, (ok_w and is_number(width)) and width or 20, true)
+        su.uc:release_control()
+    end)
+    if ok then
+        kicked_at[uid] = now_ms
+        idle_since[uid] = nil
+        out_log(tag .. " " .. unit:type() .. " (" .. uid .. ")")
+    else
+        out_log("ERROR " .. tag .. " " .. tostring(err))
+    end
+    return ok
+end
+
+-- cav cycle-charge: fight briefly, pull out, re-charge. Returns true when it
+-- issued an order this tick (caller skips other behaviour for this unit).
+local function cycle_charge_step(d, ctx)
+    if not CONFIG.cycle_charge then return false end
+    local uid = tostring(d.unit:unique_ui_id())
+    local st = charge_state[uid]
+    if not st then return false end -- set on first attack order below
+    local now_ms = ctx.now_ms
+    if st.phase == "in" then
+        -- target died or routed: cycle done; a fresh attack order re-arms it
+        local ok_t, alive = pcall(function()
+            return st.target ~= nil and not st.target:is_routing()
+        end)
+        if not (ok_t and alive) then charge_state[uid] = nil; return false end
+        local ok_m, melee = pcall(function() return d.unit:is_in_melee() end)
+        if ok_m and melee and (now_ms - st.at) > CONFIG.charge_fight_ms then
+            local ok_p, tp = pcall(function() return st.target:position() end)
+            if ok_p and tp then
+                order_flee_pos(d.su, d.unit, tp, CONFIG.charge_pull_m, now_ms, "charge-out")
+                st.phase, st.at = "out", now_ms
+                return true
+            end
+        end
+    elseif st.phase == "out" then
+        if (now_ms - st.at) > CONFIG.charge_regroup_ms then
+            local ok_v, moving = pcall(function() return d.unit:is_moving() end)
+            if not (ok_v and moving) or (now_ms - st.at) > CONFIG.charge_regroup_ms * 3 then
+                charge_state[uid] = nil -- fall through; a fresh attack order re-arms it
+            end
+        else
+            return true -- still pulling out; hold other orders
+        end
+    end
+    return false
+end
+
+-- wounded pull-out: high-value units below the hp threshold withdraw toward the
+-- planner centre until recovered. Returns true when it holds the unit this tick.
+local function wounded_step(d, ctx)
+    if not CONFIG.wounded_pullout then return false end
+    local uid = tostring(d.unit:unique_ui_id())
+    if d.role ~= "lord" and d.role ~= "monster" and d.role ~= "cav" then return false end
+    local ok_h, hp = pcall(function() return d.unit:unary_hitpoints() end)
+    if not (ok_h and is_number(hp)) then return false end
+    if not wounded_pull[uid] then
+        if hp < CONFIG.wounded_hp then
+            local ok_m, melee = pcall(function() return d.unit:is_in_melee() end)
+            if ok_m and melee then
+                wounded_pull[uid] = true
+            end
+        end
+    else
+        if hp > CONFIG.wounded_recover_hp then wounded_pull[uid] = nil end
+    end
+    if not wounded_pull[uid] then return false end
+    -- hold the withdrawal: keep moving toward own army centre
+    local ok_c, centre = pcall(function() return planner and planner:get_centre_point() end)
+    if not (ok_c and centre) then return false end -- no anchor: let the task layer have it
+    if ok_c and centre then
+        local ok_d, dist = pcall(function() return d.unit:position():distance_xz(centre) end)
+        local ok_v, moving = pcall(function() return d.unit:is_moving() end)
+        if ok_d and dist and dist > 40 and not (ok_v and moving) then
+            local ok, err = pcall(function()
+                local ok_b, bearing = pcall(function() return d.unit:bearing() end)
+                local deg = (ok_b and is_number(bearing)) and bearing * 180 / math.pi or 0
+                local ok_w, width = pcall(function() return d.unit:ordered_width() end)
+                d.su.uc:goto_location_angle_width(centre, deg, (ok_w and is_number(width)) and width or 20, true)
+                d.su.uc:release_control()
+            end)
+            if ok then out_log("wounded-pull " .. d.unit:type() .. " (" .. uid .. ") hp=" .. math.floor(hp * 100) .. "%") end
+        end
+    end
+    return true
+end
+
+-- shooter kiting: a melee-role enemy closing in triggers a fallback move; the
+-- unit resumes firing once clear (skirmish flag alone retreats too early)
+local function kite_step(d, ctx)
+    if not CONFIG.kite_fallback or d.role ~= "shooter" then return false end
+    local threat, td = nil, math.huge
+    for _, e in ipairs(ctx.enemies) do
+        local r = ctx.erole[e]
+        if r == "melee" or r == "monster" or r == "cav" then
+            local ok_d, dist = pcall(function()
+                return e:position():distance_xz(d.unit:position())
+            end)
+            if ok_d and dist and dist < td then threat, td = e, dist end
+        end
+    end
+    if not (threat and td <= CONFIG.kite_threat_m) then return false end
+    local ok_v, moving = pcall(function() return d.unit:is_moving() end)
+    if ok_v and moving then return true end -- already falling back; hold
+    local ok_p, tp = pcall(function() return threat:position() end)
+    if ok_p and tp then
+        order_flee_pos(d.su, d.unit, tp, CONFIG.kite_dest_m, ctx.now_ms, "kite-back")
+    end
+    return true
+end
+
+---------------------------------------------------------------------------------------------
 -- pass 2.5: task assignment (v2 ActionSelector v1).
 -- doctrine + role + context -> task id; tasks are the vocabulary the squad
 -- layer will later assign explicitly. Executors keyed by task below.
@@ -5225,7 +5520,7 @@ local function tick()
         -- orderless planner too. Re-delegate on the first drop; only when a
         -- unit escapes repeatedly inside the window do we believe the player
         -- keeps grabbing it back and mark it reclaimed.
-        if was_ai[uid0] and not ai_now then
+        if was_ai[uid0] and not ai_now and not overridden[uid0] then
             local n = escapes[uid0] or 0
             if now_ms - (escape_t[uid0] or 0) > CONFIG.reclaim_window_ms then n = 0 end
             n = n + 1
@@ -5261,9 +5556,25 @@ local function tick()
             out_log("handed-back " .. unit:type() .. " (" .. uid0 .. ")")
         end
         was_ai[uid0] = ai_now or nil
+        -- override decay: after the grace window, an idle overridden unit goes
+        -- back to the AI (player finished microing it and walked away)
+        local ov = overridden[uid0]
+        if ov and not ai_now then
+            if (now_ms - ov.at) > CONFIG.override_grace_s * 1000 then
+                if unit:is_idle() then
+                    ov.idle_at = ov.idle_at or now_ms
+                    if (now_ms - ov.idle_at) > CONFIG.override_idle_s * 1000 then
+                        overridden[uid0] = nil
+                        out_log("override-end " .. unit:type() .. " (" .. uid0 .. ")")
+                    end
+                else
+                    ov.idle_at = nil -- still being microed
+                end
+            end
+        end
         -- reinforcements/summons that arrived after delegation, and units the
         -- planner dropped on its own: hand them in too
-        if planner and not ai_now and not reclaimed[uid0] and not unit:is_routing() then
+        if planner and not ai_now and not reclaimed[uid0] and not overridden[uid0] and not unit:is_routing() then
             local su0 = bm:get_scriptunit_for_unit(unit)
             if su0 then
                 local ok_a = pcall(function() planner:add_sunits(su0) end)
@@ -5278,6 +5589,7 @@ local function tick()
             if su and su.uc then
                 local p = probe_unit(unit)
                 local role = classify(unit, p)
+                role_of[uid0] = role
                 delegated[#delegated + 1] = {
                     su = su, unit = unit, role = role,
                     anti_large = p.prof and p.prof.ai:find("anti_large") ~= nil,
@@ -5291,6 +5603,9 @@ local function tick()
             guard_set[uid .. "|defend"] = nil
             guard_set[uid .. "|skirmish"] = nil
             unit_task[uid] = nil
+            role_of[uid] = nil
+            charge_state[uid] = nil
+            wounded_pull[uid] = nil
         end
     end)
 
@@ -5401,11 +5716,76 @@ local function tick()
         if cast_at[uid] and (now_ms - cast_at[uid]) < CONFIG.cast_quiet_ms then
             -- cast still resolving; hold the task order this tick
         else
-            local exec = TASK_EXEC[task] or TASK_EXEC.attack
-            pcall(exec, d, ctx)
+            in_task_pass = true
+            -- tactical micro overrides the doctrine task when it triggers:
+            -- wounded pull-out > shooter kiting > cav cycle-charge > task
+            local ok_h, handled = pcall(function()
+                return wounded_step(d, ctx) or kite_step(d, ctx) or cycle_charge_step(d, ctx)
+            end)
+            if not (ok_h and handled) then
+                local exec = TASK_EXEC[task] or TASK_EXEC.attack
+                pcall(exec, d, ctx)
+            end
+            in_task_pass = false
         end
     end
 end
+
+---------------------------------------------------------------------------------------------
+-- listeners: hotkey handoff + engine command events (reclaim probe + dodge)
+---------------------------------------------------------------------------------------------
+
+-- hotkey handoff: select unit cards, press the bound shortcut (camera bookmark
+-- saves by default — rebindable under Settings > Camera)
+add_handoff_listener("czx_handoff_toggle", CONFIG.hotkey_toggle,
+    function() handoff_toggle() end)
+add_handoff_listener("czx_handoff_override", CONFIG.hotkey_override,
+    function() handoff_override(bm:time_elapsed_ms()) end)
+
+-- UI order commands on delegated units = the player took over. Events arriving
+-- while in_task_pass is true are our own uc orders and get filtered out.
+for _, name in ipairs({
+    "Attack Unit", "Move Orientation Width", "Move Rotation Angle",
+    "Change Speed", "Change Melee", "Change Skirmish", "Fire At Will",
+}) do
+    add_order_listener(name)
+end
+
+-- enemy ability casts: the Special Ability command context exposes the caster
+-- (get_unit) and hopefully the target point (get_position) -> scatter our units
+-- standing in the blast. Probe logging verifies the schema in live games.
+pcall(function()
+    bm:register_command_handler_callback("Special Ability", function(ctx)
+        cmd_probe_log(ctx, "Special Ability")
+        if not CONFIG.dodge or in_task_pass then return end
+        local ok_u, caster = pcall(function() return ctx:get_unit() end)
+        local ok_p, pos = pcall(function() return ctx:get_position() end)
+        if not (ok_u and caster and ok_p and pos) then return end
+        local ok_a, al = pcall(function() return caster:alliance_index() end)
+        if not (ok_a and al and al ~= bm:local_alliance()) then return end
+        local now_ms = bm:time_elapsed_ms()
+        local n_scatter = 0
+        for_each_player_unit(function(unit)
+            local uid = tostring(unit:unique_ui_id())
+            if unit:is_ai_controlled() and not unit:is_routing()
+                and (now_ms - (dodge_at[uid] or 0)) > CONFIG.dodge_cooldown_ms then
+                local ok_d, dist = pcall(function() return unit:position():distance_xz(pos) end)
+                if ok_d and dist and dist <= CONFIG.dodge_radius_m then
+                    local su = bm:get_scriptunit_for_unit(unit)
+                    if su and su.uc then
+                        dodge_at[uid] = now_ms
+                        order_flee_pos(su, unit, pos, CONFIG.dodge_dest_m, now_ms, "dodge")
+                        n_scatter = n_scatter + 1
+                    end
+                end
+            end
+        end)
+        if n_scatter > 0 then
+            local ok_k, key = pcall(function() return ctx:get_string1() end)
+            out_log("dodge n=" .. n_scatter .. " <- " .. tostring(ok_k and key))
+        end
+    end, "czx_cmd_special")
+end)
 
 -- pcall 兜底：tick 内任何报错只记日志——裸错会中断 timer_manager 泵的
 -- singleshot 重武装，把全场所有脚本的计时器一起打死（czx_tc 实测教训）
@@ -5414,4 +5794,5 @@ bm:repeat_callback(function()
     if not ok then out_log("ERROR tick " .. tostring(err)) end
 end, CONFIG.poll_ms, "czx_auto_ability_tick")
 out_log("loaded, poll " .. CONFIG.poll_ms .. "ms, auto_cast=" .. tostring(CONFIG.auto_cast)
-    .. " auto_delegate=" .. tostring(CONFIG.auto_delegate))
+    .. " auto_delegate=" .. tostring(CONFIG.auto_delegate)
+    .. " hotkey=" .. tostring(CONFIG.hotkey_toggle) .. "/" .. tostring(CONFIG.hotkey_override))
