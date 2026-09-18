@@ -1,0 +1,903 @@
+"""Generate czx_battle_auto_ability.lua (flags data + logic) into mod_files/zzz_czx_battle_ui."""
+import csv, glob, io
+from pathlib import Path
+
+ROOT = Path(r"E:\Code\WH3-modding")
+OUT = ROOT / "mod_files" / "zzz_czx_battle_ui" / "script" / "battle" / "mod" / "czx_battle_auto_ability.lua"
+
+sources = [ROOT / "gamedata" / "db" / "unit_special_abilities_tables" / "data__.tsv"]
+sources += sorted(glob.glob(str(ROOT / "mod_files" / "*" / "db" / "unit_special_abilities_tables" / "*.tsv")))
+
+rows = {}
+for p in sources:
+    p = Path(p)
+    with open(p, encoding="utf-8-sig", newline="") as f:
+        rd = csv.reader(f, delimiter="\t")
+        lines = [r for r in rd if r and r[0] and not r[0].startswith("#")]
+        if not lines:
+            continue
+        h = lines[0]
+        idx = {k: h.index(k) for k in ("key", "passive", "target_ground", "target_enemies",
+                                      "target_friends", "affect_self", "target_self",
+                                      "mana_cost", "recharge_time") if k in h}
+        for r in lines[1:]:
+            key = r[idx["key"]].strip()
+            if not key:
+                continue
+            def b(col):
+                return idx.get(col) is not None and r[idx[col]].strip().lower() == "true"
+            def num(col):
+                try:
+                    return float(r[idx[col]]) if idx.get(col) is not None and r[idx[col]].strip() else 0.0
+                except ValueError:
+                    return 0.0
+            if b("passive"):
+                continue
+            mask = (1 if b("target_ground") else 0) | (2 if b("target_enemies") else 0)                  | (4 if b("target_friends") else 0) | (8 if (b("affect_self") or b("target_self")) else 0)                  | (16 if num("mana_cost") > 0 else 0)
+            rows[key] = (mask, int(num("recharge_time")))
+
+data_lines = [f'    ["{k}"] = "{m},{r}",' for k, (m, r) in sorted(rows.items())]
+data = "\n".join(data_lines)
+
+# --- unit profiles for role classification, baked from land_units ---
+# vanilla export lives in the tactical-commander RFC workspace; mod units come
+# from each mod's own land_units tsv. Format: "ai_role|category|class|is_large"
+lu_sources = [
+    ROOT / "mod_files" / "czx_battle_tactical_commander" / "czx_battle_tactical_commander"
+    / "data" / "vanilla" / "land_units_tables.tsv"
+]
+lu_sources += sorted(glob.glob(str(ROOT / "mod_files" / "*" / "db" / "land_units_tables" / "*.tsv")))
+
+profiles = {}
+for p in lu_sources:
+    p = Path(p)
+    if not p.is_file():
+        continue
+    with open(p, encoding="utf-8-sig", newline="") as f:
+        rd = csv.reader(f, delimiter="\t")
+        lines = [r for r in rd if r and r[0] and not r[0].startswith("#")]
+        if not lines:
+            continue
+        h = lines[0]
+        idx = {k: h.index(k) for k in ("key", "ai_usage_group", "category", "class",
+                                      "ground_stat_effect_group") if k in h}
+        if "key" not in idx:
+            continue
+        for r in lines[1:]:
+            if len(r) <= max(idx.values()):
+                continue
+            key = r[idx["key"]].strip()
+            if not key:
+                continue
+            def cell(col):
+                return r[idx[col]].strip() if col in idx else ""
+            is_large = "large" in cell("ground_stat_effect_group").lower()
+            profiles[key] = "|".join([
+                cell("ai_usage_group"), cell("category"), cell("class"),
+                "1" if is_large else "0"])
+
+profile_lines = [f'    ["{k}"] = "{v}",' for k, v in sorted(profiles.items())]
+profile_data = "\n".join(profile_lines)
+
+template = '''---------------------------------------------------------------------------------------------
+-- czx_battle_auto_ability.lua
+-- Auto-cast non-passive special abilities for delegated (AI-controlled) player units.
+-- Complements AI General-style delegation: planner units never self-cast, so we poll and
+-- fire ready abilities through their script_unit's unitcontroller (order + release_control,
+-- which does not detach the unit from its ai_planner).
+---------------------------------------------------------------------------------------------
+
+local CONFIG = {
+    enabled          = true,
+    poll_ms          = 3000,    -- scan interval
+    retry_ms         = 20000,   -- min delay between attempts of the same ability on the same unit
+    cast_spells      = true,    -- false = skip abilities with mana_cost > 0
+    engage_range_m   = 120,     -- only attempt casts when nearest enemy is within this distance (m)
+    unit_keys        = {},      -- non-empty = only these unit keys auto-cast, e.g. {"czx_dgm_wargreymon"}
+    banned_abilities = {},      -- ability keys never auto-cast
+    auto_cast        = false,   -- master switch: false = never call perform_special_ability (sim-freeze kill switch)
+    cast_on_summons  = false,   -- summoned units despawn mid-effect and can wedge the sim; skip their abilities
+    cast_quiet_ms    = 6000,    -- after a successful cast, suppress task orders on that unit this long
+    -- idle-kicker: delegated units the planner leaves standing around get nudged
+    -- toward the nearest enemy. Ordering an already-idle unit interrupts nothing.
+    idle_kick        = true,
+    idle_kick_after_s= 8,       -- unit must stay continuously idle this long first
+    idle_kick_range_m= 400,     -- only nudge if nearest enemy within this distance
+    -- doctrine engine: pick a battle plan from delegated army composition each
+    -- tick, then run per-role behaviours. "auto" detects; or force a doctrine.
+    doctrine         = "auto",  -- "auto" | "gunline" | "balanced" | "rush" | "kite" | "none"
+    gunline_min_share= 0.35,    -- auto: gunline if >=35% of delegated units carry ammo
+    rush_max_shooter_share = 0.15, -- auto: rush if <=15% carry ammo
+    kite_min_mobile_share  = 0.70, -- auto: kite if >=70% are cav/flyers
+    -- role classification thresholds
+    cav_min_speed    = 60,      -- fast_speed() >= this counts as cavalry-class
+    artillery_min_range = 250,  -- missile_range() >= this counts as artillery
+    -- screen radii (gunline tight / balanced loose)
+    intercept_radius_m = 110,   -- screens attack enemies within this of themselves
+    protect_radius_m = 100,     -- ... or within this of a delegated ranged unit
+    leash_radius_m   = 160,     -- screens farther than this from the line fall back toward it
+    bal_intercept_radius_m = 150,
+    bal_leash_radius_m   = 220,
+    cav_intercept_radius_m = 200, -- cav reserve intercepts threats further out
+    flank_hunt_range_m = 400,   -- cav in non-gunline doctrines hunt enemy shooters within this
+    flyer_hunt_range_m = 500,   -- flyers hunt enemy flyers/artillery within this
+    shooter_hold_mult  = 1.3,   -- gunline shooters only attack enemies within missile_range * this
+    -- auto-delegation: hand the whole local army to a script_ai_planner so the
+    -- doctrine engine works standalone (no AI General needed). Units the player
+    -- takes back via vanilla group UI are never re-delegated.
+    auto_delegate    = true,
+    delegate_after_ms= 3000,    -- wait this long before creating the planner
+    focus_cap        = 3,       -- max delegated units ordered onto the same target per tick
+    -- planner directive: an orderless planner drops its units (observed: whole
+    -- army leaked out of ai-control within ~3min), so always keep a standing
+    -- order on it. rush/kite = attack the front-most enemy; hold doctrines =
+    -- defend_position on the group centre (same as the vanilla defend button).
+    directive_refresh_ms = 20000, -- re-issue/retarget this often
+    defend_radius_m  = 120,       -- radius for defend_position
+    reclaim_escapes  = 2,         -- ai-drops inside the window before we believe
+    reclaim_window_ms= 60000,     --   the player actually took the unit back
+}
+
+-- ABILITY_FLAGS[ability_key] = "mask,recharge_seconds"
+-- mask bits: 1=target_ground 2=target_enemies 4=target_friends 8=self 16=spell(mana_cost>0)
+local ABILITY_FLAGS = {
+__DATA__
+}
+
+if not CONFIG.enabled then return end
+if bm:is_replay() or bm:is_tutorial() then return end
+
+local function out_log(msg)
+    out(">>> czx_auto_ability >>> " .. tostring(msg))
+end
+
+local cast_log = {} -- [unit_ui_id] = { [ability_key] = last_attempt_ms }
+
+-- auto-delegation state
+local planner = nil           -- script_ai_planner holding the delegated army
+local delegate_err_logged = false
+local reclaimed = {}      -- [uid] = true once the player takes a unit back; never re-delegate
+local was_ai = {}         -- [uid] = true while is_ai_controlled() held last tick
+local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
+local escapes, escape_t = {}, {} -- [uid] = ai-drop count / last drop ms (reclaim debounce)
+local directive_doc = nil     -- doctrine the standing planner order was issued under
+local directive_ms = 0        -- when it was issued
+local directive_target = nil  -- enemy unit the standing attack order points at
+
+-- 野战白名单：攻城/任务战不自动托管（CA 官方不建议攻城用 planner，同 v2 gate）
+local DELEGATE_TYPES = {
+    land_normal = true, land_ambush = true,
+    underground = true, underway = true,
+    chokepoint = true, crossing = true,
+}
+
+-- 攻防克制加成（v2 counter 矩阵紧凑版）：attacker_role -> target_role -> score
+local COUNTER_BONUS = {
+    melee     = { shooter = 30, artillery = 40, monster = -20 },
+    monster   = { melee = 20, shooter = 25, cav = 10 },
+    cav       = { shooter = 40, artillery = 50, monster = -30, melee = -10 },
+    flyer     = { artillery = 40, shooter = 30, monster = -20 },
+    shooter   = { monster = 20, cav = 10 },
+    artillery = {},
+    lord      = {},
+}
+local function counter_of(att_role, def_role)
+    local row = COUNTER_BONUS[att_role]
+    return (row and row[def_role]) or 0
+end
+
+local function for_each_player_unit(cb)
+    local alliance = bm:alliances():item(bm:local_alliance())
+    if not alliance then return end
+    local army = alliance:armies():item(bm:local_army())
+    if not army then return end
+    local units = army:units()
+    for i = 1, units:count() do
+        cb(units:item(i))
+    end
+end
+
+local function nearest_enemy(unit)
+    local alliance = bm:get_non_player_alliance()
+    if not alliance then return nil, math.huge end
+    local best, best_d = nil, math.huge
+    local up = unit:position()
+    local armies = alliance:armies()
+    for a = 1, armies:count() do
+        local units = armies:item(a):units()
+        for u = 1, units:count() do
+            local e = units:item(u)
+            if e and not e:is_routing() then
+                local ok, d = pcall(function() return up:distance_xz(e:position()) end)
+                if ok and d and d < best_d then
+                    best, best_d = e, d
+                end
+            end
+        end
+    end
+    return best, best_d
+end
+
+local function ability_allowed(unit, key)
+    if CONFIG.banned_abilities[key] then return false end
+    if next(CONFIG.unit_keys) ~= nil then
+        local ut = unit:type()
+        if not CONFIG.unit_keys[ut] then return false end
+    end
+    return true
+end
+
+local unsupported = {} -- [uid.."|"..key] = true once the engine reports the unit doesn't support the ability
+local denied_keys = {} -- [ability_key] = true once a maneuver ability was skipped and logged
+local cast_at = {}     -- [unit_ui_id] = battle ms of last successful cast on the unit
+local summon_probe = {} -- [unit_type] = true once a summoned unit type was logged as cast-skipped
+
+local function try_cast(su, unit, key, now_ms)
+    local uid = tostring(unit:unique_ui_id())
+    local combo = uid .. "|" .. key
+    if unsupported[combo] then return end
+    local ulog = cast_log[uid]
+    if ulog and ulog[key] and (now_ms - ulog[key]) < CONFIG.retry_ms then
+        return
+    end
+    -- formation abilities are unit-shape toggles, not fire-and-forget casts:
+    -- re-toggling churns control and can wedge the engine's formation solver
+    -- (observed: sim froze 1.7s after formation_lance was auto-cast on a
+    -- single-model monster). Covers mod abilities missing the baked flag.
+    if key:find("formation") then return end
+    -- maneuver abilities (bomb drops / flyover attacks) require the unit to fly
+    -- over a target point; unbaked mod keys fall through to the self-cast path,
+    -- which makes the flyer maneuver toward its own position forever and deadlocks
+    -- the sim thread (observed: two freezes ~1s after casting djs_fw_190_zhadan).
+    if key:find("zhadan") or key:find("gyrobomber_bomb") or key:find("copter_bomb")
+        or key:find("bomb_drop") or key:find("djs_f4u_t0") then
+        if not denied_keys[key] then
+            denied_keys[key] = true
+            out_log("denied-maneuver " .. key)
+        end
+        return
+    end
+    local flag_str = ABILITY_FLAGS[key]
+    local mask, recharge = 0, 0
+    if flag_str then
+        mask, recharge = flag_str:match("^(%d+),(%d+)")
+        mask, recharge = tonumber(mask) or 0, tonumber(recharge) or 0
+    end
+    if mask >= 16 then
+        if not CONFIG.cast_spells then return end
+        mask = mask - 16
+    end
+    if not unit:can_perform_special_ability(key) then
+        return
+    end
+    -- engagement gate: don't churn unit control for abilities that can't matter yet
+    local e, dist = nearest_enemy(unit)
+    if not e or dist > CONFIG.engage_range_m then
+        return
+    end
+    local fired = false
+    if mask % 2 >= 1 then -- target_ground
+        su.uc:perform_special_ability_ground(key, e:position())
+        fired = true
+    elseif mask % 4 >= 2 then -- target_enemies
+        su.uc:perform_special_ability(key, e)
+        fired = true
+    else -- self / aura / target_friends -> cast on self (engine requires the target arg; pass own unit)
+        su.uc:perform_special_ability(key, unit)
+        fired = true
+    end
+    if fired then
+        -- issuing an order implicitly takes script control; release it back so the
+        -- ai planner can keep commanding the unit
+        su.uc:release_control()
+        cast_log[uid] = cast_log[uid] or {}
+        cast_log[uid][key] = now_ms
+        cast_at[uid] = now_ms -- quiet window: suppress task orders while the cast resolves
+        out_log("cast " .. key .. " on " .. uid)
+    end
+end
+
+local idle_since = {} -- [unit_ui_id] = battle ms when the unit was first seen idle
+local kicked_at = {}  -- [unit_ui_id] = battle ms of last nudge, to avoid spamming orders
+local guard_set = {}  -- [unit_ui_id] = true once a behaviour flag was applied
+local unit_task = {}  -- [unit_ui_id] = last assigned task id
+local seen_types = {} -- [unit_type] = true once role-probe info was logged
+
+local function unit_dist(a, b)
+    local ok, d = pcall(function() return a:position():distance_xz(b:position()) end)
+    return (ok and is_number(d)) and d or math.huge
+end
+
+local function nearest_of(unit, list)
+    local best, bd = nil, math.huge
+    for _, o in ipairs(list) do
+        local d = unit_dist(unit, o)
+        if d < bd then best, bd = o, d end
+    end
+    return best, bd
+end
+
+-- baked unit profiles: [unit_type] = "ai_role|category|class|is_large"
+local CZX_UNIT_PROFILE = {
+__PROFILE_DATA__
+}
+
+local function profile_of(unit)
+    local s = CZX_UNIT_PROFILE[unit:type()]
+    if not s then return nil end
+    local ai, cat, cls, lg = s:match("^([^|]*)|([^|]*)|([^|]*)|(%d)")
+    return { ai = ai or "", cat = cat or "", cls = cls or "", large = (lg == "1") }
+end
+
+local function ubool(unit, method)
+    local ok, v = pcall(function() return unit[method](unit) end)
+    return ok and v == true
+end
+
+-- engine's own unit-value estimate [需验证取值范围]
+local function sv_of(unit)
+    local ok, v = pcall(function() return unit:strategic_value() end)
+    return (ok and is_number(v)) and v or 0
+end
+
+-- pick the best target from a list of enemy units by utility score;
+-- score_fn returns -inf to exclude a candidate.
+local function best_scored(unit, list, score_fn)
+    local best, bs = nil, -math.huge
+    for _, e in ipairs(list) do
+        local s = score_fn(e)
+        if s and s > bs then best, bs = e, s end
+    end
+    return best
+end
+
+-- role classification: baked profile first (exact, covers vanilla + our mods),
+-- runtime boolean chain for unbaked (foreign mod) units. First match wins.
+local function classify(unit, p)
+    local prof = p.prof
+    if prof then
+        local cat = prof.cat
+        if cat == "war_machine" or cat == "artillery" then return "artillery" end
+        if prof.cls == "com" then return "lord" end
+        if p.flies then return "flyer" end
+        if prof.large or cat == "war_beast" then return "monster" end
+        if cat == "cavalry" then return "cav" end
+        if cat == "inf_ranged" or p.ammo ~= 0 then return "shooter" end
+        return "melee"
+    end
+    if ubool(unit, "is_artillery") or ubool(unit, "is_war_machine") then return "artillery" end
+    if ubool(unit, "is_commanding_unit") then return "lord" end
+    if p.flies then return "flyer" end
+    if ubool(unit, "is_war_beasts") or ubool(unit, "is_elephants") then return "monster" end
+    if ubool(unit, "is_cavalry") or ubool(unit, "is_chariot") or p.speed >= CONFIG.cav_min_speed then return "cav" end
+    if p.ammo ~= 0 and p.range >= CONFIG.artillery_min_range then return "artillery" end
+    if p.ammo ~= 0 then return "shooter" end
+    return "melee"
+end
+
+local function probe_unit(unit)
+    local p = {}
+    local ok_a, ammo = pcall(function() return unit:ammo_left() end)
+    p.ammo = (ok_a and is_number(ammo)) and ammo or 0
+    local ok_r, range = pcall(function() return unit:missile_range() end)
+    p.range = (ok_r and is_number(range)) and range or 0
+    local ok_s, speed = pcall(function() return unit:fast_speed() end)
+    p.speed = (ok_s and is_number(speed)) and speed or 0
+    local ok_f, flies = pcall(function() return unit:can_fly() end)
+    p.flies = ok_f and flies or false
+    p.prof = profile_of(unit)
+    local t = unit:type()
+    if not seen_types[t] then
+        seen_types[t] = true
+        out_log("role-probe " .. t
+            .. " prof=" .. (p.prof and (p.prof.cat .. "/" .. p.prof.ai .. (p.prof.large and "/L" or "")) or "none")
+            .. " spd=" .. p.speed .. " ammo=" .. p.ammo .. " range=" .. p.range .. " fly=" .. tostring(p.flies))
+    end
+    return p
+end
+
+local function idle_long_enough(unit, now_ms)
+    if not CONFIG.idle_kick then return false end -- master switch for movement orders
+    local uid = tostring(unit:unique_ui_id())
+    if not unit:is_idle() then
+        idle_since[uid] = nil
+        return false
+    end
+    if not idle_since[uid] then
+        idle_since[uid] = now_ms
+        return false
+    end
+    if (now_ms - idle_since[uid]) < CONFIG.idle_kick_after_s * 1000 then return false end
+    if kicked_at[uid] and (now_ms - kicked_at[uid]) < CONFIG.retry_ms then return false end
+    return true
+end
+
+local function order_attack(su, unit, e, now_ms, tag)
+    local uid = tostring(unit:unique_ui_id())
+    -- focus cap: don't pile the whole line onto one target this tick
+    local euid = tostring(e:unique_ui_id())
+    if (focus_count[euid] or 0) >= CONFIG.focus_cap then return end
+    local ok, err = pcall(function()
+        su.uc:attack_unit(e, true, true)
+        su.uc:release_control()
+    end)
+    if ok then
+        focus_count[euid] = (focus_count[euid] or 0) + 1
+        kicked_at[uid] = now_ms
+        idle_since[uid] = nil
+        out_log(tag .. " " .. unit:type() .. " (" .. uid .. ") -> " .. e:type())
+    else
+        out_log("ERROR " .. tag .. " " .. tostring(err))
+        idle_since[uid] = now_ms -- restart the idle timer so we don't retry every poll
+    end
+end
+
+local function order_return(su, unit, anchor, now_ms)
+    local uid = tostring(unit:unique_ui_id())
+    local ok, err = pcall(function()
+        local ok_b, bearing = pcall(function() return unit:bearing() end)
+        local deg = (ok_b and is_number(bearing)) and bearing * 180 / math.pi or 0
+        local ok_w, width = pcall(function() return unit:ordered_width() end)
+        su.uc:goto_location_angle_width(anchor:position(), deg, (ok_w and is_number(width)) and width or 20, true)
+        su.uc:release_control()
+    end)
+    if ok then
+        kicked_at[uid] = now_ms
+        idle_since[uid] = nil
+        out_log("screen-return " .. unit:type() .. " (" .. uid .. ")")
+    else
+        out_log("ERROR screen-return " .. tostring(err))
+        idle_since[uid] = now_ms
+    end
+end
+
+local function set_behaviour_once(su, unit, behaviour, flag_key)
+    local uid = tostring(unit:unique_ui_id())
+    local k = uid .. "|" .. (flag_key or behaviour)
+    if guard_set[k] then return end
+    guard_set[k] = true
+    local ok, can = pcall(function() return unit:can_use_behaviour(behaviour) end)
+    if not (ok and can) then return end
+    local ok2, active = pcall(function() return unit:is_behaviour_active(behaviour) end)
+    if ok2 and active then return end
+    pcall(function()
+        su.uc:change_behaviour_active(behaviour, true, false)
+        su.uc:release_control()
+    end)
+end
+
+-- generic screen behaviour: hold near an anchor list, intercept close threats,
+-- fall back when dragged too far out. Threats are scored, not just nearest:
+-- big threats and high-value enemies get intercepted first.
+local function screen_hold(d, ctx, intercept_r, leash_r, tag)
+    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    local anchor = ctx.shooters and nearest_of(d.unit, ctx.shooters)
+    local t = best_scored(d.unit, ctx.enemies, function(e)
+        local dist = unit_dist(d.unit, e)
+        local near = dist <= intercept_r
+            or (anchor and unit_dist(e, anchor) <= CONFIG.protect_radius_m)
+        if not near then return -math.huge end
+        local s = -dist * 0.5 + counter_of(d.role, ctx.erole[e])
+        if ctx.erole[e] == "monster" then s = s + 50 end
+        if d.anti_large and ctx.erole[e] == "monster" then s = s + 40 end
+        return s + sv_of(e) * 0.2
+    end)
+    if t then
+        order_attack(d.su, d.unit, t, ctx.now_ms, tag .. "-intercept")
+        return
+    end
+    if anchor and unit_dist(d.unit, anchor) > leash_r then
+        order_return(d.su, d.unit, anchor, ctx.now_ms)
+    end
+end
+
+local function kick_if_idle(su, unit, now_ms)
+    if not idle_long_enough(unit, now_ms) then return end
+    local e, dist = nearest_enemy(unit)
+    if e and dist <= CONFIG.idle_kick_range_m then
+        order_attack(su, unit, e, now_ms, "idle-kick")
+    end
+end
+
+-- pass 2.5: task assignment (v2 ActionSelector v1).
+-- doctrine + role + context -> task id; tasks are the vocabulary the squad
+-- layer will later assign explicitly. Executors keyed by task below.
+local function assign_task(d, ctx)
+    local role, doc = d.role, ctx.doctrine
+    if role == "artillery" then return "hold_position" end
+    if doc == "gunline" then
+        if role == "melee" or role == "monster" then return "protect_gunline" end
+        if role == "cav" then return "intercept_breakthrough" end
+        if role == "flyer" then return "hunt_backline" end
+        if role == "shooter" then return "hold_fire_line" end
+        if role == "lord" then return "free_engagement" end
+    elseif doc == "balanced" then
+        if role == "melee" or role == "monster" then return "protect_gunline" end
+        if role == "cav" or role == "flyer" then return "hunt_backline" end
+        if role == "lord" then return "free_engagement" end
+        if role == "shooter" then return "free_fire" end
+    elseif doc == "kite" then
+        if role == "cav" or role == "flyer" then return "hunt_backline" end
+        if role == "shooter" then return "hold_fire_line" end
+        return "attack"
+    end
+    -- rush / none / unknown: everything pushes
+    return "attack"
+end
+
+-- task executors; ctx = {now_ms, doctrine, shooters, enemies, ...}
+local TASK_EXEC = {}
+
+TASK_EXEC.protect_gunline = function(d, ctx)
+    set_behaviour_once(d.su, d.unit, "defend")
+    if ctx.doctrine == "gunline" then
+        screen_hold(d, ctx, CONFIG.intercept_radius_m, CONFIG.leash_radius_m, "screen")
+    else
+        screen_hold(d, ctx, CONFIG.bal_intercept_radius_m, CONFIG.bal_leash_radius_m, "screen")
+    end
+end
+
+TASK_EXEC.intercept_breakthrough = function(d, ctx)
+    -- gunline cav reserve: intercept whatever presses the line, strongly
+    -- preferring monsters threatening the anchor
+    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    local anchor = nearest_of(d.unit, ctx.shooters)
+    local t = best_scored(d.unit, ctx.enemies, function(e)
+        local dist = unit_dist(d.unit, e)
+        local near = dist <= CONFIG.cav_intercept_radius_m
+            or (anchor and unit_dist(e, anchor) <= CONFIG.protect_radius_m * 2)
+        if not near then return -math.huge end
+        local s = -dist * 0.3 + sv_of(e) * 0.3 + counter_of("cav", ctx.erole[e])
+        if ctx.erole[e] == "monster" then s = s + 80 end
+        return s
+    end)
+    if t then
+        order_attack(d.su, d.unit, t, ctx.now_ms,
+            ctx.erole[t] == "monster" and "cav-antilarge" or "cav-intercept")
+        return
+    end
+    if anchor and unit_dist(d.unit, anchor) > CONFIG.bal_leash_radius_m then
+        order_return(d.su, d.unit, anchor, ctx.now_ms)
+    end
+end
+
+TASK_EXEC.hunt_backline = function(d, ctx)
+    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    -- flyers prefer enemy flyers/artillery over ground backline
+    if d.role == "flyer" then
+        local t = best_scored(d.unit, ctx.enemies_airarty, function(e)
+            local dist = unit_dist(d.unit, e)
+            if dist > CONFIG.flyer_hunt_range_m then return -math.huge end
+            return sv_of(e) - dist * 0.2
+        end)
+        if t then
+            order_attack(d.su, d.unit, t, ctx.now_ms, "flyer-hunt")
+            return
+        end
+    end
+    local t = best_scored(d.unit, ctx.enemies_ranged, function(e)
+        local dist = unit_dist(d.unit, e)
+        if dist > CONFIG.flank_hunt_range_m then return -math.huge end
+        return sv_of(e) - dist * 0.2 + counter_of(d.role, ctx.erole[e])
+    end)
+    if t then
+        order_attack(d.su, d.unit, t, ctx.now_ms, "cav-hunt")
+        return
+    end
+    -- nothing to hunt: gunline falls back to reserve interception, else loose screen
+    if ctx.doctrine == "gunline" then
+        TASK_EXEC.intercept_breakthrough(d, ctx)
+    else
+        screen_hold(d, ctx, CONFIG.bal_intercept_radius_m, CONFIG.bal_leash_radius_m, d.role)
+    end
+end
+
+TASK_EXEC.free_engagement = function(d, ctx)
+    -- lords act freely: intercept close threats but never get leashed back;
+    -- among nearby enemies they prefer high-value targets
+    set_behaviour_once(d.su, d.unit, "defend")
+    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    local t = best_scored(d.unit, ctx.enemies, function(e)
+        local dist = unit_dist(d.unit, e)
+        if dist > CONFIG.bal_intercept_radius_m then return -math.huge end
+        return sv_of(e) - dist
+    end)
+    if t then order_attack(d.su, d.unit, t, ctx.now_ms, "lord-intercept") end
+end
+
+TASK_EXEC.hold_fire_line = function(d, ctx)
+    set_behaviour_once(d.su, d.unit, "skirmish")
+    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    local e, dist = nearest_enemy(d.unit)
+    local ok_r, rng = pcall(function() return d.unit:missile_range() end)
+    local hold = (ok_r and is_number(rng) and rng > 0) and rng * CONFIG.shooter_hold_mult or CONFIG.intercept_radius_m
+    if e and dist <= hold then
+        order_attack(d.su, d.unit, e, ctx.now_ms, "shooter-engage")
+    end
+    -- beyond hold range: stay put, don't walk past the screen
+end
+
+TASK_EXEC.free_fire = function(d, ctx)
+    kick_if_idle(d.su, d.unit, ctx.now_ms)
+end
+
+TASK_EXEC.attack = function(d, ctx)
+    kick_if_idle(d.su, d.unit, ctx.now_ms)
+end
+
+TASK_EXEC.hold_position = function() end -- artillery: never ordered; fires on its own
+
+local function select_doctrine(delegated, shooters, n_mobile)
+    if CONFIG.doctrine ~= "auto" then return CONFIG.doctrine end
+    local n = #delegated
+    if n == 0 then return "none" end
+    if n_mobile / n >= CONFIG.kite_min_mobile_share then return "kite" end
+    local share = #shooters / n
+    if share >= CONFIG.gunline_min_share and #shooters >= 2 then return "gunline" end
+    if share <= CONFIG.rush_max_shooter_share then return "rush" end
+    return "balanced"
+end
+
+local last_doctrine = nil
+local tick_n = 0
+
+-- pass 0: auto-delegate the whole local army to a script_ai_planner so the
+-- doctrine engine runs standalone (no AI General button needed). Only in
+-- field battle types; sieges stay manual (CA warns planners do badly there).
+local function ensure_delegation(now_ms)
+    if not CONFIG.auto_delegate or planner then return end
+    if now_ms < CONFIG.delegate_after_ms then return end
+    local ok_t, btype = pcall(function() return bm:battle_type() end)
+    if ok_t and btype and not DELEGATE_TYPES[btype] then return end
+    local ok, sus = pcall(function() return bm:get_scriptunits_for_local_players_army() end)
+    if not (ok and sus and sus:count() > 0) then return end
+    local ok2, p = pcall(function() return script_ai_planner:new("czx_auto", sus) end)
+    if ok2 and p then
+        planner = p
+        out_log("auto-delegate units=" .. sus:count() .. " type=" .. tostring(btype))
+    elseif not delegate_err_logged then
+        delegate_err_logged = true
+        out_log("ERROR auto-delegate " .. tostring(p))
+    end
+end
+
+-- pass 0.5: keep a standing order on the planner. With no order the engine
+-- silently hands its units back to the player (the "idle" army we observed);
+-- with attack_unit/defend_position the engine commander keeps driving them,
+-- and our per-unit uc orders layer on top for target choice.
+local function issue_planner_directive(now_ms, doctrine, delegated, enemies)
+    if not planner or doctrine == "none" then return end
+    if doctrine == "rush" or doctrine == "kite" then
+        -- refresh when the doctrine just changed, the target died/routed, or
+        -- the refresh window elapsed (keeps the push aimed at the front line)
+        local stale = true
+        if directive_target then
+            local ok_s, r = pcall(function() return directive_target:is_routing() end)
+            stale = (not ok_s) or r == true
+        end
+        if doctrine == directive_doc and not stale
+            and (now_ms - directive_ms) < CONFIG.directive_refresh_ms then
+            return
+        end
+        -- closest enemy to any of our units = what the front line is facing
+        local best, best_d = nil, math.huge
+        for _, e in ipairs(enemies) do
+            for _, d in ipairs(delegated) do
+                local ok_d, dist = pcall(function()
+                    return e:position():distance_xz(d.unit:position())
+                end)
+                if ok_d and dist and dist < best_d then best, best_d = e, dist end
+            end
+        end
+        if not best then return end
+        local ok_o, err = pcall(function() planner:attack_unit(best) end)
+        if ok_o then
+            directive_doc, directive_ms, directive_target = doctrine, now_ms, best
+            out_log("directive attack -> " .. tostring(best:type())
+                .. " d=" .. math.floor(best_d))
+        else
+            out_log("directive-fail attack " .. tostring(err))
+        end
+    else
+        -- hold doctrines: defend the ground the group stands on; the planner's
+        -- own should_reorder re-issues every 30s, we only re-issue on change
+        if doctrine == directive_doc
+            and (now_ms - directive_ms) < CONFIG.directive_refresh_ms then
+            return
+        end
+        local ok_o, err = pcall(function()
+            planner:defend_position(planner:get_centre_point(), CONFIG.defend_radius_m)
+        end)
+        if ok_o then
+            directive_doc, directive_ms, directive_target = doctrine, now_ms, nil
+            out_log("directive defend r=" .. CONFIG.defend_radius_m)
+        else
+            out_log("directive-fail defend " .. tostring(err))
+        end
+    end
+end
+
+local function tick()
+    local now_ms = bm:time_elapsed_ms()
+    focus_count = {} -- per-tick per-target order budget
+    ensure_delegation(now_ms)
+
+    -- pass 1: snapshot delegated units + enemies, classify roles
+    local delegated, shooters, n_mobile = {}, {}, 0
+    for_each_player_unit(function(unit)
+        local uid0 = tostring(unit:unique_ui_id())
+        local ai_now = unit:is_ai_controlled()
+        -- an ai->player flip is ambiguous: the engine drops units from an
+        -- orderless planner too. Re-delegate on the first drop; only when a
+        -- unit escapes repeatedly inside the window do we believe the player
+        -- keeps grabbing it back and mark it reclaimed.
+        if was_ai[uid0] and not ai_now then
+            local n = escapes[uid0] or 0
+            if now_ms - (escape_t[uid0] or 0) > CONFIG.reclaim_window_ms then n = 0 end
+            n = n + 1
+            escapes[uid0], escape_t[uid0] = n, now_ms
+            if n >= CONFIG.reclaim_escapes and not reclaimed[uid0] then
+                reclaimed[uid0] = true
+                out_log("reclaimed x" .. n .. " " .. unit:type() .. " (" .. uid0 .. ")")
+            end
+        end
+        was_ai[uid0] = ai_now or nil
+        -- reinforcements/summons that arrived after delegation, and units the
+        -- planner dropped on its own: hand them in too
+        if planner and not ai_now and not reclaimed[uid0] and not unit:is_routing() then
+            local su0 = bm:get_scriptunit_for_unit(unit)
+            if su0 then
+                local ok_a = pcall(function() planner:add_sunits(su0) end)
+                if ok_a then
+                    ai_now, was_ai[uid0] = true, true
+                    out_log("re-delegate " .. unit:type() .. " (" .. uid0 .. ")")
+                end
+            end
+        end
+        if ai_now and not unit:is_routing() then
+            local su = bm:get_scriptunit_for_unit(unit)
+            if su and su.uc then
+                local p = probe_unit(unit)
+                local role = classify(unit, p)
+                delegated[#delegated + 1] = {
+                    su = su, unit = unit, role = role,
+                    anti_large = p.prof and p.prof.ai:find("anti_large") ~= nil,
+                }
+                if role == "shooter" or role == "artillery" then shooters[#shooters + 1] = unit end
+                if role == "cav" or role == "flyer" then n_mobile = n_mobile + 1 end
+            end
+        else
+            local uid = tostring(unit:unique_ui_id())
+            idle_since[uid] = nil -- reset when not delegated
+            guard_set[uid .. "|defend"] = nil
+            guard_set[uid .. "|skirmish"] = nil
+            unit_task[uid] = nil
+        end
+    end)
+
+    -- enemy snapshot with roles for threat/target selection
+    local enemies, enemies_ranged, enemies_monster, enemies_airarty = {}, {}, {}, {}
+    local erole = {} -- [enemy unit] = role
+    do
+        local alliance = bm:get_non_player_alliance()
+        -- visibility check asks "visible to OUR alliance"; pass our side explicitly
+        local my_alliance = bm:alliances():item(bm:local_alliance())
+        if alliance then
+            local armies = alliance:armies()
+            for a = 1, armies:count() do
+                local units = armies:item(a):units()
+                for u = 1, units:count() do
+                    local e = units:item(u)
+                    -- skip enemies hidden from our alliance (stalk/unspottable) so we
+                    -- don't react to units the player can't even see
+                    local visible = true
+                    if my_alliance then
+                        local ok_v, vis = pcall(function() return e:is_visible_to_alliance(my_alliance) end)
+                        if ok_v and vis == false then visible = false end
+                    end
+                    local ok_h, hid = pcall(function() return e:is_hidden() end)
+                    if ok_h and hid == true then visible = false end
+                    if e and visible and not e:is_routing() then
+                        local p = probe_unit(e)
+                        local role = classify(e, p)
+                        enemies[#enemies + 1] = e
+                        erole[e] = role
+                        if role == "shooter" or role == "artillery" then enemies_ranged[#enemies_ranged + 1] = e end
+                        if role == "monster" then enemies_monster[#enemies_monster + 1] = e end
+                        if role == "flyer" or role == "artillery" then enemies_airarty[#enemies_airarty + 1] = e end
+                    end
+                end
+            end
+        end
+    end
+
+    local doctrine = select_doctrine(delegated, shooters, n_mobile)
+    if doctrine ~= last_doctrine then
+        out_log("doctrine -> " .. doctrine .. " (delegated=" .. #delegated
+            .. " shooters=" .. #shooters .. " mobile=" .. n_mobile .. ")")
+        last_doctrine = doctrine
+    end
+    issue_planner_directive(now_ms, doctrine, delegated, enemies)
+
+    -- heartbeat every ~60s: lets us tell "no threats in range" from "handler
+    -- never ran" when reading logs after a battle
+    tick_n = tick_n + 1
+    if tick_n % 20 == 0 then
+        local n_idle, n_planned = 0, -1
+        for _, d in ipairs(delegated) do
+            local ok_i, idl = pcall(function() return d.unit:is_idle() end)
+            if ok_i and idl then n_idle = n_idle + 1 end
+        end
+        if planner then
+            local ok_c, c = pcall(function() return planner:count() end)
+            if ok_c then n_planned = c end
+        end
+        out_log("tick-stats doctrine=" .. doctrine .. " del=" .. #delegated
+            .. " planner=" .. n_planned .. " idle=" .. n_idle .. " enemies=" .. #enemies)
+    end
+
+    -- pass 2: abilities + role behaviour
+    local ctx = {
+        now_ms = now_ms, doctrine = doctrine, shooters = shooters,
+        enemies = enemies, enemies_ranged = enemies_ranged,
+        enemies_monster = enemies_monster, enemies_airarty = enemies_airarty,
+        erole = erole,
+    }
+    for _, d in ipairs(delegated) do
+        local su, unit = d.su, d.unit
+        local uid = tostring(unit:unique_ui_id())
+        -- summoned units can despawn while an ability effect is still resolving;
+        -- both observed freezes happened on psw_summon_* flyers, so their
+        -- abilities stay manual (orders/tasks are unaffected)
+        local is_summon = unit:type():find("summon") ~= nil
+        local abilities = CONFIG.auto_cast
+            and (not is_summon or CONFIG.cast_on_summons)
+            and unit:owned_non_passive_special_abilities() or nil
+        if is_summon and not summon_probe[unit:type()] then
+            summon_probe[unit:type()] = true
+            out_log("summon-skip " .. unit:type() .. " (" .. uid .. ")")
+        end
+        if abilities then
+            for k, v in pairs(abilities) do
+                local key = is_string(v) and v or (is_string(k) and k or nil)
+                if key and ability_allowed(unit, key) then
+                    local ok, err = pcall(try_cast, su, unit, key, now_ms)
+                    if not ok then
+                        -- any perform failure is permanent for this combo:
+                        -- can_perform lies for some abilities, and retrying a
+                        -- cast that can never succeed just spams errors
+                        unsupported[uid .. "|" .. key] = true
+                        out_log("cast-fail " .. key .. " on " .. uid .. ": " .. tostring(err))
+                    end
+                end
+            end
+        end
+        local task = assign_task(d, ctx)
+        if unit_task[uid] ~= task then
+            out_log("task " .. unit:type() .. " (" .. uid .. ") role=" .. d.role .. " -> " .. task)
+            unit_task[uid] = task
+        end
+        -- quiet window: never issue an order while a cast is still resolving;
+        -- a same-tick cast+order pair raced a bomb maneuver into a sim deadlock
+        if cast_at[uid] and (now_ms - cast_at[uid]) < CONFIG.cast_quiet_ms then
+            -- cast still resolving; hold the task order this tick
+        else
+            local exec = TASK_EXEC[task] or TASK_EXEC.attack
+            pcall(exec, d, ctx)
+        end
+    end
+end
+
+-- pcall 兜底：tick 内任何报错只记日志——裸错会中断 timer_manager 泵的
+-- singleshot 重武装，把全场所有脚本的计时器一起打死（czx_tc 实测教训）
+bm:repeat_callback(function()
+    local ok, err = pcall(tick)
+    if not ok then out_log("ERROR tick " .. tostring(err)) end
+end, CONFIG.poll_ms, "czx_auto_ability_tick")
+out_log("loaded, poll " .. CONFIG.poll_ms .. "ms, auto_cast=" .. tostring(CONFIG.auto_cast)
+    .. " auto_delegate=" .. tostring(CONFIG.auto_delegate))
+'''
+
+OUT.parent.mkdir(parents=True, exist_ok=True)
+OUT.write_text(template.replace("__DATA__", data).replace("__PROFILE_DATA__", profile_data), encoding="utf-8")
+print(f"wrote {OUT} with {len(rows)} abilities")
