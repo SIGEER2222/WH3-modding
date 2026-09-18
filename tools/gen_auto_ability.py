@@ -1,5 +1,5 @@
 """Generate czx_battle_auto_ability.lua (flags data + logic) into mod_files/zzz_czx_battle_ui."""
-import csv, glob, io
+import csv, glob, io, sys
 from pathlib import Path
 
 ROOT = Path(r"E:\Code\WH3-modding")
@@ -169,6 +169,14 @@ local CONFIG = {
     dodge_radius_m   = 45,        -- scatter if within this of the ability target
     dodge_dest_m     = 60,        -- scatter destination distance from blast centre
     dodge_cooldown_ms= 8000,      -- per-unit dodge order throttle
+    -- autotest driver: simulate player micro so handoff/reclaim paths get
+    -- exercised without a human at the controls. DISABLE for normal play.
+    test_sim         = __TEST_SIM__, -- master switch for the sim cycles below
+    test_speed       = 4,         -- bm:modify_battle_speed multiplier at start
+    test_batch       = 4,         -- units grabbed per sim cycle
+    test_cycle_ms    = 25000,     -- pause between cycles
+    test_verify_ms   = 15000,     -- how long to wait for a transition before
+                                  --   declaring it missed
 }
 
 -- ABILITY_FLAGS[ability_key] = "mask,recharge_seconds"
@@ -200,6 +208,8 @@ local order_dest = {}     -- [uid] = baseline ordered_position for the player-
                           --   order fingerprint (nil = disarmed/unknown)
 local atk_target_uid = {} -- [uid] = enemy uid our last attack order pointed at
 local prev_ai = {}        -- [uid] = is_ai_controlled() last tick (edge detect)
+local prev_ordered = {}   -- [uid] = last ordered_position seen while AI-flagged
+                          -- (the planner's intent — baseline for the fingerprint)
 local reclaimed = {}      -- [uid] = true once the player takes a unit back; never re-delegate
 local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
 local directive_doc = nil     -- doctrine the standing planner order was issued under
@@ -688,6 +698,16 @@ local function add_order_listener(name)
             if managed[uid] and not reclaimed[uid] and not overridden[uid] then
                 reclaimed[uid] = true
                 order_dest[uid] = nil
+                -- must leave the planner's sunit list or the next directive
+                -- refresh stomps the player's order
+                if planner then
+                    local ok_s, su_r = pcall(function()
+                        return bm:get_scriptunit_for_unit(u)
+                    end)
+                    if ok_s and su_r then
+                        pcall(function() planner:remove_sunits(su_r) end)
+                    end
+                end
                 out_log("reclaimed-cmd " .. name .. " " .. u:type() .. " (" .. uid .. ")")
             end
         end, "czx_cmd_" .. name)
@@ -1061,6 +1081,116 @@ local function issue_planner_directive(now_ms, doctrine, delegated, enemies)
     end
 end
 
+---------------------------------------------------------------------------------------------
+-- autotest sim: exercise the player-handoff paths without a human. Each cycle
+-- picks a batch of managed units, issues a FOREIGN move order (no
+-- note_our_order, outside in_task_pass — the same signature a real player
+-- click produces), verifies the fingerprint reclaim fires, then hands them
+-- back through the planner (group-AI signature) and verifies adoption.
+---------------------------------------------------------------------------------------------
+local sim = { phase = "off", uids = {}, at = 0, cycle = 0, did_speed = false }
+
+local function sim_step(now_ms)
+    if not CONFIG.test_sim or not planner then return end
+    if not sim.did_speed then
+        sim.did_speed = true
+        local ok, err = pcall(function() bm:modify_battle_speed(CONFIG.test_speed) end)
+        out_log("sim speed x" .. tostring(CONFIG.test_speed) .. " ok=" .. tostring(ok)
+            .. (ok and "" or (" err=" .. tostring(err))))
+    end
+
+    if sim.phase == "off" then
+        local managed_n = 0
+        for_each_player_unit(function(unit)
+            local uid = tostring(unit:unique_ui_id())
+            if managed[uid] and not reclaimed[uid] and not overridden[uid] then
+                managed_n = managed_n + 1
+            end
+        end)
+        if managed_n >= CONFIG.test_batch * 2 then
+            sim.phase, sim.at = "cooldown", now_ms
+            out_log("sim begin managed=" .. managed_n)
+        end
+        return
+    end
+
+    if sim.phase == "cooldown" then
+        if now_ms - sim.at < CONFIG.test_cycle_ms then return end
+        local picks = {}
+        for_each_player_unit(function(unit)
+            if #picks >= CONFIG.test_batch then return end
+            local uid = tostring(unit:unique_ui_id())
+            if managed[uid] and not reclaimed[uid] and not overridden[uid]
+                and not unit:is_routing() then
+                picks[#picks + 1] = { uid = uid, unit = unit }
+            end
+        end)
+        if #picks == 0 then return end
+        sim.uids = {}
+        for _, p in ipairs(picks) do
+            local su = bm:get_scriptunit_for_unit(p.unit)
+            if su and su.uc then
+                local ok, err = pcall(function()
+                    local up = p.unit:position()
+                    -- no release_control: a real player grab leaves the unit
+                    -- off AI control — that flag state is half the signature
+                    su.uc:goto_location_angle_width(
+                        v(up:get_x() + 40, up:get_z() + 40), 0, 20, true)
+                end)
+                if ok then
+                    sim.uids[p.uid] = true
+                    out_log("sim-order " .. p.uid)
+                else
+                    out_log("ERROR sim-order " .. tostring(err))
+                end
+            end
+        end
+        sim.cycle, sim.phase, sim.at = sim.cycle + 1, "await-reclaim", now_ms
+        out_log("sim-cycle " .. sim.cycle .. " ordered=" .. #picks)
+        return
+    end
+
+    if sim.phase == "await-reclaim" then
+        local done, missing = 0, 0
+        for uid in pairs(sim.uids) do
+            if reclaimed[uid] then done = done + 1 else missing = missing + 1 end
+        end
+        if missing == 0 or now_ms - sim.at > CONFIG.test_verify_ms then
+            out_log("sim-cycle " .. sim.cycle .. " reclaim=" .. done .. "/" .. (done + missing)
+                .. (missing > 0 and " MISS" or ""))
+            sim.phase, sim.at = "handback", now_ms
+        end
+        return
+    end
+
+    if sim.phase == "handback" then
+        -- group-AI signature: planner add -> engine flips is_ai_controlled,
+        -- the unmanaged+ai path adopts them back into managed[]
+        for_each_player_unit(function(unit)
+            local uid = tostring(unit:unique_ui_id())
+            if sim.uids[uid] and reclaimed[uid] and not unit:is_routing() then
+                local su = bm:get_scriptunit_for_unit(unit)
+                if su then pcall(function() planner:add_sunits(su) end) end
+            end
+        end)
+        sim.phase, sim.at = "await-back", now_ms
+        return
+    end
+
+    if sim.phase == "await-back" then
+        local done, missing = 0, 0
+        for uid in pairs(sim.uids) do
+            if managed[uid] and not reclaimed[uid] then done = done + 1 else missing = missing + 1 end
+        end
+        if missing == 0 or now_ms - sim.at > CONFIG.test_verify_ms then
+            out_log("sim-cycle " .. sim.cycle .. " back=" .. done .. "/" .. (done + missing)
+                .. (missing > 0 and " MISS" or ""))
+            sim.phase, sim.at = "cooldown", now_ms
+        end
+        return
+    end
+end
+
 local function tick()
     local now_ms = bm:time_elapsed_ms()
     focus_count = {} -- per-tick per-target order budget
@@ -1085,6 +1215,8 @@ local function tick()
             reclaimed[uid0] = nil
             managed[uid0] = true
             order_dest[uid0] = nil
+            prev_ordered[uid0] = nil
+            atk_target_uid[uid0] = nil
             our_order_ms[uid0] = 0
             out_log(tag .. unit:type() .. " (" .. uid0 .. ")")
         end
@@ -1108,11 +1240,15 @@ local function tick()
         -- order — in a single-player battle that can only be the player.
         if is_man and not ai_now then
             if prev_ai[uid0] then
-                -- ai=true -> false this tick: a planner drop or our own order
-                -- taking control. Whatever ordered_position says now is the
-                -- correct baseline (stale baselines would flag planner dests)
-                local ok_b, base = pcall(function() return unit:ordered_position() end)
-                order_dest[uid0] = (ok_b and base) or nil
+                -- ai=true -> false this tick. The foreign order has ALREADY
+                -- landed so ordered_position is the foreign dest — snapshotting
+                -- it as baseline would erase the evidence. Use the last
+                -- planner-seen destination instead, UNLESS our own recorded
+                -- order is fresh (then order_dest already holds our intent).
+                if order_dest[uid0] == nil
+                    or (now_ms - (our_order_ms[uid0] or 0)) > CONFIG.order_grace_ms then
+                    order_dest[uid0] = prev_ordered[uid0]
+                end
             elseif order_dest[uid0] == nil
                 and (now_ms - (our_order_ms[uid0] or 0)) > CONFIG.order_grace_ms then
                 local ok_b, base = pcall(function() return unit:ordered_position() end)
@@ -1137,6 +1273,14 @@ local function tick()
                     if moved then
                         reclaimed[uid0] = true
                         order_dest[uid0] = nil
+                        if planner then
+                            local ok_s, su_r = pcall(function()
+                                return bm:get_scriptunit_for_unit(unit)
+                            end)
+                            if ok_s and su_r then
+                                pcall(function() planner:remove_sunits(su_r) end)
+                            end
+                        end
                         out_log("reclaimed-ordered " .. unit:type() .. " (" .. uid0 .. ")")
                         is_man = false
                     end
@@ -1165,6 +1309,12 @@ local function tick()
                 end
             end
         end
+        if ai_now then
+            -- track the planner's live intent so a foreign order landing next
+            -- tick can be measured against it
+            local ok_o, op = pcall(function() return unit:ordered_position() end)
+            if ok_o and op then prev_ordered[uid0] = op end
+        end
         prev_ai[uid0] = ai_now
 
         if is_man and not unit:is_routing() and not unit:is_shattered() then
@@ -1189,6 +1339,9 @@ local function tick()
             role_of[uid] = nil
             charge_state[uid] = nil
             wounded_pull[uid] = nil
+            atk_target_uid[uid] = nil
+            order_dest[uid] = nil
+            prev_ordered[uid] = nil
         end
     end)
 
@@ -1312,6 +1465,8 @@ local function tick()
             in_task_pass = false
         end
     end
+
+    sim_step(now_ms)
 end
 
 ---------------------------------------------------------------------------------------------
@@ -1383,5 +1538,7 @@ out_log("loaded, poll " .. CONFIG.poll_ms .. "ms, auto_cast=" .. tostring(CONFIG
 '''
 
 OUT.parent.mkdir(parents=True, exist_ok=True)
-OUT.write_text(template.replace("__DATA__", data).replace("__PROFILE_DATA__", profile_data), encoding="utf-8")
-print(f"wrote {OUT} with {len(rows)} abilities")
+test_sim = "--test" in sys.argv
+OUT.write_text(template.replace("__DATA__", data).replace("__PROFILE_DATA__", profile_data)
+    .replace("__TEST_SIM__", "true" if test_sim else "false"), encoding="utf-8")
+print(f"wrote {OUT} with {len(rows)} abilities, test_sim={test_sim}")
