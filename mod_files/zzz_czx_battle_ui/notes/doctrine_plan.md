@@ -196,3 +196,13 @@ shooter_hold_mult=1.3
 **新增日志**：directive attack -> type d=dist / directive defend r=120 / directive-fail / re-delegate type / reclaimed x n
 
 **lib 确认**：attack_unit / defend_position / get_centre_point / count 均见 lib_battle_script_ai_planner.lua；attack_unit 内部 ensure_units_are_released() 后交给引擎 planner 对象——即原版 AI 托管按钮同一机制。
+
+## v1.3：玩家微操/托管双向交接
+
+原版编组 UI 的"AI 托管"开关就是按钮——`is_ai_controlled` 即其状态，无需自制 UI。双向规则：
+
+- **收回**（玩家→手操）：ai→player 掉线分两种——planner 偶发掉线（应当 tick 补回）和玩家真的收回。判据两层：
+  1. **订单指纹**（单 tick 快判）：掉线时快照 `ordered_position`；若单位在脱管状态下 ordered_position 位移 >30m = 玩家新下的指令（planner 残余指令不会刷新 ordered_position）→ 立即 `reclaimed-ordered`
+  2. **逃逸窗口**（兜底）：60s 内 ≥2 次 ai-drop → `reclaimed x n`（玩家想拿稳 = 拿两次）
+- **归还**（手操→AI）：原版组 UI 再开 AI 托管 → `is_ai_controlled→true` → 清 `reclaimed`/`escape_pos`（`handed-back` 日志），单位自动回到任务层。escapes 计数保留衰减（防止 planner 掉线+归还序列误累计）
+- **发呆兜底**：非 reclaimed 的脱管单位当 tick 就 `re-delegate` 补回 planner——脱管空窗 ≤1 tick，不存在"没人管"的兵

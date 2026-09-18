@@ -160,6 +160,9 @@ local reclaimed = {}      -- [uid] = true once the player takes a unit back; nev
 local was_ai = {}         -- [uid] = true while is_ai_controlled() held last tick
 local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
 local escapes, escape_t = {}, {} -- [uid] = ai-drop count / last drop ms (reclaim debounce)
+local escape_pos = {}         -- [uid] = ordered_position snapshot at drop time
+                              --   (fresh player orders move it; stale planner
+                              --   remnants don't -> instant reclaim evidence)
 local directive_doc = nil     -- doctrine the standing planner order was issued under
 local directive_ms = 0        -- when it was issued
 local directive_target = nil  -- enemy unit the standing attack order points at
@@ -736,10 +739,35 @@ local function tick()
             if now_ms - (escape_t[uid0] or 0) > CONFIG.reclaim_window_ms then n = 0 end
             n = n + 1
             escapes[uid0], escape_t[uid0] = n, now_ms
+            local ok_s, snap = pcall(function() return unit:ordered_position() end)
+            escape_pos[uid0] = (ok_s and snap) or nil
             if n >= CONFIG.reclaim_escapes and not reclaimed[uid0] then
                 reclaimed[uid0] = true
                 out_log("reclaimed x" .. n .. " " .. unit:type() .. " (" .. uid0 .. ")")
             end
+        end
+        -- instant reclaim: a unit we never re-delegated that picked up NEW
+        -- orders while uncontrolled has a player behind them (planner
+        -- remnants keep executing their old destination, they never refresh
+        -- ordered_position)
+        if not ai_now and not reclaimed[uid0] and escape_pos[uid0] then
+            local ok_n, np = pcall(function() return unit:ordered_position() end)
+            if ok_n and np then
+                local ok_d, dd = pcall(function()
+                    return np:distance_xz(escape_pos[uid0])
+                end)
+                if ok_d and dd and dd > 30 then
+                    reclaimed[uid0] = true
+                    out_log("reclaimed-ordered " .. unit:type() .. " (" .. uid0 .. ")")
+                end
+            end
+        end
+        -- player hands a unit back via the vanilla group AI toggle: clear the
+        -- reclaim mark so it re-enters management (escapes keep their decay)
+        if ai_now and reclaimed[uid0] then
+            reclaimed[uid0] = nil
+            escape_pos[uid0] = nil
+            out_log("handed-back " .. unit:type() .. " (" .. uid0 .. ")")
         end
         was_ai[uid0] = ai_now or nil
         -- reinforcements/summons that arrived after delegation, and units the
