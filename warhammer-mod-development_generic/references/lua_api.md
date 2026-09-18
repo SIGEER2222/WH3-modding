@@ -112,6 +112,10 @@ end)
 | `BattleCompleted` | 战斗结束 | 常配合 `cm:model():pending_battle()` |
 | `IncidentRequest` | Incident 请求 | 需查原版用法 |
 | `UICreated` | UI 创建 | UI 逻辑优先考虑 `core:add_ui_created_callback` |
+| `PanelOpenedCampaign` | 面板打开 | `context.string`（**字段**不是方法）= 面板名 |
+| `ComponentLClickUp` | 组件左键点击 | `context.string` = 组件 id |
+
+注意：`PanelOpenedCampaign` / `ComponentLClickUp` 等事件的字符串参数在当前引擎是**字段** `context.string`，不是 `context:string()`；误写成方法调用会报 `attempt to call method 'string' (a string value)`，且该监听器条件函数内抛错会导致监听器整个不触发 `[实测/需随版本复查]`。
 
 ## campaign_manager 常用 API
 
@@ -381,3 +385,38 @@ WH3 的 twui 控件常通过 `<callbacks_with_context>` 绑定 Cco（component c
 - [ ] effect/bundle key 是否存在。
 - [ ] faction/subculture/culture key 是否来自原版表。
 - [ ] `out()` 是否能定位到模块。
+
+## 战斗脚本（battle scope）实测记录 `[实测/需随版本复查]`
+
+托管/自动施法相关（实现见 `zzz_czx_battle_ui` 的 `czx_battle_auto_ability.lua`）：
+
+- `unit:is_ai_controlled()`：识别"托管"单位（AI General 把单位交给 `script_ai_planner` 后此项为真）。CA planner 只下移动/攻击指令，**从不放技能**。
+- `su.uc:perform_special_ability(key, target)`：目标参数**必填**，自放/光环也传 `unit` 自身（CA benchmark 用法）。`perform_special_ability_ground(key, position)` 走地面目标。
+- `owned_non_passive_special_abilities()` 可能返回 uc 不支持的 key，`can_perform_special_ability` 不可靠 → 首次报 `does not support this special ability` 后把 (unit,ability) 永久拉黑，否则脚本错误刷屏本身就是卡顿源。
+- **任何 uc 指令都会隐式夺取单位控制权**；`release_control()` 把单位还给"玩家/AI"，不是还给 planner。没下指令时调 release = 制造控制振荡（发呆/乱激活的根源之一）。
+- 单位分类：`ammo_left() ~= 0`（含 -1 无限弹药）= 有远程武器；`missile_range()`、`has_attribute("shoot_disabled")` 可用。
+- 行为开关：`uc:change_behaviour_active("defend", true)` = 原版 guard mode（不追击）；合法值含 "defend"/"fire_at_will"/"skirmish" 等。前置 `unit:can_use_behaviour(name)` 判定。
+- 移动指令：`uc:goto_location_angle_width(pos, bearing_deg, width, run)`，bearing 是**角度制**（`unit:bearing()` 返回弧度需乘 180/pi），width 用 `unit:ordered_width()`。
+- 敌我距离：`a:position():distance_xz(b:position())`。
+- 冗余脚本包教训：`script/battle/mod/` 下不同文件名的旧版脚本会**同时运行**（同路径才去重）——旧 `czx_auto_skill_manage.lua` 与新脚本并行导致双重抢权，是"乱激活"的确认原因之一。改包部署时必须同时清理 playset 里的旧条目与 data\ 旧文件。
+- Mod Manager `local:data:` mod_id = `sha256(path.resolve() 转正斜杠转小写)[:18]`（源码 `backend/scanner.py::_path_fingerprint`），同文件名覆盖部署无需改 playset。
+
+入口/对象形态（对照 `gamedata/script/_lib` 原版源码确认，未上机 `[需验证]`）：
+
+- **`bm` 是 battle 全局**（lib 加载时 `battle_manager:new()` 创建并 `core:add_static_object`）；WH3 没有 `get_bm()`——lib dump 只有 campaign 的 `get_cm()`（`lib_campaign_manager.lua`）。入口写法照 czx_bridge：`if not bm then return end`；`local bm = get_bm()` 会在加载即报错。
+- **`script_unit` 的 `name`/`unit`/`uc` 是字段不是方法**（`lib_battle_script_unit.lua` 文档标 `@variable`）：`su.name` 为唯一键（`set_name` 在 `new_impl` 必填，格式 `unique_ui_id[:unit_ref]`）；`su.unit` = battle_unit 接口；`su.uc` = unitcontroller。`su:name()` 是"调用字符串"必报错。
+- `bm` 经 `set_object_class(bm, battle_manager, b)` 双挂 Lua 层方法与引擎 `empire_battle` 对象方法——`bm:battle_type()` 这类调用走引擎侧，lib dump 查不到属正常。
+- 已确认存在：`bm:repeat_callback(cb, ms, name)`、`bm:callback(cb, ms, name)`、`su:halt()/release_control()/take_control()`（均包装 `self.uc:*`）、`army:is_player_controlled()`、`unit:unique_ui_id()`。
+- **单位枚举唯一正确路径**（`lib_battle_manager.lua` `build_scriptunits`）：`bm:num_alliances()` → `bm:num_armies_in_alliance(al)` → `bm:get_scriptunits_for_army(al, ar)`；增援军：`bm:num_reinforcing_armies_for_army_in_alliance(al, ar)` → `bm:get_scriptunits_for_army(al, ar, r)`。返回 Lua `script_units` 集合（`:count()`/`:item(i)`，**不是**引擎 `:num_items()`）；出错返回 `false` 不抛错。敌我：`bm:get_player_alliance_num()` 联盟序号比对。**`bm:armies()` 不存在**（局内实锤 `attempt to call method 'armies' (a nil value)`）。
+- **`repeat_callback` 裸错 = 全脚本计时器瘫痪**：`timer_manager_battle_callback` 在 while 循环里派发回调，某回调抛错会在 singleshot 重武装前中断泵——**所有**脚本的计时器（含其他 mod）永久静默，游戏不报错只记 `RLH_battle_error_log.txt`/`script_log`。任何挂 `repeat_callback`/`callback` 的体必须 `pcall` 兜底。
+- `out` 是可调用对象（table `__call`），`out(str)` 与 `bm:out(str)` 均可用。
+- **2026-09-18 局内实测**（land_normal 野战，`czx_probe`）：`io.open` 读/写可用（游戏根目录相对路径可写文件）；`os.clock/os.time/os.date` 可用；`bm:battle_type()` 返回 `land_normal`；`bm:capture_location_manager()` 存在；**`bm:armies()` 不存在（nil value）**——枚举须走 `num_alliances → get_scriptunits_for_army`。
+- **`out()` 落点**：游戏根目录 `script_log_DDMMYY_HHMM.txt`——每个游戏会话一个新文件自动滚动，mod 日志无需自己开文件（要结构化数据仍可 `io.open` 写游戏根目录）。
+
+`script_ai_planner` 行为（`lib_battle_script_ai_planner.lua` 源码 + 2026-09-18 局内实测）：
+
+- **无指令的 planner 会"漏"单位**：`script_ai_planner:new()` 后不给任何 order，引擎把单位陆续放回玩家控制（`is_ai_controlled→false`，实测 36→1 / ~3min）。必须挂常驻指令：`attack_unit(unit)`（进攻 doctrine）或 `defend_position(pos, radius)`（驻守 doctrine=原版"Defend this position"按钮同款，内部 `should_reorder` 自带 30s 重发循环）；`get_centre_point()` 返回 planner 群组中心 vector。
+- `is_ai_controlled→false` 语义歧义：planner 自动放人与玩家 UI 收回**签名完全相同**（`is_player_controlled=true`），无法用标志位区分——需要逃逸计数/时间窗消抖，单次掉线应当 tick 补回。
+- planner 持有的单位 `is_idle()` 常为 false（"驻守"也算有令在身）——`is_idle` 驱动的补刀逻辑对 planner 单位基本无效，别用它当"该发指令了"的判据。
+- `planner:add_sunits(x)` 接受单 script_unit / scriptunits 集合 / script_unit 表；`planner:count()` 返回实有数。
+- **跨 `_lib` 文件的全局捕获必须延迟解析**：`script/_lib/mod/` 按文件名字母序加载，`local X = CZX_Y` 在 Y 的注册文件之前执行则永久捕获 nil（实测 `czx_tc_assess` 的 `local Units = CZX_TC_UNITS` 全 tick 报错）。跨模块引用直接在函数内写 `CZX_Y.method()`。
