@@ -177,6 +177,9 @@ local CONFIG = {
     test_cycle_ms    = 25000,     -- pause between cycles
     test_verify_ms   = 15000,     -- how long to wait for a transition before
                                   --   declaring it missed
+    -- v1.5 community-informed additions
+    harass_range_m   = 160,       -- mounted shooters engage within this radius
+    rundown_range_m  = 120,       -- mobile units finish routing enemies inside this
 }
 
 -- ABILITY_FLAGS[ability_key] = "mask,recharge_seconds"
@@ -210,6 +213,9 @@ local atk_target_uid = {} -- [uid] = enemy uid our last attack order pointed at
 local prev_ai = {}        -- [uid] = is_ai_controlled() last tick (edge detect)
 local prev_ordered = {}   -- [uid] = last ordered_position seen while AI-flagged
                           -- (the planner's intent — baseline for the fingerprint)
+local saw_enemies = false -- set once any enemy is seen; gates outcome detection
+local outcome_logged = false
+local roster_logged = false
 local reclaimed = {}      -- [uid] = true once the player takes a unit back; never re-delegate
 local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
 local directive_doc = nil     -- doctrine the standing planner order was issued under
@@ -240,14 +246,20 @@ local DELEGATE_TYPES = {
     chokepoint = true, crossing = true,
 }
 
--- 攻防克制加成（v2 counter 矩阵紧凑版）：attacker_role -> target_role -> score
+-- 攻防克制加成（v2 counter 矩阵，社区共识 2026-09 修订）：
+-- attacker_role -> target_role -> score。
+-- 要点：骑兵/飞行猎后排炮兵射手；远程集火克巨兽（大多无甲）；
+-- 反大步兵靠 anti_large 旗标额外加成分（对骑兵和巨兽都生效，不止巨兽）；
+-- 近战线列怕骑兵冲、远程怕一切贴身；骑射是永远风筝的骚扰兵。
 local COUNTER_BONUS = {
-    melee     = { shooter = 30, artillery = 40, monster = -20 },
-    monster   = { melee = 20, shooter = 25, cav = 10 },
-    cav       = { shooter = 40, artillery = 50, monster = -30, melee = -10 },
-    flyer     = { artillery = 40, shooter = 30, monster = -20 },
-    shooter   = { monster = 20, cav = 10 },
-    artillery = {},
+    melee     = { shooter = 30, artillery = 40, monster = -20, cav = -15 },
+    monster   = { melee = 20, shooter = 25, cav = 10, cav_shot = 15 },
+    cav       = { shooter = 40, artillery = 50, monster = -30, melee = -10,
+                  cav_shot = 35 },
+    cav_shot  = { melee = 10, artillery = 30, monster = -15 }, -- harass, avoid monsters
+    flyer     = { artillery = 40, shooter = 30, monster = -20, cav_shot = 25 },
+    shooter   = { monster = 30, cav = 10, melee = 10 },  -- ranged focus melts big unarmoured things
+    artillery = { melee = 10, monster = 10 },
     lord      = {},
 }
 local function counter_of(att_role, def_role)
@@ -396,7 +408,17 @@ local function profile_of(unit)
     local s = CZX_UNIT_PROFILE[unit:type()]
     if not s then return nil end
     local ai, cat, cls, lg = s:match("^([^|]*)|([^|]*)|([^|]*)|(%d)")
-    return { ai = ai or "", cat = cat or "", cls = cls or "", large = (lg == "1") }
+    ai = ai or ""
+    return {
+        ai = ai, cat = cat or "", cls = cls or "", large = (lg == "1"),
+        -- ai_usage_group taxonomy flags (community-informed):
+        anti_large  = ai:find("anti_large") ~= nil,  -- halberds/spears: +BvL vs cav & monsters
+        shock       = ai:find("shock") ~= nil,       -- charge bonus is their main damage -> cycle
+        highvalue   = ai:find("highvalue") ~= nil,   -- expensive -> wounded pull-out priority
+        no_skirmish = ai:find("no_skirmish") ~= nil, -- cannot skirmish; don't rely on it
+        harasser    = ai:find("harasser") ~= nil,    -- shoot-and-scoot, never stand in melee
+        mage        = ai:find("mage") ~= nil,
+    }
 end
 
 local function ubool(unit, method)
@@ -429,17 +451,24 @@ local function classify(unit, p)
         local cat = prof.cat
         if cat == "war_machine" or cat == "artillery" then return "artillery" end
         if prof.cls == "com" then return "lord" end
-        if p.flies then return "flyer" end
+        -- mounted/ranged hybrids are skirmishers, not shock troops: they harass
+        -- and kite, and melt if they stand in melee (community consensus)
+        if p.flies then return (p.ammo ~= 0 or prof.harasser) and "cav_shot" or "flyer" end
         if prof.large or cat == "war_beast" then return "monster" end
-        if cat == "cavalry" then return "cav" end
+        if cat == "cavalry" then
+            return (p.ammo ~= 0 or prof.harasser or prof.ai:find("ranged_cav"))
+                and "cav_shot" or "cav"
+        end
         if cat == "inf_ranged" or p.ammo ~= 0 then return "shooter" end
         return "melee"
     end
     if ubool(unit, "is_artillery") or ubool(unit, "is_war_machine") then return "artillery" end
     if ubool(unit, "is_commanding_unit") then return "lord" end
-    if p.flies then return "flyer" end
+    if p.flies then return p.ammo ~= 0 and "cav_shot" or "flyer" end
     if ubool(unit, "is_war_beasts") or ubool(unit, "is_elephants") then return "monster" end
-    if ubool(unit, "is_cavalry") or ubool(unit, "is_chariot") or p.speed >= CONFIG.cav_min_speed then return "cav" end
+    if ubool(unit, "is_cavalry") or ubool(unit, "is_chariot") or p.speed >= CONFIG.cav_min_speed then
+        return p.ammo ~= 0 and "cav_shot" or "cav"
+    end
     if p.ammo ~= 0 and p.range >= CONFIG.artillery_min_range then return "artillery" end
     if p.ammo ~= 0 then return "shooter" end
     return "melee"
@@ -786,7 +815,8 @@ end
 local function wounded_step(d, ctx)
     if not CONFIG.wounded_pullout then return false end
     local uid = tostring(d.unit:unique_ui_id())
-    if d.role ~= "lord" and d.role ~= "monster" and d.role ~= "cav" then return false end
+    if d.role ~= "lord" and d.role ~= "monster" and d.role ~= "cav"
+        and not d.highvalue then return false end -- highvalue flag pulls elites of any role
     local ok_h, hp = pcall(function() return d.unit:unary_hitpoints() end)
     if not (ok_h and is_number(hp)) then return false end
     if not wounded_pull[uid] then
@@ -826,7 +856,8 @@ end
 -- shooter kiting: a melee-role enemy closing in triggers a fallback move; the
 -- unit resumes firing once clear (skirmish flag alone retreats too early)
 local function kite_step(d, ctx)
-    if not CONFIG.kite_fallback or d.role ~= "shooter" then return false end
+    if not CONFIG.kite_fallback then return false end
+    if d.role ~= "shooter" and d.role ~= "cav_shot" then return false end
     local threat, td = nil, math.huge
     for _, e in ipairs(ctx.enemies) do
         local r = ctx.erole[e]
@@ -854,6 +885,7 @@ end
 local function assign_task(d, ctx)
     local role, doc = d.role, ctx.doctrine
     if role == "artillery" then return "hold_position" end
+    if role == "cav_shot" then return "harass" end -- mounted shooters skirmish in every doctrine
     if doc == "gunline" then
         if role == "melee" or role == "monster" then return "protect_gunline" end
         if role == "cav" then return "intercept_breakthrough" end
@@ -971,7 +1003,48 @@ TASK_EXEC.free_fire = function(d, ctx)
 end
 
 TASK_EXEC.attack = function(d, ctx)
-    kick_if_idle(d.su, d.unit, ctx.now_ms)
+    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    -- finish off routing units first when we're mobile: free kills and they
+    -- can't rally (community: run routers down with cavalry)
+    if (d.role == "cav" or d.role == "flyer" or d.role == "cav_shot")
+        and ctx.enemies_routing then
+        local r, rd = nil, CONFIG.rundown_range_m
+        for _, e in ipairs(ctx.enemies_routing) do
+            local dist = unit_dist(d.unit, e)
+            if dist < rd then r, rd = e, dist end
+        end
+        if r then
+            order_attack(d.su, d.unit, r, ctx.now_ms, "run-down")
+            return
+        end
+    end
+    -- counter-aware pick: distance dominates but role counters and value sway it
+    local t = best_scored(d.unit, ctx.enemies, function(e)
+        local dist = unit_dist(d.unit, e)
+        if dist > CONFIG.idle_kick_range_m then return -math.huge end
+        local s = sv_of(e) * 0.5 - dist * 0.5 + counter_of(d.role, ctx.erole[e])
+        if d.anti_large and (ctx.erole[e] == "monster" or ctx.erole[e] == "cav") then
+            s = s + 40 -- halberds/spears counter BOTH monsters and cavalry
+        end
+        if ctx.erole[e] == "lord" then s = s + 25 end -- decapitating value
+        return s
+    end)
+    if t then order_attack(d.su, d.unit, t, ctx.now_ms, "engage") end
+end
+
+-- mobile shooters (missile cav, ranged flyers, harassers): skirmish forever,
+-- pick soft backline targets, never ordered into melee
+TASK_EXEC.harass = function(d, ctx)
+    set_behaviour_once(d.su, d.unit, "skirmish")
+    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    local t = best_scored(d.unit, ctx.enemies, function(e)
+        local dist = unit_dist(d.unit, e)
+        if dist > CONFIG.harass_range_m then return -math.huge end
+        local s = sv_of(e) * 0.4 - dist * 0.4 + counter_of("cav_shot", ctx.erole[e])
+        if ctx.erole[e] == "artillery" then s = s + 30 end
+        return s
+    end)
+    if t then order_attack(d.su, d.unit, t, ctx.now_ms, "harass") end
 end
 
 TASK_EXEC.hold_position = function() end -- artillery: never ordered; fires on its own
@@ -992,6 +1065,37 @@ local tick_n = 0
 
 -- pass 0: auto-delegate the whole local army to a script_ai_planner so the
 -- doctrine engine runs standalone (no AI General button needed). Only in
+-- battle-start roster dump: both armies grouped by unit_type/role, one line
+-- each — the post-battle review record for doctrine tuning
+local function roster_dump()
+    if roster_logged then return end
+    roster_logged = true
+    local tally = {}
+    for_each_player_unit(function(u)
+        local p = probe_unit(u)
+        local k = u:type() .. "/" .. classify(u, p)
+        tally[k] = (tally[k] or 0) + 1
+    end)
+    for k, n in pairs(tally) do out_log("roster ally " .. k .. " x" .. n) end
+    tally = {}
+    local alliance = bm:get_non_player_alliance()
+    if alliance then
+        local armies = alliance:armies()
+        for a = 1, armies:count() do
+            local units = armies:item(a):units()
+            for u = 1, units:count() do
+                local e = units:item(u)
+                if e then
+                    local p = probe_unit(e)
+                    local k = e:type() .. "/" .. classify(e, p)
+                    tally[k] = (tally[k] or 0) + 1
+                end
+            end
+        end
+    end
+    for k, n in pairs(tally) do out_log("roster enemy " .. k .. " x" .. n) end
+end
+
 -- field battle types; sieges stay manual (CA warns planners do badly there).
 local function ensure_delegation(now_ms)
     if not CONFIG.auto_delegate or planner then return end
@@ -1014,6 +1118,7 @@ local function ensure_delegation(now_ms)
             end
         end
         out_log("auto-delegate units=" .. sus:count() .. " type=" .. tostring(btype))
+        roster_dump()
         -- an orderless planner leaks its units back to the player within a
         -- tick; plant a hold order NOW so the warmup flag flap never starts
         pcall(function()
@@ -1325,10 +1430,15 @@ local function tick()
                 role_of[uid0] = role
                 delegated[#delegated + 1] = {
                     su = su, unit = unit, role = role,
-                    anti_large = p.prof and p.prof.ai:find("anti_large") ~= nil,
+                    anti_large = p.prof and p.prof.anti_large,
+                    highvalue = p.prof and p.prof.highvalue,
+                    shock = p.prof and p.prof.shock,
+                    no_skirmish = p.prof and p.prof.no_skirmish,
                 }
                 if role == "shooter" or role == "artillery" then shooters[#shooters + 1] = unit end
-                if role == "cav" or role == "flyer" then n_mobile = n_mobile + 1 end
+                if role == "cav" or role == "flyer" or role == "cav_shot" then
+                    n_mobile = n_mobile + 1
+                end
             end
         else
             local uid = tostring(unit:unique_ui_id())
@@ -1347,6 +1457,7 @@ local function tick()
 
     -- enemy snapshot with roles for threat/target selection
     local enemies, enemies_ranged, enemies_monster, enemies_airarty = {}, {}, {}, {}
+    local enemies_routing = {} -- routing-but-alive: cavalry runs these down
     local erole = {} -- [enemy unit] = role
     do
         local alliance = bm:get_non_player_alliance()
@@ -1375,6 +1486,11 @@ local function tick()
                         if role == "shooter" or role == "artillery" then enemies_ranged[#enemies_ranged + 1] = e end
                         if role == "monster" then enemies_monster[#enemies_monster + 1] = e end
                         if role == "flyer" or role == "artillery" then enemies_airarty[#enemies_airarty + 1] = e end
+                    elseif e and visible then
+                        local ok_sh, sh = pcall(function() return e:is_shattered() end)
+                        if not (ok_sh and sh) then
+                            enemies_routing[#enemies_routing + 1] = e
+                        end
                     end
                 end
             end
@@ -1391,19 +1507,47 @@ local function tick()
 
     -- heartbeat every ~60s: lets us tell "no threats in range" from "handler
     -- never ran" when reading logs after a battle
+    if #enemies > 0 then saw_enemies = true end
+
     tick_n = tick_n + 1
     if tick_n % 20 == 0 then
         local n_idle, n_planned = 0, -1
+        local hp_a, hp_e, n_ally_alive = 0, 0, 0
         for _, d in ipairs(delegated) do
             local ok_i, idl = pcall(function() return d.unit:is_idle() end)
             if ok_i and idl then n_idle = n_idle + 1 end
+        end
+        -- army hp accounting for post-battle review + win/loss detection
+        for_each_player_unit(function(u)
+            local ok_r, rt = pcall(function() return u:is_routing() end)
+            if not (ok_r and rt) then n_ally_alive = n_ally_alive + 1 end
+            local ok, h = pcall(function() return u:unary_hitpoints() end)
+            if ok and is_number(h) then hp_a = hp_a + h end
+        end)
+        for _, e in ipairs(enemies) do
+            local ok, h = pcall(function() return e:unary_hitpoints() end)
+            if ok and is_number(h) then hp_e = hp_e + h end
         end
         if planner then
             local ok_c, c = pcall(function() return planner:count() end)
             if ok_c then n_planned = c end
         end
         out_log("tick-stats doctrine=" .. doctrine .. " del=" .. #delegated
-            .. " planner=" .. n_planned .. " idle=" .. n_idle .. " enemies=" .. #enemies)
+            .. " planner=" .. n_planned .. " idle=" .. n_idle
+            .. " enemies=" .. #enemies .. " routing=" .. #enemies_routing
+            .. " hp=" .. math.floor(hp_a) .. "/" .. math.floor(hp_e))
+        -- battle outcome (once): all enemies dead-or-routing = win,
+        -- all our units routing = loss
+        if saw_enemies and not outcome_logged then
+            if #enemies == 0 then
+                outcome_logged = true
+                out_log("outcome WIN — enemy army routed or destroyed, hp ally/enemy="
+                    .. math.floor(hp_a) .. "/" .. math.floor(hp_e))
+            elseif n_ally_alive == 0 then
+                outcome_logged = true
+                out_log("outcome LOSS — player army routed")
+            end
+        end
     end
 
     -- pass 2: abilities + role behaviour
@@ -1411,6 +1555,7 @@ local function tick()
         now_ms = now_ms, doctrine = doctrine, shooters = shooters,
         enemies = enemies, enemies_ranged = enemies_ranged,
         enemies_monster = enemies_monster, enemies_airarty = enemies_airarty,
+        enemies_routing = enemies_routing,
         erole = erole,
     }
     for _, d in ipairs(delegated) do
