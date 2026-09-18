@@ -101,7 +101,10 @@ local CONFIG = {
     -- idle-kicker: delegated units the planner leaves standing around get nudged
     -- toward the nearest enemy. Ordering an already-idle unit interrupts nothing.
     idle_kick        = true,
-    idle_kick_after_s= 8,       -- unit must stay continuously idle this long first
+    idle_kick_after_s= 3,       -- unit must stay continuously idle this long first
+    order_retry_ms   = 6000,    -- min gap between task orders to the same unit
+                                -- (shorter than ability retry — re-targeting a
+                                -- unit whose enemy just died must be fast)
     idle_kick_range_m= 400,     -- only nudge if nearest enemy within this distance
     -- doctrine engine: pick a battle plan from delegated army composition each
     -- tick, then run per-role behaviours. "auto" detects; or force a doctrine.
@@ -507,15 +510,58 @@ local function idle_long_enough(unit, now_ms)
         return false
     end
     if (now_ms - idle_since[uid]) < CONFIG.idle_kick_after_s * 1000 then return false end
-    if kicked_at[uid] and (now_ms - kicked_at[uid]) < CONFIG.retry_ms then return false end
+    if kicked_at[uid] and (now_ms - kicked_at[uid]) < CONFIG.order_retry_ms then return false end
     return true
 end
 
-local function order_attack(su, unit, e, now_ms, tag)
+-- stale-order detection: is_idle() lies for units carrying an old order —
+-- a unit told to hold/defend stands forever with is_idle()=false and the task
+-- layer never sees it. "Has an order but is neither moving nor fighting" is
+-- the real idle signature. Shooters get a pass while a target is in range
+-- (standing and firing = working).
+local function effectively_idle(d, unit, ctx)
+    if unit:is_idle() then return true end
+    local ok_m, moving = pcall(function() return unit:is_moving() end)
+    if ok_m and moving then return false end
+    local ok_f, melee = pcall(function() return unit:is_in_melee() end)
+    if ok_f and melee then return false end
+    if d.role == "shooter" or d.role == "artillery" or d.role == "cav_shot" then
+        local e, dist = nearest_enemy(unit)
+        if e then
+            local ok_r, rng = pcall(function() return unit:missile_range() end)
+            if ok_r and is_number(rng) and rng > 0 and dist <= rng then
+                return false -- standing in range = firing
+            end
+        end
+    end
+    return true
+end
+
+-- task gate: effectively idle for idle_kick_after_s, then throttled by
+-- order_retry_ms (not the 20s ability retry)
+local function task_ready(d, ctx)
+    if not CONFIG.idle_kick then return false end
+    local unit, now_ms = d.unit, ctx.now_ms
+    local uid = tostring(unit:unique_ui_id())
+    if not effectively_idle(d, unit, ctx) then
+        idle_since[uid] = nil
+        return false
+    end
+    if not idle_since[uid] then
+        idle_since[uid] = now_ms
+        return false
+    end
+    if (now_ms - idle_since[uid]) < CONFIG.idle_kick_after_s * 1000 then return false end
+    if kicked_at[uid] and (now_ms - kicked_at[uid]) < CONFIG.order_retry_ms then return false end
+    return true
+end
+
+local function order_attack(su, unit, e, now_ms, tag, force)
     local uid = tostring(unit:unique_ui_id())
     -- focus cap: don't pile the whole line onto one target this tick
+    -- (force bypasses: a capped target still beats standing idle)
     local euid = tostring(e:unique_ui_id())
-    if (focus_count[euid] or 0) >= CONFIG.focus_cap then return end
+    if not force and (focus_count[euid] or 0) >= CONFIG.focus_cap then return end
     local ok, err = pcall(function()
         su.uc:attack_unit(e, true, true)
         su.uc:release_control()
@@ -575,7 +621,7 @@ end
 -- fall back when dragged too far out. Threats are scored, not just nearest:
 -- big threats and high-value enemies get intercepted first.
 local function screen_hold(d, ctx, intercept_r, leash_r, tag)
-    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    if not task_ready(d, ctx) then return end
     local anchor = ctx.shooters and nearest_of(d.unit, ctx.shooters)
     local t = best_scored(d.unit, ctx.enemies, function(e)
         local dist = unit_dist(d.unit, e)
@@ -921,7 +967,7 @@ end
 TASK_EXEC.intercept_breakthrough = function(d, ctx)
     -- gunline cav reserve: intercept whatever presses the line, strongly
     -- preferring monsters threatening the anchor
-    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    if not task_ready(d, ctx) then return end
     local anchor = nearest_of(d.unit, ctx.shooters)
     local t = best_scored(d.unit, ctx.enemies, function(e)
         local dist = unit_dist(d.unit, e)
@@ -943,7 +989,7 @@ TASK_EXEC.intercept_breakthrough = function(d, ctx)
 end
 
 TASK_EXEC.hunt_backline = function(d, ctx)
-    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    if not task_ready(d, ctx) then return end
     -- flyers prefer enemy flyers/artillery over ground backline
     if d.role == "flyer" then
         local t = best_scored(d.unit, ctx.enemies_airarty, function(e)
@@ -977,7 +1023,7 @@ TASK_EXEC.free_engagement = function(d, ctx)
     -- lords act freely: intercept close threats but never get leashed back;
     -- among nearby enemies they prefer high-value targets
     set_behaviour_once(d.su, d.unit, "defend")
-    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    if not task_ready(d, ctx) then return end
     local t = best_scored(d.unit, ctx.enemies, function(e)
         local dist = unit_dist(d.unit, e)
         if dist > CONFIG.bal_intercept_radius_m then return -math.huge end
@@ -988,7 +1034,7 @@ end
 
 TASK_EXEC.hold_fire_line = function(d, ctx)
     set_behaviour_once(d.su, d.unit, "skirmish")
-    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    if not task_ready(d, ctx) then return end
     local e, dist = nearest_enemy(d.unit)
     local ok_r, rng = pcall(function() return d.unit:missile_range() end)
     local hold = (ok_r and is_number(rng) and rng > 0) and rng * CONFIG.shooter_hold_mult or CONFIG.intercept_radius_m
@@ -1003,7 +1049,7 @@ TASK_EXEC.free_fire = function(d, ctx)
 end
 
 TASK_EXEC.attack = function(d, ctx)
-    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    if not task_ready(d, ctx) then return end
     -- finish off routing units first when we're mobile: free kills and they
     -- can't rally (community: run routers down with cavalry)
     if (d.role == "cav" or d.role == "flyer" or d.role == "cav_shot")
@@ -1029,14 +1075,20 @@ TASK_EXEC.attack = function(d, ctx)
         if ctx.erole[e] == "lord" then s = s + 25 end -- decapitating value
         return s
     end)
-    if t then order_attack(d.su, d.unit, t, ctx.now_ms, "engage") end
+    if t then
+        order_attack(d.su, d.unit, t, ctx.now_ms, "engage")
+        return
+    end
+    -- every candidate capped or out of range: piling on beats standing idle
+    local e2 = nearest_enemy(d.unit)
+    if e2 then order_attack(d.su, d.unit, e2, ctx.now_ms, "engage-forced", true) end
 end
 
 -- mobile shooters (missile cav, ranged flyers, harassers): skirmish forever,
 -- pick soft backline targets, never ordered into melee
 TASK_EXEC.harass = function(d, ctx)
     set_behaviour_once(d.su, d.unit, "skirmish")
-    if not idle_long_enough(d.unit, ctx.now_ms) then return end
+    if not task_ready(d, ctx) then return end
     local t = best_scored(d.unit, ctx.enemies, function(e)
         local dist = unit_dist(d.unit, e)
         if dist > CONFIG.harass_range_m then return -math.huge end
@@ -1514,8 +1566,9 @@ local function tick()
         local n_idle, n_planned = 0, -1
         local hp_a, hp_e, n_ally_alive = 0, 0, 0
         for _, d in ipairs(delegated) do
-            local ok_i, idl = pcall(function() return d.unit:is_idle() end)
-            if ok_i and idl then n_idle = n_idle + 1 end
+            -- "standing with a stale order" counts as idle — is_idle() alone
+            -- misses units frozen on a completed hold/defend order
+            if effectively_idle(d, d.unit, nil) then n_idle = n_idle + 1 end
         end
         -- army hp accounting for post-battle review + win/loss detection
         for_each_player_unit(function(u)
