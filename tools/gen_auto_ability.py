@@ -134,8 +134,15 @@ local CONFIG = {
     -- defend_position on the group centre (same as the vanilla defend button).
     directive_refresh_ms = 20000, -- re-issue/retarget this often
     defend_radius_m  = 120,       -- radius for defend_position
-    reclaim_escapes  = 2,         -- ai-drops inside the window before we believe
-    reclaim_window_ms= 60000,     --   the player actually took the unit back
+    -- reclaim fingerprint: OUR uc orders flip is_ai_controlled=false (script
+    -- control) and planner orders call release_control() first — the flag is
+    -- useless as an ownership signal. Ownership is the managed[] set; the only
+    -- trustworthy player-takeover evidence is a fresh ordered_position the
+    -- engine got while the unit was NOT under AI control.
+    order_grace_ms   = 9000,      -- after OUR uc order, ordered_position drift
+                                  --   is just the order executing — wait this long
+    reclaim_move_m   = 30,        -- ordered_position moved this far past grace
+                                  --   = a fresh player order -> reclaim
     -- hotkey handoff (AI General-style, engine ShortcutTriggered events):
     -- bind "Save Camera Bookmark" keys in game settings, select unit cards,
     -- press to move them between AI and player control.
@@ -181,17 +188,32 @@ local cast_log = {} -- [unit_ui_id] = { [ability_key] = last_attempt_ms }
 
 -- auto-delegation state
 local planner = nil           -- script_ai_planner holding the delegated army
+local delegate_ms = 0         -- when the planner was created (diagnostics)
 local delegate_err_logged = false
+local managed = {}        -- [uid] = true: this commander owns tasking. NOT the
+                          --   same as is_ai_controlled — our own uc orders flip
+                          --   that flag to false (script control) and planner
+                          --   orders release_control() first, so it flaps.
+                          --   managed[] is the stable ownership record.
+local our_order_ms = {}   -- [uid] = last battle-ms WE issued a uc order
+local order_dest = {}     -- [uid] = baseline ordered_position for the player-
+                          --   order fingerprint (nil = disarmed/unknown)
+local atk_target_uid = {} -- [uid] = enemy uid our last attack order pointed at
+local prev_ai = {}        -- [uid] = is_ai_controlled() last tick (edge detect)
 local reclaimed = {}      -- [uid] = true once the player takes a unit back; never re-delegate
-local was_ai = {}         -- [uid] = true while is_ai_controlled() held last tick
 local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
-local escapes, escape_t = {}, {} -- [uid] = ai-drop count / last drop ms (reclaim debounce)
-local escape_pos = {}         -- [uid] = ordered_position snapshot at drop time
-                              --   (fresh player orders move it; stale planner
-                              --   remnants don't -> instant reclaim evidence)
 local directive_doc = nil     -- doctrine the standing planner order was issued under
 local directive_ms = 0        -- when it was issued
 local directive_target = nil  -- enemy unit the standing attack order points at
+
+-- every uc order we issue flips the unit to script control and rewrites
+-- ordered_position; record it so the reclaim fingerprint doesn't flag our
+-- own orders as player takeovers. target_uid kept for attack-order checks.
+local function note_our_order(uid, now_ms, target_uid)
+    our_order_ms[uid] = now_ms
+    order_dest[uid] = nil           -- disarm until the order settles
+    atk_target_uid[uid] = target_uid
+end
 -- handoff / micro state
 local overridden = {}         -- [uid] = {at=ms, idle_at=ms} temp player control, auto-returns
 local charge_state = {}       -- [uid] = {phase="in"|"out", at=ms} cav cycle-charge
@@ -327,6 +349,7 @@ local function try_cast(su, unit, key, now_ms)
         -- issuing an order implicitly takes script control; release it back so the
         -- ai planner can keep commanding the unit
         su.uc:release_control()
+        note_our_order(uid, now_ms)
         cast_log[uid] = cast_log[uid] or {}
         cast_log[uid][key] = now_ms
         cast_at[uid] = now_ms -- quiet window: suppress task orders while the cast resolves
@@ -459,6 +482,7 @@ local function order_attack(su, unit, e, now_ms, tag)
         su.uc:release_control()
     end)
     if ok then
+        note_our_order(uid, now_ms, euid)
         focus_count[euid] = (focus_count[euid] or 0) + 1
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
@@ -483,6 +507,7 @@ local function order_return(su, unit, anchor, now_ms)
         su.uc:release_control()
     end)
     if ok then
+        note_our_order(uid, now_ms)
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
         out_log("screen-return " .. unit:type() .. " (" .. uid .. ")")
@@ -575,17 +600,18 @@ local function handoff_toggle()
         if sel[uid] then
             local su = bm:get_scriptunit_for_unit(unit)
             if su and su.uc then
-                if unit:is_ai_controlled() then
+                if managed[uid] and not reclaimed[uid] then
                     reclaimed[uid] = true
                     overridden[uid] = nil
+                    order_dest[uid] = nil
                     if planner then pcall(function() planner:remove_sunits(su) end) end
                     took = took + 1
                     out_log("handoff take " .. unit:type() .. " (" .. uid .. ")")
                 else
                     reclaimed[uid] = nil
                     overridden[uid] = nil
-                    escape_pos[uid] = nil
-                    escapes[uid] = 0
+                    order_dest[uid] = nil
+                    managed[uid] = true
                     if planner then pcall(function() planner:add_sunits(su) end) end
                     gave = gave + 1
                     out_log("handoff give " .. unit:type() .. " (" .. uid .. ")")
@@ -603,10 +629,11 @@ local function handoff_override(now_ms)
     local n = 0
     for_each_player_unit(function(unit)
         local uid = tostring(unit:unique_ui_id())
-        if sel[uid] and unit:is_ai_controlled() then
+        if sel[uid] and managed[uid] and not reclaimed[uid] and not overridden[uid] then
             local su = bm:get_scriptunit_for_unit(unit)
             if su then
                 overridden[uid] = { at = now_ms, idle_at = nil }
+                order_dest[uid] = nil
                 if planner then pcall(function() planner:remove_sunits(su) end) end
                 n = n + 1
                 out_log("override " .. unit:type() .. " (" .. uid .. ")")
@@ -657,10 +684,10 @@ local function add_order_listener(name)
             local ok_u, u = pcall(function() return ctx:get_unit() end)
             if not (ok_u and u) then return end
             local uid = tostring(u:unique_ui_id())
-            -- player-issued order on a unit we think is delegated = they took it
-            if was_ai[uid] and not reclaimed[uid] and not overridden[uid] then
+            -- player-issued order on a unit we think we own = they took it
+            if managed[uid] and not reclaimed[uid] and not overridden[uid] then
                 reclaimed[uid] = true
-                escape_pos[uid] = nil
+                order_dest[uid] = nil
                 out_log("reclaimed-cmd " .. name .. " " .. u:type() .. " (" .. uid .. ")")
             end
         end, "czx_cmd_" .. name)
@@ -688,6 +715,7 @@ local function order_flee_pos(su, unit, from_pos, dist_m, now_ms, tag)
         su.uc:release_control()
     end)
     if ok then
+        note_our_order(uid, now_ms)
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
         out_log(tag .. " " .. unit:type() .. " (" .. uid .. ")")
@@ -766,7 +794,10 @@ local function wounded_step(d, ctx)
                 d.su.uc:goto_location_angle_width(centre, deg, (ok_w and is_number(width)) and width or 20, true)
                 d.su.uc:release_control()
             end)
-            if ok then out_log("wounded-pull " .. d.unit:type() .. " (" .. uid .. ") hp=" .. math.floor(hp * 100) .. "%") end
+            if ok then
+                note_our_order(uid, ctx.now_ms)
+                out_log("wounded-pull " .. d.unit:type() .. " (" .. uid .. ") hp=" .. math.floor(hp * 100) .. "%")
+            end
         end
     end
     return true
@@ -952,7 +983,22 @@ local function ensure_delegation(now_ms)
     local ok2, p = pcall(function() return script_ai_planner:new("czx_auto", sus) end)
     if ok2 and p then
         planner = p
+        delegate_ms = now_ms
+        -- the managed set owns tasking regardless of is_ai_controlled flaps
+        for i = 1, sus:count() do
+            local su0 = sus:item(i)
+            local ok_u, u = pcall(function() return su0.unit end)
+            if ok_u and u then
+                local ok_i, id = pcall(function() return u:unique_ui_id() end)
+                if ok_i and id then managed[tostring(id)] = true end
+            end
+        end
         out_log("auto-delegate units=" .. sus:count() .. " type=" .. tostring(btype))
+        -- an orderless planner leaks its units back to the player within a
+        -- tick; plant a hold order NOW so the warmup flag flap never starts
+        pcall(function()
+            planner:defend_position(planner:get_centre_point(), CONFIG.defend_radius_m)
+        end)
     elseif not delegate_err_logged then
         delegate_err_logged = true
         out_log("ERROR auto-delegate " .. tostring(p))
@@ -1020,51 +1066,84 @@ local function tick()
     focus_count = {} -- per-tick per-target order budget
     ensure_delegation(now_ms)
 
-    -- pass 1: snapshot delegated units + enemies, classify roles
+    -- pass 1: snapshot managed units + enemies, classify roles
+    -- Ownership = the managed[] set, NOT is_ai_controlled: our uc orders flip
+    -- that flag false (script control) and planner orders release_control()
+    -- first, so it flaps under normal operation. The flag is only consulted
+    -- for handback detection (unmanaged unit turning ai=true = the player
+    -- enabled the vanilla group AI toggle) and to arm the order fingerprint.
     local delegated, shooters, n_mobile = {}, {}, 0
     for_each_player_unit(function(unit)
         local uid0 = tostring(unit:unique_ui_id())
         local ai_now = unit:is_ai_controlled()
-        -- an ai->player flip is ambiguous: the engine drops units from an
-        -- orderless planner too. Re-delegate on the first drop; only when a
-        -- unit escapes repeatedly inside the window do we believe the player
-        -- keeps grabbing it back and mark it reclaimed.
-        if was_ai[uid0] and not ai_now and not overridden[uid0] then
-            local n = escapes[uid0] or 0
-            if now_ms - (escape_t[uid0] or 0) > CONFIG.reclaim_window_ms then n = 0 end
-            n = n + 1
-            escapes[uid0], escape_t[uid0] = n, now_ms
-            local ok_s, snap = pcall(function() return unit:ordered_position() end)
-            escape_pos[uid0] = (ok_s and snap) or nil
-            if n >= CONFIG.reclaim_escapes and not reclaimed[uid0] then
-                reclaimed[uid0] = true
-                out_log("reclaimed x" .. n .. " " .. unit:type() .. " (" .. uid0 .. ")")
+
+        -- handback / adoption: a unit we don't own turning ai-controlled can
+        -- only mean the player enabled its group AI (reinforcements arriving
+        -- pre-toggled land here too) -> take it into management
+        if ai_now and (reclaimed[uid0] or not managed[uid0]) then
+            local tag = reclaimed[uid0] and "handed-back " or "adopted "
+            reclaimed[uid0] = nil
+            managed[uid0] = true
+            order_dest[uid0] = nil
+            our_order_ms[uid0] = 0
+            out_log(tag .. unit:type() .. " (" .. uid0 .. ")")
+        end
+        -- brand-new units arriving while uncontrolled (summons, reinforcements)
+        if planner and not managed[uid0] and not reclaimed[uid0]
+            and not overridden[uid0] and not ai_now and not unit:is_routing() then
+            local su0 = bm:get_scriptunit_for_unit(unit)
+            if su0 then
+                pcall(function() planner:add_sunits(su0) end)
+                managed[uid0] = true
+                out_log("adopted-new " .. unit:type() .. " (" .. uid0 .. ")")
             end
         end
-        -- instant reclaim: a unit we never re-delegated that picked up NEW
-        -- orders while uncontrolled has a player behind them (planner
-        -- remnants keep executing their old destination, they never refresh
-        -- ordered_position)
-        if not ai_now and not reclaimed[uid0] and escape_pos[uid0] then
-            local ok_n, np = pcall(function() return unit:ordered_position() end)
-            if ok_n and np then
-                local ok_d, dd = pcall(function()
-                    return np:distance_xz(escape_pos[uid0])
-                end)
-                if ok_d and dd and dd > 30 then
-                    reclaimed[uid0] = true
-                    out_log("reclaimed-ordered " .. unit:type() .. " (" .. uid0 .. ")")
+
+        local is_man = managed[uid0] and not reclaimed[uid0] and not overridden[uid0]
+
+        -- reclaim fingerprint: while a managed unit sits uncontrolled
+        -- (ai=false covers both our script-control and real player grabs),
+        -- ordered_position is the receipt of the LAST order issued. If it
+        -- moves well past our order's grace window, someone else gave a fresh
+        -- order — in a single-player battle that can only be the player.
+        if is_man and not ai_now then
+            if prev_ai[uid0] then
+                -- ai=true -> false this tick: a planner drop or our own order
+                -- taking control. Whatever ordered_position says now is the
+                -- correct baseline (stale baselines would flag planner dests)
+                local ok_b, base = pcall(function() return unit:ordered_position() end)
+                order_dest[uid0] = (ok_b and base) or nil
+            elseif order_dest[uid0] == nil
+                and (now_ms - (our_order_ms[uid0] or 0)) > CONFIG.order_grace_ms then
+                local ok_b, base = pcall(function() return unit:ordered_position() end)
+                order_dest[uid0] = (ok_b and base) or nil
+            end
+            local base = order_dest[uid0]
+            if base then
+                local ok_n, np = pcall(function() return unit:ordered_position() end)
+                if ok_n and np then
+                    local ok_d, dd = pcall(function() return np:distance_xz(base) end)
+                    local moved = ok_d and dd and dd > CONFIG.reclaim_move_m
+                    if moved and atk_target_uid[uid0] then
+                        -- attack-ordered units: ordered_position may track the
+                        -- moving target; only reclaim if the target changed
+                        local ok_c, ct = pcall(function() return unit:current_target() end)
+                        local ok_i, cid = pcall(function()
+                            return ct and ct:unique_ui_id()
+                        end)
+                        moved = not (ok_c and ok_i and cid
+                            and tostring(cid) == atk_target_uid[uid0])
+                    end
+                    if moved then
+                        reclaimed[uid0] = true
+                        order_dest[uid0] = nil
+                        out_log("reclaimed-ordered " .. unit:type() .. " (" .. uid0 .. ")")
+                        is_man = false
+                    end
                 end
             end
         end
-        -- player hands a unit back via the vanilla group AI toggle: clear the
-        -- reclaim mark so it re-enters management (escapes keep their decay)
-        if ai_now and reclaimed[uid0] then
-            reclaimed[uid0] = nil
-            escape_pos[uid0] = nil
-            out_log("handed-back " .. unit:type() .. " (" .. uid0 .. ")")
-        end
-        was_ai[uid0] = ai_now or nil
+
         -- override decay: after the grace window, an idle overridden unit goes
         -- back to the AI (player finished microing it and walked away)
         local ov = overridden[uid0]
@@ -1074,6 +1153,11 @@ local function tick()
                     ov.idle_at = ov.idle_at or now_ms
                     if (now_ms - ov.idle_at) > CONFIG.override_idle_s * 1000 then
                         overridden[uid0] = nil
+                        -- back under the planner so the standing directive reaches it
+                        if planner then
+                            local su1 = bm:get_scriptunit_for_unit(unit)
+                            if su1 then pcall(function() planner:add_sunits(su1) end) end
+                        end
                         out_log("override-end " .. unit:type() .. " (" .. uid0 .. ")")
                     end
                 else
@@ -1081,19 +1165,9 @@ local function tick()
                 end
             end
         end
-        -- reinforcements/summons that arrived after delegation, and units the
-        -- planner dropped on its own: hand them in too
-        if planner and not ai_now and not reclaimed[uid0] and not overridden[uid0] and not unit:is_routing() then
-            local su0 = bm:get_scriptunit_for_unit(unit)
-            if su0 then
-                local ok_a = pcall(function() planner:add_sunits(su0) end)
-                if ok_a then
-                    ai_now, was_ai[uid0] = true, true
-                    out_log("re-delegate " .. unit:type() .. " (" .. uid0 .. ")")
-                end
-            end
-        end
-        if ai_now and not unit:is_routing() then
+        prev_ai[uid0] = ai_now
+
+        if is_man and not unit:is_routing() and not unit:is_shattered() then
             local su = bm:get_scriptunit_for_unit(unit)
             if su and su.uc then
                 local p = probe_unit(unit)
@@ -1276,7 +1350,8 @@ pcall(function()
         local n_scatter = 0
         for_each_player_unit(function(unit)
             local uid = tostring(unit:unique_ui_id())
-            if unit:is_ai_controlled() and not unit:is_routing()
+            if managed[uid] and not reclaimed[uid] and not overridden[uid]
+                and not unit:is_routing()
                 and (now_ms - (dodge_at[uid] or 0)) > CONFIG.dodge_cooldown_ms then
                 local ok_d, dist = pcall(function() return unit:position():distance_xz(pos) end)
                 if ok_d and dist and dist <= CONFIG.dodge_radius_m then
