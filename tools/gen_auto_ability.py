@@ -574,7 +574,7 @@ local function order_attack(su, unit, e, now_ms, tag, force)
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
         -- arm cycle-charge: a cavalry attack order starts the fight timer
-        if role_of[uid] == "cav" then
+        if role_of[uid] == "cav" or role_of[uid] == "flyer" then
             charge_state[uid] = { phase = "in", at = now_ms, target = e }
         end
         out_log(tag .. " " .. unit:type() .. " (" .. uid .. ") -> " .. e:type())
@@ -632,7 +632,7 @@ local function screen_hold(d, ctx, intercept_r, leash_r, tag)
         if not near then return -math.huge end
         local s = -dist * 0.5 + counter_of(d.role, ctx.erole[e])
         if ctx.erole[e] == "monster" then s = s + 50 end
-        if d.anti_large and ctx.erole[e] == "monster" then s = s + 40 end
+        if d.anti_large and (ctx.erole[e] == "monster" or ctx.erole[e] == "cav") then s = s + 40 end
         return s + sv_of(e) * 0.2
     end)
     if t then
@@ -895,7 +895,7 @@ local function kite_step(d, ctx)
     local threat, td = nil, math.huge
     for _, e in ipairs(ctx.enemies) do
         local r = ctx.erole[e]
-        if r == "melee" or r == "monster" or r == "cav" then
+        if r == "melee" or r == "monster" or r == "cav" or r == "flyer" then
             local ok_d, dist = pcall(function()
                 return e:position():distance_xz(d.unit:position())
             end)
@@ -920,6 +920,7 @@ local function assign_task(d, ctx)
     local role, doc = d.role, ctx.doctrine
     if role == "artillery" then return "hold_position" end
     if role == "cav_shot" then return "harass" end -- mounted shooters skirmish in every doctrine
+    if role == "lord" and d.mage and doc ~= "rush" then return "sheltered" end -- casters sit with the shooters (in rush everyone pushes)
     if doc == "gunline" then
         if role == "melee" or role == "monster" then return "protect_gunline" end
         if role == "cav" then return "intercept_breakthrough" end
@@ -964,6 +965,7 @@ TASK_EXEC.intercept_breakthrough = function(d, ctx)
         if not near then return -math.huge end
         local s = -dist * 0.3 + sv_of(e) * 0.3 + counter_of("cav", ctx.erole[e])
         if ctx.erole[e] == "monster" then s = s + 80 end
+        if d.anti_large and (ctx.erole[e] == "monster" or ctx.erole[e] == "cav") then s = s + 40 end
         return s
     end)
     if t then
@@ -1032,7 +1034,15 @@ TASK_EXEC.hold_fire_line = function(d, ctx)
     -- beyond hold range: stay put, don't walk past the screen
 end
 
+TASK_EXEC.sheltered = function(d, ctx)
+    -- caster lord/hero: sit with the shooters, only swat what gets close
+    set_behaviour_once(d.su, d.unit, "defend")
+    screen_hold(d, ctx, 70, 90, "shelter")
+end
+
 TASK_EXEC.free_fire = function(d, ctx)
+    -- skirmish where supported: engine auto-retreat beats our flee hops
+    if not d.no_skirmish then set_behaviour_once(d.su, d.unit, "skirmish") end
     kick_if_idle(d.su, d.unit, ctx.now_ms)
 end
 
@@ -1499,6 +1509,7 @@ local function tick()
                     highvalue = p.prof and p.prof.highvalue,
                     shock = p.prof and p.prof.shock,
                     no_skirmish = p.prof and p.prof.no_skirmish,
+                    mage = p.prof and p.prof.mage,
                 }
                 if role == "shooter" or role == "artillery" then shooters[#shooters + 1] = unit end
                 if role == "cav" or role == "flyer" or role == "cav_shot" then

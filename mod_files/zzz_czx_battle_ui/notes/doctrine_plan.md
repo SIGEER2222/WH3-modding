@@ -4,6 +4,12 @@
 > 本文档为功能级设计说明，实现细节以 `script/battle/mod/czx_battle_auto_ability.lua` 为准；
 > 生成器模板 `tools/gen_auto_ability.py` 与源文件保持逐字节同步。
 >
+> **2026-09-19 v1.5.4（战术层补洞）**：法师类领主/英雄（`mage` 旗标）不再
+> free_engagement 送脸，除 rush 外一律 `sheltered`——贴射手线、只拦 70m 内贴身敌；
+> `kite_step` 威胁角色加 `flyer`（敌方空军俯冲后排也触发撤退）；屏线/拦截的
+> anti_large 加成覆盖骑兵目标（与 attack 任务一致）；balanced `free_fire` 射手
+> 自动开 skirmish（`no_skirmish` 单位跳过）；循环冲锋对 `flyer` 同样武装。
+>
 > **2026-09-19 v1.5.3**：伤员处理改为**脱战跳步**——hp < `wounded_hp`(0.35) 且仍
 > 在近战的高价值单位（lord/monster/cav/highvalue）朝远离最近敌人的方向跳出
 > `wounded_pull_m`(80m)，脱离近战立刻回任务层继续打；每 `wounded_retry_ms`(12s)
