@@ -342,3 +342,46 @@ battle 1324（血河渡口，32v32）暴露三个问题：
 - `scratch/czx_battle_test/assert_battle_log.py <log> [--expect-win] [--expect-deploy]`——11 项断言：deploy-silent（部署期零战术指令）、mobile-tasking（cav/flyer 不得拿 attack）、mobile-activity、reclaim-bounded（总量≤12 且 2s 突发≤5）、idle-after-contact（接敌 45s 后 idle≤6，容忍 join 尖峰）、del-survival≥40%、outcome、formation-once、no-mod-errors 等。
 - `czx_test_battle_deploy.xml` = 去掉 skip_deployment 的变体；测试包 test_sim 在部署 9s 后自动 `SimulateLClick("button_battle_start")` 开战，覆盖部署期路径。
 - 实测：1336（部署路径）与 1341（跳部署回归）全部断言 PASS；v1.6.7 修复在旧日志 1324 上回放断言会 FAIL（125 条部署期违禁指令 + 9 个 cav/flyer→attack），确认断言有效。
+
+### v1.6.8 reclaim 二次确认 + 场景矩阵（battle 1352/1416/1426 实测）
+
+1352（渡口 38v32）reclaim=17 拆解：8 个是敌全灭后 d2e=-1 的战后停驻误报；5 个 gou/领主是**追溃完成后**停驻误报（追杀目标死亡后 ordered_position 残留旧追击点，停稳时指纹炸）。修复：
+
+- **无敌人不 reclaim**：enemy_pos 为空时任何指令都是家务整理，吸收基线不收回（战后拖拽无意义）。
+- **二次确认门**（pending_reclaim）：指纹炸不立即收回——记下 np，下一 tick 单位仍静止且 np 同点（≤15m）才真收。追击停驻/风扇扩散的 np 各 tick 漂移，真接管的停驻点稳定。代价=接管检测再慢 3s。
+- 断言修正：idle-after-contact 只在 enemies>0 的 tick-stats 样本里算（战后 settling 不计入）。
+- 1352 断言结果：deploy-silent/reclaim-bounded/idle-after-contact 三 FAIL → 修复后 S3(1416) 全 PASS（reclaim=3, idle=2, flank-move 触发）。
+
+**分类 bug**[1426 实锤]：帝国骑士/瑞克禁卫 profile 是 cavalry/melee_flanker_shock/L（带 large 标志），classify 里 prof.large 判定在 cat=="cavalry" 之前 → 全被分进 monster → protect_gunline，mobile=0 整场无机动部队。cavalry 判定已前移到 large 之前；runtime probe 的 is_cavalry 同步前移到 is_war_beasts 之前。[实测/需随版本复查] profile 的 large 标志来源是 land_units.is_large，骑兵类全部带该标志。
+
+**场景矩阵**（gen_scenarios.py）：s3 开阔 rush(37v32)、s4 渡口枪阵(27v30 帝vs绿皮)、s5 开阔均衡(26v32)、s6 开阔风筝(20v30)。s4 首跑暴露兵种键错误（general_of_the_empire_0→general_0、orc_arrer_boyz_0→去后缀、goblins→goblin_spearmen）——**XML 引用不存在的兵种键 = 加载阶段静默崩溃**（无 Application Error 事件、无 script_log），校验兵种键必须用 gamedata/db/main_units_tables/data__.tsv 的 unit/land_unit 列。
+
+### v1.6.9 枪玩家单位 bug + outcome 兜底 + idle 取证（battle 1525/1549/1617 实测）
+
+**pending_reclaim 期间禁发指令**[待实机复验]：battle 1617 抓到"AI 和玩家抢单位"活例——test_sim 每 ~51s 对 warrior_priest(1002) 下一次 sim-order，pending 记下了但单位在移动 → 移动清除 pending → regroup 又把 ordered_position 改回我们的目的地 → "explained" 清除 → 下轮 sim-order 再来，整场 25+ 循环 reclaim 永不确认。修法：pending_reclaim[uid] 非空时**抑制一切 planner 指令**（cast 静默窗/deploy 门之外的第三道闸）——让我们自己的指令别去覆盖指纹，给二次确认留出观察窗。
+
+**outcome 兜底**：VictoryCountdown→battle_complete 可短于一个 poll 间隔（battle 1549：1346700→1346900ms，tick 泵没来得及看到 phase 变化就被清回调）。两路兜底：
+- mod 侧：phase 跳变命中 victory/defeat 时**当场直接数双方存活**（不依赖 %20 心跳数据）记 `outcome WIN/LOSS/END — phase=...`
+- 断言侧：无 outcome 行但有 battle_complete/VictoryCountdown/clear_battle_event_callbacks 时，用最后一条 tick-stats 的 hp 推断（hp_e≤0.5→WIN；hp_a≤0.5 或 del≤2 且 hp_e>hp_a→LOSS；否则 END）
+
+**idle-units 遥测**：tick-stats 追加 `idle-units=` 字段（最多 12 个兵种名）——idle 超标时直接看到是谁在站着。1617 实锤价值：两个 lord 每场全程 idle，根因即上面的 sim-order 拉锯。
+
+**断言修正×3**：
+- engage 检测从 `>>> engage` 扩展为任一接触动词（screen-intercept/shooter-engage/counter-charge/charge-in/cav-*）——engage 动词早已不存在，此前 idle-after-contact 恒 SKIP
+- del-survival 败局降级 WARN（硬仗减员是正常战损；只有"赢了但池空"才 FAIL——那意味着单位被误报收回/送死）
+- S6(1508) 的 `del-survival FAIL 0/20` 即 cav_shot 误报收回史证——skirmish 豁免（`is_behaviour_active("skirmish")` → 不算 idle、不做 reclaim 评估）已入库，待实机复验
+
+**场景 XML 必须 CRLF**[实锤]：python `open(w)` 重写会把 CRLF 换成 LF——WH3 战斗 XML 加载器对纯 LF 文件**静默卡死在 "battle is being initialised"**（1602/1614 两次挂死，进程 Responding=False 685MB），转回 CRLF 即恢复。写 XML 一律 `open(p,'wb')` + 显式 `\r\n`。
+
+### 场景矩阵结果汇总（截至 v1.6.9）
+
+| 场景 | 日志 | 结果 | 断言状态 |
+|---|---|---|---|
+| S3 开阔rush VMP vs WEF | 1416 | WIN 300s | 全 PASS（reclaim=3 idle=2 mobile-act=40） |
+| S4 渡口枪阵 EMP vs GRN | 1525 | END 2/2 互灭 | 机制全 PASS；idle=7 待复跑取证（该日志无 idle-units 字段） |
+| S5 开阔均衡 EMP vs GRN | 1617 | WIN | 全 PASS（del 46%）；idle=7 已定位为 sim-order 拉锯，修复待复验 |
+| S6 开阔风筝 全骑 vs GRN | 1508 | WIN | 修复前 FAIL（reclaim=9 del=0）；skirmish 豁免待复验 |
+| 部署路径 | 1336 | WIN | 全 PASS（部署窗 0 违禁指令） |
+| 跳部署回归 | 1341 | WIN | 全 PASS |
+
+**待实机复验清单**（下次可跑游戏时按序跑）：S6 复跑验证 skirmish 豁免（reclaim 应从 9 降到 ≤3、del-survival 归位）；S5/S3 复跑验证 pending_reclaim 抑制后 sim 回收率从 MISS 变 HIT；S4 复跑用 idle-units 字段定位拉锯期站着的是谁。

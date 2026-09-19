@@ -137,6 +137,13 @@ local CONFIG = {
     -- defend_position on the group centre (same as the vanilla defend button).
     directive_refresh_ms = 20000, -- re-issue/retarget this often
     defend_radius_m  = 120,       -- radius for defend_position
+    stale_creep_ms   = 60000,     -- no contact this long -> creep the anchor
+    creep_step_m     = 150,       -- metres per creep toward the enemy
+    contact_range_m  = 200,       -- nearest-enemy distance that counts as "in
+                                  -- contact"; must sit inside the shooter hold
+                                  -- ring or the gunline parks just out of
+                                  -- range and the stalemate never resolves
+                                  -- (battle 1444: creep stopped at ~450m)
     -- reclaim fingerprint: OUR uc orders flip is_ai_controlled=false (script
     -- control) and planner orders call release_control() first — the flag is
     -- useless as an ownership signal. Ownership is the managed[] set; the only
@@ -244,6 +251,8 @@ local saw_enemies = false -- set once any enemy is seen; gates outcome detection
 local outcome_logged = false
 local last_phase = nil     -- last bm phase name; changes get logged
 local deploy_started = false -- test build: deployment auto-start fired once
+local pending_reclaim = {} -- [uid] = np vector; two-tick reclaim confirmation
+local last_contact_ms = 0 -- last tick any unit was in melee / enemy within reach
 local roster_logged = false
 local reclaimed = {}      -- [uid] = true once the player takes a unit back; never re-delegate
 local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
@@ -518,21 +527,25 @@ local function classify(unit, p)
         -- mounted/ranged hybrids are skirmishers, not shock troops: they harass
         -- and kite, and melt if they stand in melee (community consensus)
         if p.flies then return (p.ammo ~= 0 or prof.harasser) and "cav_shot" or "flyer" end
-        if prof.large or cat == "war_beast" then return "monster" end
+        -- cavalry before large: mounted shock troops ARE large entities
+        -- (empire knights/reiksguard carry prof.large); routing them to
+        -- "monster" parked the whole reserve pool on protect_gunline and
+        -- left the doctrine with mobile=0 (battle 1426)
         if cat == "cavalry" then
             return (p.ammo ~= 0 or prof.harasser or prof.ai:find("ranged_cav"))
                 and "cav_shot" or "cav"
         end
+        if prof.large or cat == "war_beast" then return "monster" end
         if cat == "inf_ranged" or p.ammo ~= 0 then return "shooter" end
         return "melee"
     end
     if ubool(unit, "is_artillery") or ubool(unit, "is_war_machine") then return "artillery" end
     if ubool(unit, "is_commanding_unit") then return "lord" end
     if p.flies then return p.ammo ~= 0 and "cav_shot" or "flyer" end
-    if ubool(unit, "is_war_beasts") or ubool(unit, "is_elephants") then return "monster" end
     if ubool(unit, "is_cavalry") or ubool(unit, "is_chariot") or p.speed >= CONFIG.cav_min_speed then
         return p.ammo ~= 0 and "cav_shot" or "cav"
     end
+    if ubool(unit, "is_war_beasts") or ubool(unit, "is_elephants") then return "monster" end
     if p.ammo ~= 0 and p.range >= CONFIG.artillery_min_range then return "artillery" end
     if p.ammo ~= 0 then return "shooter" end
     return "melee"
@@ -581,6 +594,11 @@ end
 -- the real idle signature. Shooters get a pass while a target is in range
 -- (standing and firing = working).
 local function effectively_idle(d, unit, ctx)
+    -- engine-skirmishing units pause between hop orders — not idle, just
+    -- waiting on their behaviour layer (battle 1508: the kite army's "idle=8"
+    -- was 8 cav_shot mid-hop)
+    local ok_sk, sk = pcall(function() return unit:is_behaviour_active("skirmish") end)
+    if ok_sk and sk then return false end
     if unit:is_idle() then return true end
     local ok_m, moving = pcall(function() return unit:is_moving() end)
     if ok_m and moving then return false end
@@ -739,6 +757,71 @@ local function enemy_support(e, ctx, r)
     return n
 end
 
+-- flank maneuver: when every backline target sits beyond the leash, ground
+-- mobiles walk to a waypoint BESIDE the enemy line instead of queueing
+-- through the chokepoint behind the blob. The engine pathfinder picks
+-- whichever crossing actually gets there — on maps with a second ford this
+-- is the hammer going around while the infantry anvil pins. uid parity
+-- splits consecutive mobiles into opposite pincers. Once arrived, the
+-- backline is within leash of the flanking unit itself and the hunt fires.
+local flank_state = {} -- [uid] = {wp=vector, at=ms}
+local creep_anchor = nil  -- forward anchor while stale (vector)
+local creep_off = {}      -- [uid] = {dx,dz} frozen offset from centre at creep start
+local creep_step_ms = 0   -- last anchor step time
+
+-- stalemate creep slot: each unit keeps its frozen lateral offset from the
+-- anchor so the whole line marches forward in formation instead of blobbing
+local function creep_slot(d, ctx)
+    if not ctx.creep_anchor then return nil end
+    local uid = tostring(d.unit:unique_ui_id())
+    local off = ctx.creep_off and ctx.creep_off[uid]
+    local ax, az = ctx.creep_anchor:get_x(), ctx.creep_anchor:get_z()
+    if off then ax, az = ax + off.dx, az + off.dz end
+    local ok_v, wp = pcall(function() return v(ax, az) end)
+    if ok_v then return wp end
+    return nil
+end
+
+-- walk toward the creep slot while the enemy refuses battle; returns true
+-- whenever the unit should be governed by the creep (already parked at the
+-- slot counts — caller returns and re-evaluates next tick)
+local function creep_move(d, ctx)
+    local slot = creep_slot(d, ctx)
+    if not slot then return false end
+    local ok_up, up = pcall(function() return d.unit:position() end)
+    if not (ok_up and up) then return false end
+    local ok_d, dd = pcall(function() return up:distance_xz(slot) end)
+    if ok_d and dd and dd > 25 then
+        order_move_pos(d.su, d.unit, slot, ctx.now_ms, "creep")
+    end
+    return true
+end
+local function flank_waypoint(d, ctx)
+    local ok_up, up = pcall(function() return d.unit:position() end)
+    if not (ok_up and up) then return nil end
+    local ex, ez, en = 0, 0, 0
+    for _, e in ipairs(ctx.enemies) do
+        local ok_p, ep = pcall(function() return e:position() end)
+        if ok_p and ep then ex, ez, en = ex + ep:get_x(), ez + ep:get_z(), en + 1 end
+    end
+    if en == 0 then return nil end
+    ex, ez = ex / en, ez / en
+    local dx, dz = ex - up:get_x(), ez - up:get_z()
+    local len = math.sqrt(dx * dx + dz * dz)
+    if len < 80 then return nil end -- already inside the scrum
+    dx, dz = dx / len, dz / len
+    local uid = tostring(d.unit:unique_ui_id())
+    local side = ((tonumber(uid) or 0) % 2 == 0) and 1 or -1
+    -- beside the enemy line (~200m lateral), pulled a touch toward us so the
+    -- approach lane stays out of the blob
+    local ok_v, wp = pcall(function()
+        return v(ex - dz * side * 200 - dx * 40,
+                 ez + dx * side * 200 - dz * 40)
+    end)
+    if ok_v and wp then return wp end
+    return nil
+end
+
 
 local function set_behaviour_once(su, unit, behaviour, flag_key)
     local uid = tostring(unit:unique_ui_id())
@@ -775,6 +858,8 @@ local function screen_hold(d, ctx, intercept_r, leash_r, tag)
         order_attack(d.su, d.unit, t, ctx.now_ms, tag .. "-intercept")
         return
     end
+    -- enemy refusing battle: edge forward in formation instead of standing
+    if ctx.stale and creep_move(d, ctx) then return end
     if anchor and unit_dist(d.unit, anchor) > leash_r then
         order_return(d.su, d.unit, anchor, ctx.now_ms)
     end
@@ -1113,8 +1198,17 @@ TASK_EXEC.intercept_breakthrough = function(d, ctx)
     local anchor = nearest_of(d.unit, ctx.shooters)
     local t = best_scored(d.unit, ctx.enemies, function(e)
         local dist = unit_dist(d.unit, e)
+        -- targets: anything pressing us, anything pressing the anchor, and
+        -- anything already in melee — if the screen is fighting, the reserve
+        -- should be counter-charging the scrum, not waiting for the enemy to
+        -- reach the shooters (battle 1517: screen held the bridge while all
+        -- three cavalry stood the whole fight)
+        local in_melee = false
+        local ok_m, m = pcall(function() return e:is_in_melee() end)
+        if ok_m and m then in_melee = true end
         local near = dist <= CONFIG.cav_intercept_radius_m
             or (anchor and unit_dist(e, anchor) <= CONFIG.protect_radius_m * 2)
+            or in_melee
         if not near then return -math.huge end
         local s = -dist * 0.3 + sv_of(e) * 0.3 + counter_of("cav", ctx.erole[e])
         if ctx.erole[e] == "monster" then s = s + 80 end
@@ -1126,6 +1220,7 @@ TASK_EXEC.intercept_breakthrough = function(d, ctx)
             ctx.erole[t] == "monster" and "cav-antilarge" or "cav-intercept")
         return
     end
+    if ctx.stale and creep_move(d, ctx) then return end
     if anchor and unit_dist(d.unit, anchor) > CONFIG.bal_leash_radius_m then
         order_return(d.su, d.unit, anchor, ctx.now_ms)
     end
@@ -1237,10 +1332,39 @@ TASK_EXEC.hunt_backline = function(d, ctx)
         order_attack(d.su, d.unit, t, ctx.now_ms, "cav-hunt")
         return
     end
-    -- nothing legal to hunt: gunline keeps its shooter-anchored reserve;
-    -- anything else becomes the counter-charge reserve at the fighting front
-    -- (screen_hold anchors on the shooters — on a chokepoint that parks the
-    -- cavalry at the column's tail doing nothing)
+    -- a backline exists but nothing is leash-legal: ground mobiles take a
+    -- flank waypoint and come in from the side rather than joining the queue
+    -- through the chokepoint. Flyers skip this — the isolation dive already
+    -- covers them, and reserve keeps them near the pounce line.
+    local uid = tostring(d.unit:unique_ui_id())
+    local fs = flank_state[uid]
+    if fs then
+        local ok_m, inm = pcall(function() return d.unit:is_in_melee() end)
+        local ok_d, dd = pcall(function()
+            return d.unit:position():distance_xz(fs.wp)
+        end)
+        -- done when arrived, committed to melee, or timed out — then re-eval
+        if (ok_m and inm) or (ok_d and dd and dd < 80)
+            or (ctx.now_ms - fs.at > 45000) then
+            flank_state[uid] = nil
+        else
+            order_move_pos(d.su, d.unit, fs.wp, ctx.now_ms, "flank-move")
+            return
+        end
+    end
+    if (d.role == "cav" or (d.role == "melee" and d.flanker))
+        and #ctx.enemies_ranged > 0 then
+        local wp = flank_waypoint(d, ctx)
+        if wp then
+            flank_state[uid] = { wp = wp, at = ctx.now_ms }
+            order_move_pos(d.su, d.unit, wp, ctx.now_ms, "flank-move")
+            return
+        end
+    end
+    -- nothing legal to hunt and nowhere to flank: gunline keeps its
+    -- shooter-anchored reserve; anything else becomes the counter-charge
+    -- reserve at the fighting front (screen_hold anchors on the shooters —
+    -- on a chokepoint that parks the cavalry at the column's tail)
     if ctx.doctrine == "gunline" then
         TASK_EXEC.intercept_breakthrough(d, ctx)
     else
@@ -1269,8 +1393,11 @@ TASK_EXEC.hold_fire_line = function(d, ctx)
     local hold = (ok_r and is_number(rng) and rng > 0) and rng * CONFIG.shooter_hold_mult or CONFIG.intercept_radius_m
     if e and dist <= hold then
         order_attack(d.su, d.unit, e, ctx.now_ms, "shooter-engage")
+        return
     end
-    -- beyond hold range: stay put, don't walk past the screen
+    -- enemy refuses to close: creep the firing line toward them (still
+    -- screened — the melee creep slots advance in the same formation)
+    if ctx.stale then creep_move(d, ctx) end
 end
 
 TASK_EXEC.sheltered = function(d, ctx)
@@ -1360,7 +1487,11 @@ TASK_EXEC.harass = function(d, ctx)
     if t then order_attack(d.su, d.unit, t, ctx.now_ms, "harass") end
 end
 
-TASK_EXEC.hold_position = function() end -- artillery: never ordered; fires on its own
+TASK_EXEC.hold_position = function(d, ctx)
+    -- artillery holds by default; during a stalemate creep it repositions
+    -- with the line or it gets left 900m behind the anchor
+    if ctx.stale then creep_move(d, ctx) end
+end
 
 local function select_doctrine(delegated, shooters, n_mobile)
     if CONFIG.doctrine ~= "auto" then return CONFIG.doctrine end
@@ -1654,6 +1785,7 @@ local function cohesion_step(d, ctx)
     if not anchor or d.role == "artillery" then return false end
     local uid = tostring(d.unit:unique_ui_id())
     if bait_uid == uid then return false end
+    if flank_state[uid] then return false end -- flank isolation is deliberate
     if not ctx.delegated or #ctx.delegated < 3 then return false end
     local ok_m, melee = pcall(function() return d.unit:is_in_melee() end)
     if ok_m and melee then return false end
@@ -1720,14 +1852,49 @@ local function issue_planner_directive(now_ms, doctrine, delegated, enemies)
             and (now_ms - directive_ms) < CONFIG.directive_refresh_ms then
             return
         end
+        local ok_cp0, cp0 = pcall(function() return planner:get_centre_point() end)
+        local anchor = (ok_cp0 and cp0) or nil
+        -- stalemate creep: nobody in melee and the nearest enemy sits beyond
+        -- gunline reach = the enemy refuses battle, and the timeout favours
+        -- them — sitting still is a slow loss. Edge the defend anchor toward
+        -- the enemy one step per refresh; it's a formation-preserving move,
+        -- not a charge, and contact resets the clock (battle 1426/1432:
+        -- greenskin AI sat out of range for 11+ and 38+ minutes)
+        local stale = (now_ms - last_contact_ms) > CONFIG.stale_creep_ms
+        if stale and anchor then
+            local best, best_d = nil, math.huge
+            for _, e in ipairs(enemies) do
+                local ok_d, dist = pcall(function()
+                    return e:position():distance_xz(anchor)
+                end)
+                if ok_d and dist and dist < best_d then best, best_d = e, dist end
+            end
+            if best then
+                local ok_ep, ep = pcall(function() return best:position() end)
+                if ok_ep and ep then
+                    local dx = ep:get_x() - anchor:get_x()
+                    local dz = ep:get_z() - anchor:get_z()
+                    local len = math.sqrt(dx * dx + dz * dz)
+                    if len > 1 then
+                        local step = math.min(CONFIG.creep_step_m, len)
+                        local ok_v, nv = pcall(function()
+                            return v(anchor:get_x() + dx / len * step,
+                                     anchor:get_z() + dz / len * step)
+                        end)
+                        if ok_v and nv then anchor = nv end
+                    end
+                end
+            end
+        end
+        if not anchor then return end
         local ok_o, err = pcall(function()
-            planner:defend_position(planner:get_centre_point(), CONFIG.defend_radius_m)
+            planner:defend_position(anchor, CONFIG.defend_radius_m)
         end)
         if ok_o then
             directive_doc, directive_ms, directive_target = doctrine, now_ms, nil
-            local ok_cp, cp = pcall(function() return planner:get_centre_point() end)
-            directive_pos = (ok_cp and cp) or nil
-            out_log("directive defend r=" .. CONFIG.defend_radius_m)
+            directive_pos = anchor
+            out_log("directive defend r=" .. CONFIG.defend_radius_m
+                .. (stale and " creep" or ""))
         else
             out_log("directive-fail defend " .. tostring(err))
         end
@@ -1869,6 +2036,35 @@ local function tick()
     if ok_pn and phase_name and phase_name ~= last_phase then
         last_phase = phase_name
         out_log("phase -> " .. phase_name)
+        -- battles can end between heartbeat ticks — on the victory/defeat
+        -- phase transition, tally both armies directly and log the outcome
+        -- (battle 1535: VictoryCountdown fired with no outcome line)
+        if not outcome_logged
+            and (phase_name:lower():find("victory")
+                 or phase_name:lower():find("defeat")) then
+            local a_alive, e_alive = 0, 0
+            for_each_player_unit(function(u)
+                local ok_r, r = pcall(function() return u:is_routing() end)
+                if not (ok_r and r) then a_alive = a_alive + 1 end
+            end)
+            local nal = bm:get_non_player_alliance()
+            if nal then
+                local armies = nal:armies()
+                for a = 1, armies:count() do
+                    local units = armies:item(a):units()
+                    for u = 1, units:count() do
+                        local e = units:item(u)
+                        local ok_r, r = pcall(function() return e:is_routing() end)
+                        if not (ok_r and r) then e_alive = e_alive + 1 end
+                    end
+                end
+            end
+            outcome_logged = true
+            out_log(string.format(
+                "outcome %s — phase=%s alive ally/enemy=%d/%d",
+                e_alive == 0 and "WIN" or (a_alive == 0 and "LOSS" or "END"),
+                phase_name, a_alive, e_alive))
+        end
     end
     -- test build: nobody clicks Start in an automated run — hold deployment
     -- ~9s (enough ticks to prove the suppression gate), then click it
@@ -1911,6 +2107,7 @@ local function tick()
             prev_ordered[uid0] = nil
             atk_target_uid[uid0] = nil
             our_order_ms[uid0] = 0
+            pending_reclaim[uid0] = nil
             out_log(tag .. unit:type() .. " (" .. uid0 .. ")")
         end
         -- brand-new units arriving while uncontrolled (summons, reinforcements)
@@ -1958,6 +2155,7 @@ local function tick()
                 -- is evidence of a foreign order; reclaim then costs the walk
                 -- time, which is acceptable for correctness.
                 local ok_mv, mv = pcall(function() return unit:is_moving() end)
+                if ok_mv and mv then pending_reclaim[uid0] = nil end
                 local ok_n, np = nil, nil
                 if not (ok_mv and mv) then
                     ok_n, np = pcall(function() return unit:ordered_position() end)
@@ -1965,11 +2163,34 @@ local function tick()
                 if ok_n and np then
                     local ok_d, dd = pcall(function() return np:distance_xz(base) end)
                     local moved = ok_d and dd and dd > CONFIG.reclaim_move_m
+                    if moved then
+                        -- skirmish behaviour: the ENGINE repositions these
+                        -- units continuously to keep them at missile range —
+                        -- their ordered_position is never ours (battle 1508:
+                        -- all 9 reclaims were outriders/pistoliers settling
+                        -- between engine kite hops). Absorb and move on.
+                        local ok_sk, sk = pcall(function()
+                            return unit:is_behaviour_active("skirmish")
+                        end)
+                        if ok_sk and sk then
+                            moved = false
+                            order_dest[uid0] = np
+                            pending_reclaim[uid0] = nil
+                        end
+                    end
                     if moved and deploy_phase then
                         -- deployment drags are arrangement, not takeover —
                         -- absorb the new position as baseline; reclaiming a
                         -- unit the player merely placed would leave it
                         -- unmanaged for the whole battle
+                        moved = false
+                        order_dest[uid0] = np
+                    end
+                    if moved and #enemy_pos == 0 then
+                        -- no enemies left = post-battle housekeeping orders;
+                        -- nothing to fight over, so a foreign order here is
+                        -- never a meaningful takeover (battle 1352: 8
+                        -- d2e=-1 reclaims after VictoryCountdown)
                         moved = false
                         order_dest[uid0] = np
                     end
@@ -2078,7 +2299,13 @@ local function tick()
                         if dp then
                             local ok_d2, d2 = pcall(function() return np:distance_xz(dp) end)
                             if ok_d2 and d2 then
-                                if d2 <= 120 then
+                                -- defend fan-out parks units across the whole
+                                -- defend ring (creep shifts the anchor 150m
+                                -- per step); absorb anything inside the ring
+                                -- + margin, keep the tight 120m for attacks
+                                local ring = directive_target and 120
+                                    or (CONFIG.defend_radius_m + 60)
+                                if d2 <= ring then
                                     moved = false
                                     order_dest[uid0] = np -- adopt the directive dest as baseline
                                 else
@@ -2122,6 +2349,32 @@ local function tick()
                                 end
                             end
                         end
+                    end
+                    if moved then
+                        -- two-tick confirm: a spent pursuit/planner
+                        -- destination keeps drifting tick to tick; a real
+                        -- player drop is stable while the unit stays parked.
+                        -- First sighting pends, second consecutive sighting
+                        -- at the same spot confirms (battle 1352: post-chase
+                        -- stops and fan-out arrivals each fired once).
+                        local pend = pending_reclaim[uid0]
+                        local stable = false
+                        if pend then
+                            local ok_pd, pd = pcall(function()
+                                return np:distance_xz(pend)
+                            end)
+                            stable = ok_pd and pd and pd <= 15
+                        end
+                        if not stable then
+                            pending_reclaim[uid0] = np
+                            moved = false
+                        else
+                            pending_reclaim[uid0] = nil
+                        end
+                    else
+                        -- explained away by a suppression rule — any parked
+                        -- sighting is stale
+                        pending_reclaim[uid0] = nil
                     end
                     if moved then
                         reclaimed[uid0] = true
@@ -2219,6 +2472,7 @@ local function tick()
             order_dest[uid] = nil
             our_dests[uid] = nil
             prev_ordered[uid] = nil
+            flank_state[uid] = nil
         end
     end)
 
@@ -2276,6 +2530,73 @@ local function tick()
         last_doctrine = doctrine
     end
     if not deploy_phase then
+        -- contact clock for the gunline stalemate creep: any melee or an
+        -- enemy inside reach of the group centre counts as contact
+        local ok_cp, cp = pcall(function()
+            return planner and planner:get_centre_point()
+        end)
+        if ok_cp and cp then
+            local nd = math.huge
+            for _, e in ipairs(enemies) do
+                local ok_d, dd = pcall(function()
+                    return e:position():distance_xz(cp)
+                end)
+                if ok_d and dd and dd < nd then nd = dd end
+            end
+            if nd <= CONFIG.contact_range_m then last_contact_ms = now_ms end
+        end
+        for _, d in ipairs(delegated) do
+            local ok_m, m = pcall(function() return d.unit:is_in_melee() end)
+            if ok_m and m then last_contact_ms = now_ms break end
+        end
+        -- stalemate creep anchor: the defend directive alone never relocates
+        -- anyone (battle 1444: 47 creeps, idle pinned at 26) — so the task
+        -- layer walks each unit to anchor+frozen offset instead. The anchor
+        -- steps toward the nearest enemy once per directive refresh.
+        if (now_ms - last_contact_ms) > CONFIG.stale_creep_ms
+            and #enemies > 0 and ok_cp and cp then
+            if not creep_anchor then
+                creep_anchor = cp
+                creep_off = {}
+                for _, d in ipairs(delegated) do
+                    local ok_up, up = pcall(function() return d.unit:position() end)
+                    if ok_up and up then
+                        creep_off[tostring(d.unit:unique_ui_id())] = {
+                            dx = up:get_x() - cp:get_x(),
+                            dz = up:get_z() - cp:get_z(),
+                        }
+                    end
+                end
+            end
+            if now_ms - creep_step_ms >= CONFIG.directive_refresh_ms then
+                creep_step_ms = now_ms
+                local best, bd = nil, math.huge
+                for _, e in ipairs(enemies) do
+                    local ok_d, dd = pcall(function()
+                        return e:position():distance_xz(creep_anchor)
+                    end)
+                    if ok_d and dd and dd < bd then best, bd = e, dd end
+                end
+                if best then
+                    local ok_ep, ep = pcall(function() return best:position() end)
+                    if ok_ep and ep then
+                        local dx = ep:get_x() - creep_anchor:get_x()
+                        local dz = ep:get_z() - creep_anchor:get_z()
+                        local len = math.sqrt(dx * dx + dz * dz)
+                        if len > 1 then
+                            local st = math.min(CONFIG.creep_step_m, len)
+                            local ok_v, nv = pcall(function()
+                                return v(creep_anchor:get_x() + dx / len * st,
+                                         creep_anchor:get_z() + dz / len * st)
+                            end)
+                            if ok_v and nv then creep_anchor = nv end
+                        end
+                    end
+                end
+            end
+        else
+            creep_anchor, creep_off, creep_step_ms = nil, {}, 0
+        end
         issue_planner_directive(now_ms, doctrine, delegated, enemies)
     end
     if not formation_done and #delegated > 0 then
@@ -2291,11 +2612,17 @@ local function tick()
     tick_n = tick_n + 1
     if tick_n % 20 == 0 then
         local n_idle, n_planned = 0, -1
+        local idle_names = {}
         local hp_a, hp_e, n_ally_alive = 0, 0, 0
         for _, d in ipairs(delegated) do
             -- "standing with a stale order" counts as idle — is_idle() alone
             -- misses units frozen on a completed hold/defend order
-            if effectively_idle(d, d.unit, nil) then n_idle = n_idle + 1 end
+            if effectively_idle(d, d.unit, nil) then
+                n_idle = n_idle + 1
+                if #idle_names < 12 then
+                    idle_names[#idle_names + 1] = tostring(d.unit:type())
+                end
+            end
         end
         -- army hp accounting for post-battle review + win/loss detection
         for_each_player_unit(function(u)
@@ -2315,7 +2642,8 @@ local function tick()
         out_log("tick-stats doctrine=" .. doctrine .. " del=" .. #delegated
             .. " planner=" .. n_planned .. " idle=" .. n_idle
             .. " enemies=" .. #enemies .. " routing=" .. #enemies_routing
-            .. " hp=" .. math.floor(hp_a) .. "/" .. math.floor(hp_e))
+            .. " hp=" .. math.floor(hp_a) .. "/" .. math.floor(hp_e)
+            .. (n_idle > 0 and (" idle-units=" .. table.concat(idle_names, ",")) or ""))
         -- battle outcome (once): all enemies dead-or-routing = win,
         -- all our units routing = loss
         if saw_enemies and not outcome_logged then
@@ -2357,6 +2685,8 @@ local function tick()
         enemies_monster = enemies_monster, enemies_airarty = enemies_airarty,
         enemies_routing = enemies_routing,
         erole = erole, ally_centroid = ally_centroid, delegated = delegated,
+        stale = creep_anchor ~= nil, creep_anchor = creep_anchor,
+        creep_off = creep_off,
     }
     for _, d in ipairs(delegated) do
         local su, unit = d.su, d.unit
@@ -2398,6 +2728,12 @@ local function tick()
             -- cast still resolving; hold the task order this tick
         elseif deploy_phase then
             -- deployment phase: no tactical orders — the player is arranging
+        elseif pending_reclaim[uid] then
+            -- foreign order suspected: hold ALL our orders this round so the
+            -- two-tick confirmation can observe where the unit settles.
+            -- (battle 1617: regroup kept overwriting the sim-order's
+            -- ordered_position — pending never confirmed and the AI fought
+            -- the "player's" unit for the whole game)
         else
             in_task_pass = true
             -- tactical micro overrides the doctrine task when it triggers:
