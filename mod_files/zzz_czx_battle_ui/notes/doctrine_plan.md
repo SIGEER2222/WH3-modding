@@ -312,4 +312,25 @@ shooter_hold_mult=1.3
 - **指令风扇扩散不止 5s**——planner 指令刷新后行军航点持续落地十几秒。两条新抑制：
   - 刷新后 5s 窗口内全部翻转视为 planner 噪声（`directive_ms` 时间戳）
   - np 比单位更靠近指令目标 ≥40m = 行军航点（方向签名），抑制并采纳为基线
-- **`is_player_controlled` 硬门槛**[需验证]：翻转时该标志 false = 引擎侧指令，直接抑制+重基线，日志 `suppressed-nonplayer`；若为 true 才走完空间豁免链后 reclaim，日志带 `pc=` 字段验证语义。若此 API 实为"可被控制"，它恒 true → 无抑制 → 空间规则兜底，日志可鉴别。
+- **`is_player_controlled` 硬门槛**[实测证伪]：battle 1224 全部 reclaim 均 `pc=true`——该 API 语义是"可被玩家控制"而非"正被玩家操控"，不能当判别器，保留为无副作用的兜底分支。
+- **移动门控**（battle 1228 实锤有效）：`ordered_position` 行军时返回**寻路航点**而非终点——移动中一律不评估指纹；只在单位静止时比对 np 与基线。代价：接管检测延迟到单位停稳；收益：行军段误报归零（1228 全场 reclaim 6 次 vs 1210 的 48 次）。
+
+### v1.6.6 走廊布阵 + 反冲预备队（桥战调研 2026-09-19）
+
+社区共识（TWC 桥战指南/锤砧战术/攻城预备队用法）：
+- 桥头战骑兵标准位 = **锋线后第二排预备队**，敌压上来时反冲——不是队尾看戏，也不是孤冲送死
+- 锤砧前提是有 flank 可绕；窄图无 flank 时骑兵价值 = 反冲预备队 + 追溃
+- 冲锋需要直线空间——桥上挤满人时正确位置就是锋线后等缝隙
+
+实现：
+- **走廊布阵**（`formation`）：布阵量军队横向展开宽度 <280m 判走廊 → 车道按可走宽度折行进深，地面机动编入 `mobiles` 第二排（近战后排），空军仍甩两翼（能飞过不可走区）。日志带 `corridor=` `spread=` `mobiles=` 字段。
+- **`reserve_counter` 任务**：hunt_backline 全目标被拴绳拒（走廊或目标全在绳外）时的兜底——锚定**交战锋线**（在 melee 的友军质心，fallback 战线质心），无压时停锋线后 45m（`reserve-park`），敌进锋线 `bal_intercept_radius_m` 内就 `counter-charge`（counter_of+巨兽优先，走 order_attack 自动带循环冲锋）。
+- **修正的兜底 bug**：原兜底 `screen_hold` 锚射手群——窄图上射手在队尾 → 骑兵锚射手 = 停队尾发呆（用户截图实锤）。gunline 阵型除外（射手即战线，intercept_breakthrough 语义正确）。
+
+### v1.6.7 部署阶段闸门 + rush 机动单位修任务（战役战局 1324 实测驱动）
+
+battle 1324（血河渡口，32v32）暴露三个问题：
+
+- **部署期乱动**[已修]：Deployment 阶段 29.9–61.2s 期间 mod 下发了 8×摆位 + 32×advance + 62×hold-line——"准备阶段自动平移靠前"就是 advance 在部署区内推全军。现 `bm:is_deployment_phase()` 为 true 时：planner 指令、任务执行、micro 步全部跳过；formation 保留（自动布阵本来就是部署期功能）；**部署期拖拽只吸收基线不 reclaim**（拖拽摆位≠接管，否则被拖单位整场脱管）。
+- **rush 下没人切后排**[已修]：assign_task 的 rush 分支原来全员 `attack`——6 个机动单位（飞蝠×3/吸血魔/飞将×2）全挤进人堆。现 rush 下 cav/flyer/`flanker` 画像 melee（如 dire wolves 的 `melee_flanker_undead`）→ `hunt_backline`，无合法目标落 `reserve_counter`。
+- **拴绳锁死飞行切后**[已修]：敌后排隔河 300m+ 超出 272m 拴绳全拒。现 flyer 目标过绳时若 `enemy_support`（90m 内其他敌人 ≤3）判定孤立仍允许俯冲——飞兵无视地形能自行撤离；地面机动保持硬拴绳。

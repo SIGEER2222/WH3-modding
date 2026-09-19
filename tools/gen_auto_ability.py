@@ -717,6 +717,26 @@ local function within_leash(e, delegated, mult)
     return false
 end
 
+-- how many other enemies stand within r of e — a detached target (artillery
+-- crew, lone archer line) is a safe flyer dive even beyond the leash, since
+-- flyers ignore terrain and can self-extract; a target embedded in the blob
+-- is suicide and stays leash-gated
+local function enemy_support(e, ctx, r)
+    local ok_p, ep = pcall(function() return e:position() end)
+    if not (ok_p and ep) then return 999 end
+    local n = 0
+    for _, o in ipairs(ctx.enemies) do
+        if o ~= e then
+            local ok_o, op = pcall(function() return o:position() end)
+            if ok_o and op then
+                local ok_d, dd = pcall(function() return ep:distance_xz(op) end)
+                if ok_d and dd and dd <= r then n = n + 1 end
+            end
+        end
+    end
+    return n
+end
+
 
 local function set_behaviour_once(su, unit, behaviour, flag_key)
     local uid = tostring(unit:unique_ui_id())
@@ -1055,7 +1075,11 @@ local function assign_task(d, ctx)
         if role == "shooter" then return "hold_fire_line" end
         return "attack"
     end
-    -- rush / none / unknown: everything pushes
+    -- rush / none / unknown: the line pushes, but mobiles and profiled
+    -- flankers (dire wolves etc.) still hunt the backline — with no legal
+    -- target they drop to the counter-charge reserve instead of blobbing in
+    if role == "cav" or role == "flyer" then return "hunt_backline" end
+    if role == "melee" and d.flanker then return "hunt_backline" end
     return "attack"
 end
 
@@ -1105,6 +1129,74 @@ TASK_EXEC.intercept_breakthrough = function(d, ctx)
     end
 end
 
+-- the fighting front: centroid of delegated units currently in melee;
+-- falls back to the line centroid when nobody is engaged yet
+local function front_anchor(ctx)
+    local mx, mz, n = 0, 0, 0
+    for _, od in ipairs(ctx.delegated or {}) do
+        local ok_m, m = pcall(function() return od.unit:is_in_melee() end)
+        if ok_m and m then
+            local ok_p, p = pcall(function() return od.unit:position() end)
+            if ok_p and p then mx, mz, n = mx + p:get_x(), mz + p:get_z(), n + 1 end
+        end
+    end
+    if n > 0 then
+        local ok_v, av = pcall(function() return v(mx / n, mz / n) end)
+        if ok_v and av then return av end
+    end
+    return ctx.ally_centroid
+end
+
+-- reserve counter-charge (community bridge doctrine: melee holds the crossing,
+-- cavalry sits one rank behind, charges whatever commits). Mobile units with
+-- no legal hunt — corridor map or every backline target beyond the leash —
+-- park behind the fighting front and hit enemies pressing it, instead of
+-- trailing at the column's tail anchored to the shooters.
+TASK_EXEC.reserve_counter = function(d, ctx)
+    if not task_ready(d, ctx) then return end
+    local anchor = front_anchor(ctx)
+    if not anchor then return end
+    local t = best_scored(d.unit, ctx.enemies, function(e)
+        local ok_p, ep = pcall(function() return e:position() end)
+        if not (ok_p and ep) then return -math.huge end
+        local ok_d, dd = pcall(function() return ep:distance_xz(anchor) end)
+        if not (ok_d and dd and dd <= CONFIG.bal_intercept_radius_m) then
+            return -math.huge
+        end
+        local s = sv_of(e) * 0.5 + counter_of(d.role, ctx.erole[e])
+        if ctx.erole[e] == "monster" then s = s + 60 end -- break a monster off the line first
+        return s
+    end)
+    if t then
+        order_attack(d.su, d.unit, t, ctx.now_ms, "counter-charge")
+        return
+    end
+    -- nothing pressing the front: park just behind the anchor on our side
+    local ok_up, up = pcall(function() return d.unit:position() end)
+    if not (ok_up and up) then return end
+    local ok_d, dd = pcall(function() return up:distance_xz(anchor) end)
+    if not (ok_d and dd and dd > 60) then return end
+    -- park offset = away from the enemy centroid (behind the fighting)
+    local ex, ez, en = 0, 0, 0
+    for _, e in ipairs(ctx.enemies) do
+        local ok_p, ep = pcall(function() return e:position() end)
+        if ok_p and ep then ex, ez, en = ex + ep:get_x(), ez + ep:get_z(), en + 1 end
+    end
+    local dest = anchor
+    if en > 0 then
+        local dx, dz = anchor:get_x() - ex / en, anchor:get_z() - ez / en
+        local len = math.sqrt(dx * dx + dz * dz)
+        if len > 1 then
+            local ok_v, pv = pcall(function()
+                return v(anchor:get_x() + dx / len * 45,
+                         anchor:get_z() + dz / len * 45)
+            end)
+            if ok_v and pv then dest = pv end
+        end
+    end
+    order_move_pos(d.su, d.unit, dest, ctx.now_ms, "reserve-park")
+end
+
 TASK_EXEC.hunt_backline = function(d, ctx)
     if not task_ready(d, ctx) then return end
     -- flyers prefer enemy flyers/artillery over ground backline; hunts get
@@ -1114,7 +1206,10 @@ TASK_EXEC.hunt_backline = function(d, ctx)
         local t = best_scored(d.unit, ctx.enemies_airarty, function(e)
             local dist = unit_dist(d.unit, e)
             if dist > CONFIG.flyer_hunt_range_m then return -math.huge end
-            if not within_leash(e, ctx.delegated, CONFIG.hunt_leash_mult) then return -math.huge end
+            if not within_leash(e, ctx.delegated, CONFIG.hunt_leash_mult)
+                and enemy_support(e, ctx, 90) > 3 then
+                return -math.huge
+            end
             return sv_of(e) - dist * 0.2
         end)
         if t then
@@ -1122,21 +1217,32 @@ TASK_EXEC.hunt_backline = function(d, ctx)
             return
         end
     end
+    local hunt_cap = (d.role == "flyer") and CONFIG.flyer_hunt_range_m
+        or CONFIG.flank_hunt_range_m
     local t = best_scored(d.unit, ctx.enemies_ranged, function(e)
         local dist = unit_dist(d.unit, e)
-        if dist > CONFIG.flank_hunt_range_m then return -math.huge end
-        if not within_leash(e, ctx.delegated, CONFIG.hunt_leash_mult) then return -math.huge end
+        if dist > hunt_cap then return -math.huge end
+        if not within_leash(e, ctx.delegated, CONFIG.hunt_leash_mult) then
+            -- past the leash only flyers may still dive — and only a detached
+            -- target; ground mobiles keep the hard leash
+            if d.role ~= "flyer" or enemy_support(e, ctx, 90) > 3 then
+                return -math.huge
+            end
+        end
         return sv_of(e) - dist * 0.2 + counter_of(d.role, ctx.erole[e])
     end)
     if t then
         order_attack(d.su, d.unit, t, ctx.now_ms, "cav-hunt")
         return
     end
-    -- nothing to hunt: gunline falls back to reserve interception, else loose screen
+    -- nothing legal to hunt: gunline keeps its shooter-anchored reserve;
+    -- anything else becomes the counter-charge reserve at the fighting front
+    -- (screen_hold anchors on the shooters — on a chokepoint that parks the
+    -- cavalry at the column's tail doing nothing)
     if ctx.doctrine == "gunline" then
         TASK_EXEC.intercept_breakthrough(d, ctx)
     else
-        screen_hold(d, ctx, CONFIG.bal_intercept_radius_m, CONFIG.bal_leash_radius_m, d.role)
+        TASK_EXEC.reserve_counter(d, ctx)
     end
 end
 
@@ -1369,13 +1475,35 @@ local function formation_lineup(delegated, enemies, now_ms)
         end
     end
     local lx, lz = -fz, fx
-    local lanes = { front = {}, mid = {}, rear = {}, left = {}, right = {}, centre = {} }
+    -- corridor detection: the army's lateral spread at deploy time is the
+    -- map's real frontage. Narrow (bridge/causeway) means the flank lanes —
+    -- and even a 27-wide front — physically can't fit; units pushed off the
+    -- playable edge just path back into a tail-end column (screenshot: cav
+    -- parked behind the whole army on a bridge).
+    local lmin, lmax = math.huge, -math.huge
+    for _, d in ipairs(delegated) do
+        local ok_p, p = pcall(function() return d.unit:position() end)
+        if ok_p and p then
+            local s = (p:get_x() - cx) * lx + (p:get_z() - cz) * lz
+            if s < lmin then lmin = s end
+            if s > lmax then lmax = s end
+        end
+    end
+    local spread = (lmax > lmin) and (lmax - lmin) or 9999
+    local corridor = spread < 280
+    local lanes = { front = {}, mid = {}, rear = {}, left = {}, right = {},
+                    centre = {}, mobiles = {} }
     for _, d in ipairs(delegated) do
         local r = d.role
         if r == "melee" or r == "monster" then lanes.front[#lanes.front + 1] = d
         elseif r == "shooter" then lanes.mid[#lanes.mid + 1] = d
         elseif r == "artillery" then lanes.rear[#lanes.rear + 1] = d
         elseif r == "lord" then lanes.centre[#lanes.centre + 1] = d
+        elseif corridor and r ~= "flyer" then
+            -- ground mobiles fold into a second-rank lane behind the melee
+            -- front: close enough to counter-charge through gaps, not parked
+            -- at the tail of the column
+            lanes.mobiles[#lanes.mobiles + 1] = d
         else
             local side = (#lanes.left <= #lanes.right) and lanes.left or lanes.right
             side[#side + 1] = d
@@ -1385,32 +1513,67 @@ local function formation_lineup(delegated, enemies, now_ms)
     local ok_a, az = pcall(function() return math.atan2(fx, fz) end)
     if ok_a and is_number(az) then deg = az * 180 / math.pi end
     local placed = 0
+    local function issue(d, dest)
+        local ok = pcall(function()
+            local ok_w, width = pcall(function() return d.unit:ordered_width() end)
+            d.su.uc:goto_location_angle_width(dest, deg,
+                (ok_w and is_number(width)) and width or 20, true)
+            d.su.uc:release_control()
+        end)
+        if ok then
+            note_our_order(tostring(d.unit:unique_ui_id()), now_ms, nil, dest)
+            placed = placed + 1
+        end
+    end
     local function place(list, ox, oz, ax, az)
         for i, d in ipairs(list) do
             local off = (i - (#list + 1) / 2) * SP
-            local dest = v(cx + ox + ax * off, cz + oz + az * off)
-            local ok = pcall(function()
-                local ok_w, width = pcall(function() return d.unit:ordered_width() end)
-                d.su.uc:goto_location_angle_width(dest, deg,
-                    (ok_w and is_number(width)) and width or 20, true)
-                d.su.uc:release_control()
-            end)
-            if ok then
-                note_our_order(tostring(d.unit:unique_ui_id()), now_ms, nil, dest)
-                placed = placed + 1
-            end
+            issue(d, v(cx + ox + ax * off, cz + oz + az * off))
         end
     end
-    place(lanes.front,  fx * 15,  fz * 15,  lx, lz)
-    place(lanes.mid,   -fx * 15, -fz * 15,  lx, lz)
-    place(lanes.rear,  -fx * 45, -fz * 45,  lx, lz)
-    place(lanes.left,   lx * 75 + fx * 10,  lz * 75 + fz * 10,  fx, fz)
-    place(lanes.right, -lx * 75 + fx * 10, -lz * 75 + fz * 10,  fx, fz)
-    place(lanes.centre,-fx * 25, -fz * 25,  lx, lz)
+    -- capped-width variant: wraps a lane into rows of `cols` columns, each
+    -- 40m deeper — corridor layout uses it so lanes fit the playable width
+    local function place_rows(list, ox, oz, ax, az, maxw)
+        local cols = math.max(1, math.floor(maxw / SP))
+        for i, d in ipairs(list) do
+            local col = (i - 1) % cols
+            local row = math.floor((i - 1) / cols)
+            local vis = math.min(#list, cols)
+            local off = (col - (vis - 1) / 2) * SP
+            issue(d, v(cx + ox + ax * off - fx * row * 40,
+                       cz + oz + az * off - fz * row * 40))
+        end
+    end
+    if corridor then
+        -- column doctrine: lanes stack in depth at the playable width —
+        -- melee front (wrapping), mobile ground second rank, shooters, lords,
+        -- artillery rear. Flyers keep the wide flanks (they cross the gaps).
+        local maxw = math.max(90, spread * 0.9)
+        local cols = math.max(1, math.floor(maxw / SP))
+        local d_front = 15
+        local d_mob = d_front - math.ceil(#lanes.front / cols) * 40
+        local d_mid = d_mob - math.ceil(math.max(1, #lanes.mobiles) / cols) * 40
+        local d_rear = d_mid - math.ceil(math.max(1, #lanes.mid) / cols) * 40
+        place_rows(lanes.front,   fx * d_front, fz * d_front, lx, lz, maxw)
+        place_rows(lanes.mobiles, fx * d_mob,   fz * d_mob,   lx, lz, maxw)
+        place_rows(lanes.mid,     fx * d_mid,   fz * d_mid,   lx, lz, maxw)
+        place_rows(lanes.centre,  fx * (d_mid + 20), fz * (d_mid + 20), lx, lz, maxw)
+        place_rows(lanes.rear,    fx * d_rear,  fz * d_rear,  lx, lz, maxw)
+        place(lanes.left,   lx * 75 + fx * 10,  lz * 75 + fz * 10,  fx, fz)
+        place(lanes.right, -lx * 75 + fx * 10, -lz * 75 + fz * 10,  fx, fz)
+    else
+        place(lanes.front,  fx * 15,  fz * 15,  lx, lz)
+        place(lanes.mid,   -fx * 15, -fz * 15,  lx, lz)
+        place(lanes.rear,  -fx * 45, -fz * 45,  lx, lz)
+        place(lanes.left,   lx * 75 + fx * 10,  lz * 75 + fz * 10,  fx, fz)
+        place(lanes.right, -lx * 75 + fx * 10, -lz * 75 + fz * 10,  fx, fz)
+        place(lanes.centre,-fx * 25, -fz * 25,  lx, lz)
+    end
     out_log("formation n=" .. placed
         .. " front=" .. #lanes.front .. " mid=" .. #lanes.mid
         .. " rear=" .. #lanes.rear .. " flank=" .. #lanes.left + #lanes.right
-        .. " centre=" .. #lanes.centre)
+        .. " centre=" .. #lanes.centre .. " mobiles=" .. #lanes.mobiles
+        .. " corridor=" .. tostring(corridor) .. " spread=" .. math.floor(spread))
 end
 
 -- bait: pick the cheapest ground-mobile unit as the lure (cav/cav_shot only —
@@ -1694,6 +1857,12 @@ end
 local function tick()
     local now_ms = bm:time_elapsed_ms()
     focus_count = {} -- per-tick per-target order budget
+    -- deployment phase: the player is arranging the army. Formation may run
+    -- (auto-setup is its job) but no tactical orders — an advance issued here
+    -- visibly slides the whole army forward inside the zone (battle 1324:
+    -- advance x32 + hold-line x62 before the player even clicked start)
+    local ok_dp, deploy_phase = pcall(function() return bm:is_deployment_phase() end)
+    deploy_phase = ok_dp and deploy_phase or false
     ensure_delegation(now_ms)
 
     -- pass 1: snapshot managed units + enemies, classify roles
@@ -1773,6 +1942,14 @@ local function tick()
                 if ok_n and np then
                     local ok_d, dd = pcall(function() return np:distance_xz(base) end)
                     local moved = ok_d and dd and dd > CONFIG.reclaim_move_m
+                    if moved and deploy_phase then
+                        -- deployment drags are arrangement, not takeover —
+                        -- absorb the new position as baseline; reclaiming a
+                        -- unit the player merely placed would leave it
+                        -- unmanaged for the whole battle
+                        moved = false
+                        order_dest[uid0] = np
+                    end
                     local pc_flag = "?"
                     if moved then
                         -- control flag gate [需验证]: planner/uc orders never
@@ -1996,6 +2173,7 @@ local function tick()
                     anti_large = p.prof and p.prof.anti_large,
                     highvalue = p.prof and p.prof.highvalue,
                     shock = p.prof and p.prof.shock,
+                    flanker = p.prof and p.prof.ai and p.prof.ai:find("flanker") ~= nil,
                     no_skirmish = p.prof and p.prof.no_skirmish,
                     mage = p.prof and p.prof.mage,
                 }
@@ -2074,7 +2252,9 @@ local function tick()
             .. " shooters=" .. #shooters .. " mobile=" .. n_mobile .. ")")
         last_doctrine = doctrine
     end
-    issue_planner_directive(now_ms, doctrine, delegated, enemies)
+    if not deploy_phase then
+        issue_planner_directive(now_ms, doctrine, delegated, enemies)
+    end
     if not formation_done and #delegated > 0 then
         formation_done = true
         pick_bait(delegated)
@@ -2193,6 +2373,8 @@ local function tick()
         -- a same-tick cast+order pair raced a bomb maneuver into a sim deadlock
         if cast_at[uid] and (now_ms - cast_at[uid]) < CONFIG.cast_quiet_ms then
             -- cast still resolving; hold the task order this tick
+        elseif deploy_phase then
+            -- deployment phase: no tactical orders — the player is arranging
         else
             in_task_pass = true
             -- tactical micro overrides the doctrine task when it triggers:
