@@ -184,6 +184,17 @@ local CONFIG = {
     -- v1.5 community-informed additions
     harass_range_m   = 160,       -- mounted shooters engage within this radius
     rundown_range_m  = 120,       -- mobile units finish routing enemies inside this
+    -- formation lineup: once, right after delegation. Role lanes relative to
+    -- the enemy centroid: melee/monster front, shooters behind, artillery rear,
+    -- cav/flyer/cav_shot split on the flanks, lords centre-back. Skipped when
+    -- the enemy is already on top of us (ambush).
+    formation        = true,
+    -- bait: cheapest ground-mobile unit edges forward to provoke, then runs for
+    -- the shooter line when something bites — drags pursuit into the kill zone.
+    bait             = true,
+    bait_approach_m  = 150,       -- closes to this range to provoke
+    bait_trigger_m   = 90,        -- enemy this close = it bit -> run
+    bait_safe_m      = 220,       -- stop fleeing once pursuit is this far behind
 }
 
 -- ABILITY_FLAGS[ability_key] = "mask,recharge_seconds"
@@ -240,6 +251,9 @@ local overridden = {}         -- [uid] = {at=ms, idle_at=ms} temp player control
 local charge_state = {}       -- [uid] = {phase="in"|"out", at=ms} cav cycle-charge
 local role_of = {}            -- [uid] = role, snapshot map for order arming
 local wounded_pull = {}       -- [uid] = battle-ms of last disengage hop
+local formation_done = false  -- role-lane lineup issued once per battle
+local bait_uid = nil          -- the designated lure unit
+local bait_flee = {}          -- [uid] = true while the bait is running home
 local dodge_at = {}           -- [uid] = last dodge-order ms
 local cmd_seen = {}           -- [command name] = count, probe throttle
 local in_task_pass = false    -- true while our own uc orders are being issued
@@ -586,25 +600,33 @@ local function order_attack(su, unit, e, now_ms, tag, force)
     end
 end
 
-local function order_return(su, unit, anchor, now_ms)
+local function order_move_pos(su, unit, pos, now_ms, tag)
     local uid = tostring(unit:unique_ui_id())
     local ok, err = pcall(function()
         local ok_b, bearing = pcall(function() return unit:bearing() end)
         local deg = (ok_b and is_number(bearing)) and bearing * 180 / math.pi or 0
         local ok_w, width = pcall(function() return unit:ordered_width() end)
-        su.uc:goto_location_angle_width(anchor:position(), deg, (ok_w and is_number(width)) and width or 20, true)
+        su.uc:goto_location_angle_width(pos, deg, (ok_w and is_number(width)) and width or 20, true)
         su.uc:release_control()
     end)
     if ok then
         note_our_order(uid, now_ms)
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
-        out_log("screen-return " .. unit:type() .. " (" .. uid .. ")")
+        if tag then out_log(tag .. " " .. unit:type() .. " (" .. uid .. ")") end
     else
-        out_log("ERROR screen-return " .. tostring(err))
+        out_log("ERROR " .. tostring(tag or "move") .. " " .. tostring(err))
         idle_since[uid] = now_ms
     end
+    return ok
 end
+
+local function order_return(su, unit, anchor, now_ms)
+    local ok_p, ap = pcall(function() return anchor:position() end)
+    if not (ok_p and ap) then return end
+    order_move_pos(su, unit, ap, now_ms, "screen-return")
+end
+
 
 local function set_behaviour_once(su, unit, behaviour, flag_key)
     local uid = tostring(unit:unique_ui_id())
@@ -1192,6 +1214,145 @@ end
 -- silently hands its units back to the player (the "idle" army we observed);
 -- with attack_unit/defend_position the engine commander keeps driving them,
 -- and our per-unit uc orders layer on top for target choice.
+-- formation lineup: one-time role-lane arrangement at delegation. Lanes are
+-- laid out relative to the enemy centroid: melee/monster front, shooters
+-- behind, artillery rear, mobile split on the flanks, lords centre-back.
+local function formation_lineup(delegated, enemies, now_ms)
+    if not CONFIG.formation then return end
+    local cx, cz, n = 0, 0, 0
+    for _, d in ipairs(delegated) do
+        local ok_p, p = pcall(function() return d.unit:position() end)
+        if ok_p and p then cx, cz, n = cx + p:get_x(), cz + p:get_z(), n + 1 end
+    end
+    if n == 0 then return end
+    cx, cz = cx / n, cz / n
+    local ex, ez, en = 0, 0, 0
+    for _, e in ipairs(enemies) do
+        local ok_p, p = pcall(function() return e:position() end)
+        if ok_p and p then ex, ez, en = ex + p:get_x(), ez + p:get_z(), en + 1 end
+    end
+    local fx, fz = 0, 1
+    if en > 0 then
+        ex, ez = ex / en, ez / en
+        local dx, dz = ex - cx, ez - cz
+        local len = math.sqrt(dx * dx + dz * dz)
+        if len > 1 then fx, fz = dx / len, dz / len end
+        -- already in contact (ambush): shuffling lanes now is pure chaos
+        if len < 250 then
+            out_log("formation skipped - enemy at " .. math.floor(len) .. "m")
+            return
+        end
+    end
+    local lx, lz = -fz, fx
+    local lanes = { front = {}, mid = {}, rear = {}, left = {}, right = {}, centre = {} }
+    for _, d in ipairs(delegated) do
+        local r = d.role
+        if r == "melee" or r == "monster" then lanes.front[#lanes.front + 1] = d
+        elseif r == "shooter" then lanes.mid[#lanes.mid + 1] = d
+        elseif r == "artillery" then lanes.rear[#lanes.rear + 1] = d
+        elseif r == "lord" then lanes.centre[#lanes.centre + 1] = d
+        else
+            local side = (#lanes.left <= #lanes.right) and lanes.left or lanes.right
+            side[#side + 1] = d
+        end
+    end
+    local SP, deg = 45, 0
+    local ok_a, az = pcall(function() return math.atan2(fx, fz) end)
+    if ok_a and is_number(az) then deg = az * 180 / math.pi end
+    local placed = 0
+    local function place(list, ox, oz, ax, az)
+        for i, d in ipairs(list) do
+            local off = (i - (#list + 1) / 2) * SP
+            local dest = v(cx + ox + ax * off, cz + oz + az * off)
+            local ok = pcall(function()
+                local ok_w, width = pcall(function() return d.unit:ordered_width() end)
+                d.su.uc:goto_location_angle_width(dest, deg,
+                    (ok_w and is_number(width)) and width or 20, true)
+                d.su.uc:release_control()
+            end)
+            if ok then
+                note_our_order(tostring(d.unit:unique_ui_id()), now_ms)
+                placed = placed + 1
+            end
+        end
+    end
+    place(lanes.front,  fx * 15,  fz * 15,  lx, lz)
+    place(lanes.mid,   -fx * 15, -fz * 15,  lx, lz)
+    place(lanes.rear,  -fx * 45, -fz * 45,  lx, lz)
+    place(lanes.left,   lx * 75 + fx * 10,  lz * 75 + fz * 10,  fx, fz)
+    place(lanes.right, -lx * 75 + fx * 10, -lz * 75 + fz * 10,  fx, fz)
+    place(lanes.centre,-fx * 25, -fz * 25,  lx, lz)
+    out_log("formation n=" .. placed
+        .. " front=" .. #lanes.front .. " mid=" .. #lanes.mid
+        .. " rear=" .. #lanes.rear .. " flank=" .. #lanes.left + #lanes.right
+        .. " centre=" .. #lanes.centre)
+end
+
+-- bait: pick the cheapest ground-mobile unit as the lure (cav/cav_shot only —
+-- flyers can't be threatened by ground troops, so they provoke nothing)
+local function pick_bait(delegated)
+    local best, bs = nil, math.huge
+    for _, d in ipairs(delegated) do
+        if d.role == "cav" or d.role == "cav_shot" then
+            local sv = sv_of(d.unit)
+            if sv < bs then best, bs = d, sv end
+        end
+    end
+    bait_uid = best and tostring(best.unit:unique_ui_id()) or nil
+    if bait_uid then out_log("bait -> " .. best.unit:type() .. " (" .. bait_uid .. ")") end
+end
+
+-- bait behaviour: creep to bait_approach_m of the nearest enemy; when one
+-- closes inside bait_trigger_m it has bitten -> run straight back to the
+-- shooter line, dragging the pursuit into the kill zone. Returns true while
+-- holding the unit on bait duty (defensive doctrines only).
+local function bait_step(d, ctx)
+    if not CONFIG.bait or not bait_uid then return false end
+    if tostring(d.unit:unique_ui_id()) ~= bait_uid then return false end
+    if ctx.doctrine ~= "gunline" and ctx.doctrine ~= "balanced" then return false end
+    local e, dist = nearest_enemy(d.unit)
+    if not e then return false end
+    if bait_flee[bait_uid] then
+        if dist > CONFIG.bait_safe_m then
+            bait_flee[bait_uid] = nil -- pursuit shaken off
+            return false
+        end
+        local anchor = ctx.shooters and ctx.shooters[1]
+        local ok_p, ap = pcall(function()
+            return anchor and anchor:position() or planner:get_centre_point()
+        end)
+        if ok_p and ap then
+            local ok_v, moving = pcall(function() return d.unit:is_moving() end)
+            if not (ok_v and moving) then
+                order_move_pos(d.su, d.unit, ap, ctx.now_ms, "bait-run")
+            end
+        end
+        return true
+    end
+    if dist <= CONFIG.bait_trigger_m then
+        bait_flee[bait_uid] = true
+        out_log("bait-bit " .. d.unit:type() .. " (" .. bait_uid .. ")")
+        return true -- flee order lands next tick
+    end
+    if dist > CONFIG.bait_approach_m then
+        local ok_e, ep = pcall(function() return e:position() end)
+        local ok_u, up = pcall(function() return d.unit:position() end)
+        if ok_e and ep and ok_u and up then
+            local dx, dz = ep:get_x() - up:get_x(), ep:get_z() - up:get_z()
+            local len = math.sqrt(dx * dx + dz * dz)
+            if len > 1 then
+                local step = math.min(len - CONFIG.bait_trigger_m, 120)
+                local dest = v(up:get_x() + dx / len * step,
+                               up:get_z() + dz / len * step)
+                order_move_pos(d.su, d.unit, dest, ctx.now_ms, "bait-in")
+            end
+        end
+        return true
+    end
+    return true -- loitering in the provoke band; hold
+end
+
+
 local function issue_planner_directive(now_ms, doctrine, delegated, enemies)
     if not planner or doctrine == "none" then return end
     if doctrine == "rush" or doctrine == "kite" then
@@ -1533,6 +1694,7 @@ local function tick()
             role_of[uid] = nil
             charge_state[uid] = nil
             wounded_pull[uid] = nil
+            bait_flee[uid] = nil
             atk_target_uid[uid] = nil
             order_dest[uid] = nil
             prev_ordered[uid] = nil
@@ -1588,6 +1750,11 @@ local function tick()
         last_doctrine = doctrine
     end
     issue_planner_directive(now_ms, doctrine, delegated, enemies)
+    if not formation_done and #delegated > 0 then
+        formation_done = true
+        pick_bait(delegated)
+        formation_lineup(delegated, enemies, now_ms)
+    end
 
     -- heartbeat every ~60s: lets us tell "no threats in range" from "handler
     -- never ran" when reading logs after a battle
@@ -1686,7 +1853,8 @@ local function tick()
             -- tactical micro overrides the doctrine task when it triggers:
             -- wounded pull-out > shooter kiting > cav cycle-charge > task
             local ok_h, handled = pcall(function()
-                return wounded_step(d, ctx) or kite_step(d, ctx) or cycle_charge_step(d, ctx)
+                return wounded_step(d, ctx) or kite_step(d, ctx)
+                    or bait_step(d, ctx) or cycle_charge_step(d, ctx)
             end)
             if not (ok_h and handled) then
                 local exec = TASK_EXEC[task] or TASK_EXEC.attack

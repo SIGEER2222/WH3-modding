@@ -4,6 +4,13 @@
 > 本文档为功能级设计说明，实现细节以 `script/battle/mod/czx_battle_auto_ability.lua` 为准；
 > 生成器模板 `tools/gen_auto_ability.py` 与源文件保持逐字节同步。
 >
+> **2026-09-19 v1.6（排兵布阵 + 勾引）**：delegation 完成时按角色摆一次阵型
+> （`formation`）——朝敌军质心取朝向，melee/monster 前排、shooter 二排、
+> artillery 后排、cav/flyer/cav_shot 分两翼、lord 中后，列距 45m；敌军质心已
+> 在 250m 内（伏击贴脸）则跳过。勾引（`bait`）：gunline/balanced 下挑最便宜的
+> 地面机动单位（cav/cav_shot，空军骗不动地面）前出到 150m 撩拨，敌军贴近 90m
+> 即向射手线逃（`bait-bit`/`bait-run`），甩开 220m 后重新出钩——把追兵拖进火力网。
+>
 > **2026-09-19 v1.5.5（克制矩阵补全）**：`monster→artillery +35`（巨兽砸炮组）、
 > `lord` 行补 `lord+15/monster-10/melee-15`（领主找决斗、不绞肉）、`melee→cav_shot/
 > flyer -20`（步兵不追追不上的目标）、`shooter→flyer +15`（对空）、`cav_shot→shooter
