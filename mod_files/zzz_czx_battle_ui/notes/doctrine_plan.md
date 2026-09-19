@@ -334,3 +334,11 @@ battle 1324（血河渡口，32v32）暴露三个问题：
 - **部署期乱动**[已修]：Deployment 阶段 29.9–61.2s 期间 mod 下发了 8×摆位 + 32×advance + 62×hold-line——"准备阶段自动平移靠前"就是 advance 在部署区内推全军。现 `bm:is_deployment_phase()` 为 true 时：planner 指令、任务执行、micro 步全部跳过；formation 保留（自动布阵本来就是部署期功能）；**部署期拖拽只吸收基线不 reclaim**（拖拽摆位≠接管，否则被拖单位整场脱管）。
 - **rush 下没人切后排**[已修]：assign_task 的 rush 分支原来全员 `attack`——6 个机动单位（飞蝠×3/吸血魔/飞将×2）全挤进人堆。现 rush 下 cav/flyer/`flanker` 画像 melee（如 dire wolves 的 `melee_flanker_undead`）→ `hunt_backline`，无合法目标落 `reserve_counter`。
 - **拴绳锁死飞行切后**[已修]：敌后排隔河 300m+ 超出 272m 拴绳全拒。现 flyer 目标过绳时若 `enemy_support`（90m 内其他敌人 ≤3）判定孤立仍允许俯冲——飞兵无视地形能自行撤离；地面机动保持硬拴绳。
+
+### 测试断言化（battle 1336/1341 验证）
+
+之前漏检的根因：测试 XML 带 `<skip_deployment/>` 导致部署期路径从未被跑；且只看 reclaim/idle 总数，没断言任务分配正确性。现建立：
+
+- `scratch/czx_battle_test/assert_battle_log.py <log> [--expect-win] [--expect-deploy]`——11 项断言：deploy-silent（部署期零战术指令）、mobile-tasking（cav/flyer 不得拿 attack）、mobile-activity、reclaim-bounded（总量≤12 且 2s 突发≤5）、idle-after-contact（接敌 45s 后 idle≤6，容忍 join 尖峰）、del-survival≥40%、outcome、formation-once、no-mod-errors 等。
+- `czx_test_battle_deploy.xml` = 去掉 skip_deployment 的变体；测试包 test_sim 在部署 9s 后自动 `SimulateLClick("button_battle_start")` 开战，覆盖部署期路径。
+- 实测：1336（部署路径）与 1341（跳部署回归）全部断言 PASS；v1.6.7 修复在旧日志 1324 上回放断言会 FAIL（125 条部署期违禁指令 + 9 个 cav/flyer→attack），确认断言有效。

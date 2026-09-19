@@ -2118,6 +2118,8 @@ local enemy_pos = {}      -- last-tick enemy positions; the planner fans its
                           -- (the planner's intent — baseline for the fingerprint)
 local saw_enemies = false -- set once any enemy is seen; gates outcome detection
 local outcome_logged = false
+local last_phase = nil     -- last bm phase name; changes get logged
+local deploy_started = false -- test build: deployment auto-start fired once
 local roster_logged = false
 local reclaimed = {}      -- [uid] = true once the player takes a unit back; never re-delegate
 local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
@@ -6354,6 +6356,27 @@ local function tick()
     -- advance x32 + hold-line x62 before the player even clicked start)
     local ok_dp, deploy_phase = pcall(function() return bm:is_deployment_phase() end)
     deploy_phase = ok_dp and deploy_phase or false
+    local ok_pn, phase_name = pcall(function() return bm:get_current_phase_name() end)
+    if ok_pn and phase_name and phase_name ~= last_phase then
+        last_phase = phase_name
+        out_log("phase -> " .. phase_name)
+    end
+    -- test build: nobody clicks Start in an automated run — hold deployment
+    -- ~9s (enough ticks to prove the suppression gate), then click it
+    if CONFIG.test_sim and deploy_phase and now_ms > 9000 and not deploy_started then
+        deploy_started = true
+        local clicked = false
+        for _, bname in ipairs({"button_battle_start", "button_start_deployment"}) do
+            local ok_b, btn = pcall(function()
+                return find_uicomponent(core:get_ui_root(), bname)
+            end)
+            if ok_b and btn then
+                local ok_c = pcall(function() btn:SimulateLClick() end)
+                if ok_c then clicked = true break end
+            end
+        end
+        out_log("deploy-auto-start clicked=" .. tostring(clicked))
+    end
     ensure_delegation(now_ms)
 
     -- pass 1: snapshot managed units + enemies, classify roles
