@@ -385,3 +385,13 @@ battle 1324（血河渡口，32v32）暴露三个问题：
 | 跳部署回归 | 1341 | WIN | 全 PASS |
 
 **待实机复验清单**（下次可跑游戏时按序跑）：S6 复跑验证 skirmish 豁免（reclaim 应从 9 降到 ≤3、del-survival 归位）；S5/S3 复跑验证 pending_reclaim 抑制后 sim 回收率从 MISS 变 HIT；S4 复跑用 idle-units 字段定位拉锯期站着的是谁。
+
+### v1.7.0 攻击点击接管检测（pending_atk）[待实机复验]
+
+玩家右键点敌军攻击托管单位的盲区已修——但不是走 `ordered_position`（attack 令下它退化到自身脚下）。三通道判别汇总：
+
+- **cmd 事件通道**（既有）：`register_command_handler_callback("Attack Unit"/"Move ...")` 收**真实 UI 指令**——uc 脚本指令不产生 command 事件（1617 实锤：sim-order 走了指纹路而非 cmd 路），所以 cmd 到达 = 玩家点击，即收。注意 Attack Unit 事件的 `ctx:get_unit()` 返回的是**攻击目标**不是下单单位——只能当"有攻击事件"用，不能拿 uid 判归属。
+- **指纹位置通道**（既有）：静止单位 np 距基线 >30m → 两 tick 确认 → reclaim。
+- **指纹目标通道**（新增 `pending_atk`）：静止 + 非近战 + `current_target()` 连续两拍指向同一个**我们没指派过**的敌人 → reclaim（日志 `via=atk`）。自动索敌的目标每 tick 换、玩家点的目标稳定，两拍稳定即区分。引擎 auto-acquire 的近战接触噪声用 `is_in_melee` 门掉。
+
+pending_reclaim 抑制闸对 pending_atk 同样生效（pending 期间我们的指令不下发，证据不被覆盖）。

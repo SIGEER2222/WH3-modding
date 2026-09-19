@@ -252,6 +252,7 @@ local outcome_logged = false
 local last_phase = nil     -- last bm phase name; changes get logged
 local deploy_started = false -- test build: deployment auto-start fired once
 local pending_reclaim = {} -- [uid] = np vector; two-tick reclaim confirmation
+local pending_atk = {}     -- [uid] = foreign current_target uid seen last eval
 local last_contact_ms = 0 -- last tick any unit was in melee / enemy within reach
 local roster_logged = false
 local reclaimed = {}      -- [uid] = true once the player takes a unit back; never re-delegate
@@ -2108,6 +2109,7 @@ local function tick()
             atk_target_uid[uid0] = nil
             our_order_ms[uid0] = 0
             pending_reclaim[uid0] = nil
+            pending_atk[uid0] = nil
             out_log(tag .. unit:type() .. " (" .. uid0 .. ")")
         end
         -- brand-new units arriving while uncontrolled (summons, reinforcements)
@@ -2155,7 +2157,10 @@ local function tick()
                 -- is evidence of a foreign order; reclaim then costs the walk
                 -- time, which is acceptable for correctness.
                 local ok_mv, mv = pcall(function() return unit:is_moving() end)
-                if ok_mv and mv then pending_reclaim[uid0] = nil end
+                if ok_mv and mv then
+                    pending_reclaim[uid0] = nil
+                    pending_atk[uid0] = nil
+                end
                 local ok_n, np = nil, nil
                 if not (ok_mv and mv) then
                     ok_n, np = pcall(function() return unit:ordered_position() end)
@@ -2163,6 +2168,40 @@ local function tick()
                 if ok_n and np then
                     local ok_d, dd = pcall(function() return np:distance_xz(base) end)
                     local moved = ok_d and dd and dd > CONFIG.reclaim_move_m
+                    if not moved and not deploy_phase and #enemy_pos > 0 then
+                        -- attack-click signature: ordered_position degenerates
+                        -- under attack orders (np lands on the unit's own
+                        -- feet), so a foreign right-click never trips the
+                        -- distance rule. The live target betrays it instead —
+                        -- a stationary, not-in-melee unit aiming at an enemy
+                        -- we never assigned got a player click. Auto-acquire
+                        -- churns targets between evals; a clicked target
+                        -- stays, so require the same foreign uid twice.
+                        local ok_m2, in_melee = pcall(function()
+                            return unit:is_in_melee()
+                        end)
+                        if not (ok_m2 and in_melee) then
+                            local ok_c, ct = pcall(function()
+                                return unit:current_target()
+                            end)
+                            local ok_i, cid = pcall(function()
+                                return ct and ct:unique_ui_id()
+                            end)
+                            if ok_c and ct and ok_i and cid then
+                                local cids = tostring(cid)
+                                if cids ~= (atk_target_uid[uid0] or "") then
+                                    if pending_atk[uid0] == cids then
+                                        moved = "atk"
+                                        pending_atk[uid0] = nil
+                                    else
+                                        pending_atk[uid0] = cids
+                                    end
+                                else
+                                    pending_atk[uid0] = nil
+                                end
+                            end
+                        end
+                    end
                     if moved then
                         -- skirmish behaviour: the ENGINE repositions these
                         -- units continuously to keep them at missile range —
@@ -2380,6 +2419,7 @@ local function tick()
                         reclaimed[uid0] = true
                         order_dest[uid0] = nil
                         our_dests[uid0] = nil
+                        pending_atk[uid0] = nil
                         if planner then
                             local ok_s, su_r = pcall(function()
                                 return bm:get_scriptunit_for_unit(unit)
@@ -2401,8 +2441,9 @@ local function tick()
                             end
                         end
                         out_log(string.format(
-                            "reclaimed-ordered %s (%s) d2e=%d pc=%s",
-                            unit:type(), uid0, math.floor(d2e), pc_flag))
+                            "reclaimed-ordered %s (%s) d2e=%d pc=%s via=%s",
+                            unit:type(), uid0, math.floor(d2e), pc_flag,
+                            moved == "atk" and "atk" or "pos"))
                         is_man = false
                     end
                 end
