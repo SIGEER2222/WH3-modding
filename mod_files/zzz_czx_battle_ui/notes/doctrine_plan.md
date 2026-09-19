@@ -289,3 +289,14 @@ shooter_hold_mult=1.3
 - `roster ally/enemy <type>/<role> x<n>`：开局双方兵种 × 角色 tally
 - `tick-stats ... hp=<ally>/<enemy>`：双方总血量和每 60s 快照
 - `outcome WIN/LOSS`：一方全溃/全灭时输出
+
+### v1.6.4 实测修正（battle 1152，2026-09-19）[实测/需随版本复查]
+
+`ordered_position` 语义陷阱：对正在执行**攻击令**的单位，它返回**单位自身位置**（或跟随的追击路径点），不是目标位置。证据：每条 engage 后 ~3s（下一轮询 tick）准时跟一条 reclaimed，d2e 数值精确等于单位到敌人的距离。
+
+接管指纹新增两条抑制（先验签名，误伤面为零）：
+- np 距单位自身位置 ≤20m = 不存在外来指令
+- np 距我们最近 4 条指令目的地之一 ≤40m = 引擎重放旧指令
+
+残余盲区（已接受）：玩家对敌军的**攻击点击**不会触发 reclaim——attack 令的 ordered_position 可能也退化；移动拖拽仍会正常收回。
+

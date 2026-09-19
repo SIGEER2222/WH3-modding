@@ -2103,6 +2103,10 @@ local order_dest = {}     -- [uid] = baseline ordered_position for the player-
 local atk_target_uid = {} -- [uid] = enemy uid our last attack order pointed at
 local prev_ai = {}        -- [uid] = is_ai_controlled() last tick (edge detect)
 local prev_ordered = {}   -- [uid] = last ordered_position seen while AI-flagged
+local enemy_pos = {}      -- last-tick enemy positions; the planner fans its
+                          -- attack directive out to per-unit targets, so a
+                          -- destination near ANY enemy is planner intent,
+                          -- not a player grab (battle 1106 drip-reclaims)
                           -- (the planner's intent — baseline for the fingerprint)
 local saw_enemies = false -- set once any enemy is seen; gates outcome detection
 local outcome_logged = false
@@ -2117,6 +2121,10 @@ local directive_pos = nil     -- defend_position anchor (attack uses live target
 -- every uc order we issue flips the unit to script control and rewrites
 -- ordered_position; record it so the reclaim fingerprint doesn't flag our
 -- own orders as player takeovers. target_uid kept for attack-order checks.
+local our_dests = {}      -- [uid] = ring buffer of our last few order dests;
+                          -- the engine sometimes replays a stale ordered_
+                          -- position, so np matching ANY of our recent dests
+                          -- is our own echo, not a player grab
 local function note_our_order(uid, now_ms, target_uid, dest)
     our_order_ms[uid] = now_ms
     -- record our destination as the fingerprint baseline: the prev_ai
@@ -2126,6 +2134,12 @@ local function note_our_order(uid, now_ms, target_uid, dest)
     -- reclaimed-ordered one tick after every batch order (battle 1041/1056)
     order_dest[uid] = dest
     atk_target_uid[uid] = target_uid
+    if dest then
+        local h = our_dests[uid]
+        if not h then h = {}; our_dests[uid] = h end
+        h[#h + 1] = dest
+        if #h > 4 then table.remove(h, 1) end
+    end
 end
 -- handoff / micro state
 local overridden = {}         -- [uid] = {at=ms, idle_at=ms} temp player control, auto-returns
@@ -5229,6 +5243,7 @@ local function handoff_toggle()
                     reclaimed[uid] = true
                     overridden[uid] = nil
                     order_dest[uid] = nil
+                    our_dests[uid] = nil
                     if planner then pcall(function() planner:remove_sunits(su) end) end
                     took = took + 1
                     out_log("handoff take " .. unit:type() .. " (" .. uid .. ")")
@@ -5236,6 +5251,7 @@ local function handoff_toggle()
                     reclaimed[uid] = nil
                     overridden[uid] = nil
                     order_dest[uid] = nil
+                    our_dests[uid] = nil
                     managed[uid] = true
                     if planner then pcall(function() planner:add_sunits(su) end) end
                     gave = gave + 1
@@ -5259,6 +5275,7 @@ local function handoff_override(now_ms)
             if su then
                 overridden[uid] = { at = now_ms, idle_at = nil }
                 order_dest[uid] = nil
+                our_dests[uid] = nil
                 if planner then pcall(function() planner:remove_sunits(su) end) end
                 n = n + 1
                 out_log("override " .. unit:type() .. " (" .. uid .. ")")
@@ -5313,6 +5330,7 @@ local function add_order_listener(name)
             if managed[uid] and not reclaimed[uid] and not overridden[uid] then
                 reclaimed[uid] = true
                 order_dest[uid] = nil
+                our_dests[uid] = nil
                 -- must leave the planner's sunit list or the next directive
                 -- refresh stomps the player's order
                 if planner then
@@ -6079,6 +6097,7 @@ local function tick()
             reclaimed[uid0] = nil
             managed[uid0] = true
             order_dest[uid0] = nil
+            our_dests[uid0] = nil
             prev_ordered[uid0] = nil
             atk_target_uid[uid0] = nil
             our_order_ms[uid0] = 0
@@ -6145,6 +6164,44 @@ local function tick()
                         moved = not chasing
                     end
                     if moved then
+                        -- attack-order signature: on a unit EXECUTING an
+                        -- attack order, ordered_position reports the unit's
+                        -- own position (or a chase waypoint shadowing it),
+                        -- not the target — np sitting on the unit's feet
+                        -- means no foreign order exists at all. Real player
+                        -- drags always point away. (battle 1152: every
+                        -- engage -> reclaim ~3s later, d2e == unit->enemy
+                        -- distance, i.e. np was the unit's own position)
+                        local ok_up, up = pcall(function()
+                            return unit:position()
+                        end)
+                        if ok_up and up then
+                            local ok_ud, ud = pcall(function()
+                                return np:distance_xz(up)
+                            end)
+                            if ok_ud and ud and ud <= 20 then
+                                moved = false
+                            end
+                        end
+                    end
+                    if moved then
+                        -- stale-dest replay: the engine may keep reporting a
+                        -- destination we issued earlier after the order is
+                        -- spent; np matching any recent own dest is our echo
+                        local h = our_dests[uid0]
+                        if h then
+                            for _, hd in ipairs(h) do
+                                local ok_h, hd_d = pcall(function()
+                                    return np:distance_xz(hd)
+                                end)
+                                if ok_h and hd_d and hd_d <= 40 then
+                                    moved = false
+                                    break
+                                end
+                            end
+                        end
+                    end
+                    if moved then
                         -- directive flap: attack_unit/defend_position releases
                         -- control then re-orders every unit — a fresh
                         -- ordered_position near the directive target is the
@@ -6165,10 +6222,28 @@ local function tick()
                                 order_dest[uid0] = np -- adopt the directive dest as baseline
                             end
                         end
+                        -- planner fan-out: an attack directive retargets units
+                        -- onto OTHER enemies continuously; a destination near
+                        -- any enemy is planner intent. Blind spot accepted:
+                        -- a player attack-click ON an enemy won't reclaim —
+                        -- move orders to open ground still will.
+                        if moved then
+                            for _, ep in ipairs(enemy_pos) do
+                                local ok_e, ed = pcall(function()
+                                    return np:distance_xz(ep)
+                                end)
+                                if ok_e and ed and ed <= 100 then
+                                    moved = false
+                                    order_dest[uid0] = np
+                                    break
+                                end
+                            end
+                        end
                     end
                     if moved then
                         reclaimed[uid0] = true
                         order_dest[uid0] = nil
+                        our_dests[uid0] = nil
                         if planner then
                             local ok_s, su_r = pcall(function()
                                 return bm:get_scriptunit_for_unit(unit)
@@ -6177,7 +6252,21 @@ local function tick()
                                 pcall(function() planner:remove_sunits(su_r) end)
                             end
                         end
-                        out_log("reclaimed-ordered " .. unit:type() .. " (" .. uid0 .. ")")
+                        -- diagnostics: distance to nearest enemy tells us who
+                        -- likely issued it — far = player/other-mod ground
+                        -- order, near-enemy = planner fan-out that slipped past
+                        local d2e = -1
+                        for _, ep in ipairs(enemy_pos) do
+                            local ok_e, ed = pcall(function()
+                                return np:distance_xz(ep)
+                            end)
+                            if ok_e and ed and (d2e < 0 or ed < d2e) then
+                                d2e = ed
+                            end
+                        end
+                        out_log(string.format(
+                            "reclaimed-ordered %s (%s) d2e=%d",
+                            unit:type(), uid0, math.floor(d2e)))
                         is_man = false
                     end
                 end
@@ -6244,6 +6333,7 @@ local function tick()
             bait_flee[uid] = nil
             atk_target_uid[uid] = nil
             order_dest[uid] = nil
+            our_dests[uid] = nil
             prev_ordered[uid] = nil
         end
     end)
@@ -6251,6 +6341,7 @@ local function tick()
     -- enemy snapshot with roles for threat/target selection
     local enemies, enemies_ranged, enemies_monster, enemies_airarty = {}, {}, {}, {}
     local enemies_routing = {} -- routing-but-alive: cavalry runs these down
+    enemy_pos = {}           -- refreshed below; pass 1 reads last tick's set
     local erole = {} -- [enemy unit] = role
     do
         local alliance = bm:get_non_player_alliance()
@@ -6276,6 +6367,8 @@ local function tick()
                         local role = classify(e, p)
                         enemies[#enemies + 1] = e
                         erole[e] = role
+                        local ok_ep, epp = pcall(function() return e:position() end)
+                        if ok_ep and epp then enemy_pos[#enemy_pos + 1] = epp end
                         if role == "shooter" or role == "artillery" then enemies_ranged[#enemies_ranged + 1] = e end
                         if role == "monster" then enemies_monster[#enemies_monster + 1] = e end
                         if role == "flyer" or role == "artillery" then enemies_airarty[#enemies_airarty + 1] = e end
@@ -6283,6 +6376,8 @@ local function tick()
                         local ok_sh, sh = pcall(function() return e:is_shattered() end)
                         if not (ok_sh and sh) then
                             enemies_routing[#enemies_routing + 1] = e
+                            local ok_ep, epp = pcall(function() return e:position() end)
+                            if ok_ep and epp then enemy_pos[#enemy_pos + 1] = epp end
                         end
                     end
                 end
