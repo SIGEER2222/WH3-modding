@@ -12,14 +12,16 @@ Output: mod_output/<mod_name>.pack (PFH5, uncompressed).
 """
 from __future__ import annotations
 
+import json
 import re
+import shutil
 import struct
 import sys
 import time
 import uuid
 from pathlib import Path
 
-ROOT = Path(r"E:\Code\WH3-modding")
+ROOT = Path(__file__).resolve().parents[1]
 PACK_PATH_OVERRIDES = {
     "zzz_psw_merged": {
         "script/campaign/mod/psw_01_global_vars.lua": "script/campaign/mod/psw_全局变量总表.lua",
@@ -300,8 +302,10 @@ def encode_loc(rows) -> bytes:
 
 
 # ------------------------------------------------------------- pack
-def pack_reserved_files():
-    notes = b'{\n  "pack_notes": "",\n  "file_notes": {}\n}'
+def pack_reserved_files(pack_notes: str = ""):
+    notes = (
+        '{\n  "pack_notes": ' + json.dumps(pack_notes) + ',\n  "file_notes": {}\n}'
+    ).encode("utf-8")
     settings = (
         '{\n'
         '  "settings_text": {\n'
@@ -347,7 +351,7 @@ def build(mod_name: str, out_path: Path | None = None):
         files[internal] = path.read_bytes()
         print(f"file {internal}: {path.stat().st_size} bytes")
 
-    for top in sorted(p for p in mod_root.iterdir() if p.is_dir() and p.name not in ("db", "text")):
+    for top in sorted(p for p in mod_root.iterdir() if p.is_dir() and p.name not in ("db", "text", "notes")):
         base = mod_root / top.name
         for path in sorted(base.rglob("*")):
             if path.is_file():
@@ -357,7 +361,11 @@ def build(mod_name: str, out_path: Path | None = None):
                 files[internal] = path.read_bytes()
                 print(f"file {internal}: {path.stat().st_size} bytes")
 
-    files.update(pack_reserved_files())
+    notes_path = mod_root / "notes" / "pack_notes.txt"
+    pack_notes = notes_path.read_text(encoding="utf-8").strip() if notes_path.is_file() else ""
+    if pack_notes:
+        print(f"notes: {pack_notes[:60]}...")
+    files.update(pack_reserved_files(pack_notes))
 
     entries = sorted(files.items(), key=lambda item: item[0])
     index = bytearray()
@@ -386,6 +394,14 @@ def build(mod_name: str, out_path: Path | None = None):
     count = struct.unpack_from("<I", blob, 0x10)[0]
     assert count == len(entries), (count, len(entries))
     print(f"Wrote {out_path} ({len(blob)} bytes, {count} files)")
+
+    preview = mod_root / "preview.png"
+    if preview.is_file():
+        png_out = out_path.with_suffix(".png")
+        shutil.copy2(preview, png_out)
+        print(f"preview -> {png_out}")
+    else:
+        print("warning: no preview.png in mod_files/" + mod_name)
 
 
 if __name__ == "__main__":

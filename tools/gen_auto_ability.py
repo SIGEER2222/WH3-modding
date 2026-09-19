@@ -2,7 +2,7 @@
 import csv, glob, io, sys
 from pathlib import Path
 
-ROOT = Path(r"E:\Code\WH3-modding")
+ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "mod_files" / "zzz_czx_battle_ui" / "script" / "battle" / "mod" / "czx_battle_auto_ability.lua"
 
 sources = [ROOT / "gamedata" / "db" / "unit_special_abilities_tables" / "data__.tsv"]
@@ -224,6 +224,7 @@ local focus_count = {}    -- [enemy_uid] = attack orders issued this tick
 local directive_doc = nil     -- doctrine the standing planner order was issued under
 local directive_ms = 0        -- when it was issued
 local directive_target = nil  -- enemy unit the standing attack order points at
+local directive_pos = nil     -- defend_position anchor (attack uses live target pos)
 
 -- every uc order we issue flips the unit to script control and rewrites
 -- ordered_position; record it so the reclaim fingerprint doesn't flag our
@@ -1214,6 +1215,7 @@ local function issue_planner_directive(now_ms, doctrine, delegated, enemies)
         local ok_o, err = pcall(function() planner:attack_unit(best) end)
         if ok_o then
             directive_doc, directive_ms, directive_target = doctrine, now_ms, best
+            directive_pos = nil -- attack directives track the live target unit
             out_log("directive attack -> " .. tostring(best:type())
                 .. " d=" .. math.floor(best_d))
         else
@@ -1231,6 +1233,8 @@ local function issue_planner_directive(now_ms, doctrine, delegated, enemies)
         end)
         if ok_o then
             directive_doc, directive_ms, directive_target = doctrine, now_ms, nil
+            local ok_cp, cp = pcall(function() return planner:get_centre_point() end)
+            directive_pos = (ok_cp and cp) or nil
             out_log("directive defend r=" .. CONFIG.defend_radius_m)
         else
             out_log("directive-fail defend " .. tostring(err))
@@ -1426,6 +1430,28 @@ local function tick()
                         end)
                         moved = not (ok_c and ok_i and cid
                             and tostring(cid) == atk_target_uid[uid0])
+                    end
+                    if moved then
+                        -- directive flap: attack_unit/defend_position releases
+                        -- control then re-orders every unit — a fresh
+                        -- ordered_position near the directive target is the
+                        -- PLANNER's order, not a player grab (observed: mass
+                        -- reclaimed-ordered within seconds of each refresh)
+                        local ok_dp, dp = nil, nil
+                        if directive_target then
+                            ok_dp, dp = pcall(function()
+                                return directive_target:position()
+                            end)
+                        else
+                            dp = directive_pos
+                        end
+                        if dp then
+                            local ok_d2, d2 = pcall(function() return np:distance_xz(dp) end)
+                            if ok_d2 and d2 and d2 <= 120 then
+                                moved = false
+                                order_dest[uid0] = np -- adopt the directive dest as baseline
+                            end
+                        end
                     end
                     if moved then
                         reclaimed[uid0] = true
