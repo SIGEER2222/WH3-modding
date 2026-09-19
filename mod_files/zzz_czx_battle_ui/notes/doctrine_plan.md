@@ -4,6 +4,15 @@
 > 本文档为功能级设计说明，实现细节以 `script/battle/mod/czx_battle_auto_ability.lua` 为准；
 > 生成器模板 `tools/gen_auto_ability.py` 与源文件保持逐字节同步。
 >
+> **2026-09-19 v1.6.2（指纹自伤修复，script_log_1056 实证）**：
+> 干净 playset（无 tc、无测试包）下仍在 9200ms 全员 reclaimed-ordered——
+> 病根不在外部 mod：uc 指令异步翻转 is_ai_controlled，下一 tick 走
+> `prev_ai` 跳变分支时 `order_dest` 已被置 nil，基线退到 `prev_ordered`
+> （下单前的旧目的地），与刚发的 advance 目的地比对必爆 → 自己的批量令
+> 被自己当玩家接管。`note_our_order` 现直接记录目的地（移动令=目标点，
+> 攻击令=目标位置快照，漂移由追击豁免覆盖）。另查明：`bait ->` 日志只是
+> 选人记录，rush 下 bait_step 正确未激活，非 bug。
+>
 > **2026-09-19 v1.6.1（战局实证修复，script_log_0957）**：
 > ① 指纹接管检测修复——`atk_target_uid` 豁免原先只看 `current_target` uid
 > 匹配，而 current_target 永远返回旧目标 → 豁免永久成立 → 接管全 MISS；
