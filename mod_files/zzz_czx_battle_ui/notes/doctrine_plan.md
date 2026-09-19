@@ -4,6 +4,19 @@
 > 本文档为功能级设计说明，实现细节以 `script/battle/mod/czx_battle_auto_ability.lua` 为准；
 > 生成器模板 `tools/gen_auto_ability.py` 与源文件保持逐字节同步。
 >
+> **2026-09-19 v1.6.1（战局实证修复，script_log_0957）**：
+> ① 指纹接管检测修复——`atk_target_uid` 豁免原先只看 `current_target` uid
+> 匹配，而 current_target 永远返回旧目标 → 豁免永久成立 → 接管全 MISS；
+> 现要求新目的地距该目标 ≤70m（真追击才豁免）。② 隐身对峙修复——敌军全员
+> stalk/超视距时 `enemies` 为空、攻击令空转（木精堆实站 16 分钟）；attack
+> 兜底改为目标不可见时 `advance` 朝其位置进军（移动令对隐身单位合法）。
+> ③ dodge 救活——`Special Ability` 事件实测 `get_unit()`=nil（无施法者，
+> 拿不到敌我），但 `get_position()`=落点有效、`s1`=技能 key；改为有落点
+> 即躲。④ sim 记账修正——back 只统计真正 reclaimed 过的单位。
+> 另实测确认：`Move Orientation Width` 命令事件 `get_unit()`=nil，
+> `Attack Unit` 事件的 unit 是**目标**而非下令者——cmd_reclaim 指令事件
+> 收回路径不可用，接管检测只能靠指纹。
+>
 > **2026-09-19 v1.6（排兵布阵 + 勾引）**：delegation 完成时按角色摆一次阵型
 > （`formation`）——朝敌军质心取朝向，melee/monster 前排、shooter 二排、
 > artillery 后排、cav/flyer/cav_shot 分两翼、lord 中后，列距 45m；敌军质心已

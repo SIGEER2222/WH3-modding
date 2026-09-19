@@ -288,6 +288,20 @@ local function counter_of(att_role, def_role)
     return (row and row[def_role]) or 0
 end
 
+local my_alliance_cache = nil -- resolved lazily; constant for the battle
+local function is_visible_to_us(u)
+    if not my_alliance_cache then
+        my_alliance_cache = bm:alliances():item(bm:local_alliance())
+    end
+    if not my_alliance_cache then return true end
+    local ok_v, vis = pcall(function() return u:is_visible_to_alliance(my_alliance_cache) end)
+    if ok_v and vis == false then return false end
+    local ok_h, hid = pcall(function() return u:is_hidden() end)
+    if ok_h and hid == true then return false end
+    return true
+end
+
+
 local function for_each_player_unit(cb)
     local alliance = bm:alliances():item(bm:local_alliance())
     if not alliance then return end
@@ -671,7 +685,7 @@ end
 local function kick_if_idle(su, unit, now_ms)
     if not idle_long_enough(unit, now_ms) then return end
     local e, dist = nearest_enemy(unit)
-    if e and dist <= CONFIG.idle_kick_range_m then
+    if e and dist <= CONFIG.idle_kick_range_m and is_visible_to_us(e) then
         order_attack(su, unit, e, now_ms, "idle-kick")
     end
 end
@@ -1107,7 +1121,18 @@ TASK_EXEC.attack = function(d, ctx)
     end
     -- every candidate capped or out of range: piling on beats standing idle
     local e2 = nearest_enemy(d.unit)
-    if e2 then order_attack(d.su, d.unit, e2, ctx.now_ms, "engage-forced", true) end
+    if e2 then
+        if is_visible_to_us(e2) then
+            order_attack(d.su, d.unit, e2, ctx.now_ms, "engage-forced", true)
+        else
+            -- can't attack what we can't see (stalk/out of sight): march to
+            -- contact — a move order is always legal, spots the hidden army
+            local ok_p, ep = pcall(function() return e2:position() end)
+            if ok_p and ep then
+                order_move_pos(d.su, d.unit, ep, ctx.now_ms, "advance")
+            end
+        end
+    end
 end
 
 -- mobile shooters (missile cav, ranged flyers, harassers): skirmish forever,
@@ -1416,6 +1441,7 @@ end
 -- back through the planner (group-AI signature) and verifies adoption.
 ---------------------------------------------------------------------------------------------
 local sim = { phase = "off", uids = {}, at = 0, cycle = 0, did_speed = false }
+local sim_reclaimed = {}      -- uids that actually hit reclaimed this cycle
 
 local function sim_step(now_ms)
     if not CONFIG.test_sim or not planner then return end
@@ -1480,7 +1506,12 @@ local function sim_step(now_ms)
     if sim.phase == "await-reclaim" then
         local done, missing = 0, 0
         for uid in pairs(sim.uids) do
-            if reclaimed[uid] then done = done + 1 else missing = missing + 1 end
+            if reclaimed[uid] then
+                done = done + 1
+                sim_reclaimed[uid] = true
+            else
+                missing = missing + 1
+            end
         end
         if missing == 0 or now_ms - sim.at > CONFIG.test_verify_ms then
             out_log("sim-cycle " .. sim.cycle .. " reclaim=" .. done .. "/" .. (done + missing)
@@ -1489,6 +1520,7 @@ local function sim_step(now_ms)
         end
         return
     end
+
 
     if sim.phase == "handback" then
         -- group-AI signature: planner add -> engine flips is_ai_controlled,
@@ -1505,17 +1537,22 @@ local function sim_step(now_ms)
     end
 
     if sim.phase == "await-back" then
+        -- only units observed reclaimed can count as handed back; anything
+        -- else was never out of our hands (old code scored those as "back")
         local done, missing = 0, 0
-        for uid in pairs(sim.uids) do
-            if managed[uid] and not reclaimed[uid] then done = done + 1 else missing = missing + 1 end
+        for uid in pairs(sim_reclaimed) do
+            if managed[uid] and not reclaimed[uid] then done = done + 1
+            else missing = missing + 1 end
         end
         if missing == 0 or now_ms - sim.at > CONFIG.test_verify_ms then
             out_log("sim-cycle " .. sim.cycle .. " back=" .. done .. "/" .. (done + missing)
                 .. (missing > 0 and " MISS" or ""))
+            sim_reclaimed = {}
             sim.phase, sim.at = "cooldown", now_ms
         end
         return
     end
+
 end
 
 local function tick()
@@ -1588,14 +1625,24 @@ local function tick()
                     local ok_d, dd = pcall(function() return np:distance_xz(base) end)
                     local moved = ok_d and dd and dd > CONFIG.reclaim_move_m
                     if moved and atk_target_uid[uid0] then
-                        -- attack-ordered units: ordered_position may track the
-                        -- moving target; only reclaim if the target changed
+                        -- attack-ordered units: ordered_position follows the
+                        -- moving target. Suppress only when the new destination
+                        -- still tracks OUR target — a click elsewhere is real.
+                        -- (current_target reports the stale target forever, so
+                        -- uid match alone is not enough — sim reclaim=0/4)
+                        local chasing = false
                         local ok_c, ct = pcall(function() return unit:current_target() end)
                         local ok_i, cid = pcall(function()
                             return ct and ct:unique_ui_id()
                         end)
-                        moved = not (ok_c and ok_i and cid
-                            and tostring(cid) == atk_target_uid[uid0])
+                        if ok_c and ok_i and cid and tostring(cid) == atk_target_uid[uid0] then
+                            local ok_tp, tp = pcall(function() return ct:position() end)
+                            local ok_cd, cd = pcall(function()
+                                return tp and np:distance_xz(tp)
+                            end)
+                            chasing = ok_tp and tp and ok_cd and cd and cd <= 70
+                        end
+                        moved = not chasing
                     end
                     if moved then
                         -- directive flap: attack_unit/defend_position releases
@@ -1894,11 +1941,12 @@ pcall(function()
     bm:register_command_handler_callback("Special Ability", function(ctx)
         cmd_probe_log(ctx, "Special Ability")
         if not CONFIG.dodge or in_task_pass then return end
-        local ok_u, caster = pcall(function() return ctx:get_unit() end)
+        -- probe-verified schema: get_unit() is nil here — no caster, so we
+        -- can't filter by alliance. Position IS exposed -> dodge anything with
+        -- a target point. Player's own casts scatter our units too; rare and
+        -- self-inflicted, accepted.
         local ok_p, pos = pcall(function() return ctx:get_position() end)
-        if not (ok_u and caster and ok_p and pos) then return end
-        local ok_a, al = pcall(function() return caster:alliance_index() end)
-        if not (ok_a and al and al ~= bm:local_alliance()) then return end
+        if not (ok_p and pos) then return end
         local now_ms = bm:time_elapsed_ms()
         local n_scatter = 0
         for_each_player_unit(function(unit)
