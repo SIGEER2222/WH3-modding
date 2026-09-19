@@ -4,6 +4,10 @@
 > 本文档为功能级设计说明，实现细节以 `script/battle/mod/czx_battle_auto_ability.lua` 为准；
 > 生成器模板 `tools/gen_auto_ability.py` 与源文件保持逐字节同步。
 >
+> **2026-09-19 v1.5.3**：`wounded_pull` 触发时把单位移出 planner sunits——否则
+> standing directive 每 20s 刷新会把撤退中的伤员拖回战线（与 reclaim 修复同类的
+> 指令覆盖）；血量恢复后重新入列，日志 `wounded-back`。
+>
 > **2026-09-18 v1.1（脱离 AI General 依赖）**：新增 `ensure_delegation`——开局 ~3s 自动
 > 把本地军全量交给 `script_ai_planner("czx_auto")`（野战白名单 gated，攻城不托管），
 > 玩家经原版组 UI 收回的单位记 `reclaimed` 永不重夺，后进场单位（增援/召唤）自动补托管；
