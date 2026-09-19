@@ -300,3 +300,16 @@ shooter_hold_mult=1.3
 
 残余盲区（已接受）：玩家对敌军的**攻击点击**不会触发 reclaim——attack 令的 ordered_position 可能也退化；移动拖拽仍会正常收回。
 
+
+### v1.6.5 凝聚力系统（battle 1210/1215 实测）[实测/需随版本复查]
+
+用户反馈"猛冲脱离部队"——快单位（骑兵/飞行/巨兽）idle 后被 attack 任务分配全图目标，孤军深入被围。两层防御：
+
+- **拴绳闸门**（`cohesion_leash_m`=170）：TASK_EXEC.attack 的 engage/run-down 和 hunt_backline（放宽 1.6x）的目标必须落在**任一友军** 170m 内。关键：度量用"距最近友军"而非"距质心"——v1 质心版在 27 前排 ×45m 布阵下把两翼全误判为孤立（6200ms 全军 regroup 刷屏）。超绳目标 → `hold-line` 收拢到绳边等战线推进（质心跟随 blob，环边持续推进不 stall）。
+- **孤立归队**（`cohesion_regroup_m`=240）：`cohesion_step` 每 tick 检查——最近友军 >240m、非近战、非炮兵、非诱饵 → `regroup` 走回质心。阈值大于拴绳，给交战目标留缓冲。
+
+指纹误报持续收敛（battle 1215 实锤）：
+- **指令风扇扩散不止 5s**——planner 指令刷新后行军航点持续落地十几秒。两条新抑制：
+  - 刷新后 5s 窗口内全部翻转视为 planner 噪声（`directive_ms` 时间戳）
+  - np 比单位更靠近指令目标 ≥40m = 行军航点（方向签名），抑制并采纳为基线
+- **`is_player_controlled` 硬门槛**[需验证]：翻转时该标志 false = 引擎侧指令，直接抑制+重基线，日志 `suppressed-nonplayer`；若为 true 才走完空间豁免链后 reclaim，日志带 `pc=` 字段验证语义。若此 API 实为"可被控制"，它恒 true → 无抑制 → 空间规则兜底，日志可鉴别。

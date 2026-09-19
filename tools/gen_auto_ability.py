@@ -169,6 +169,14 @@ local CONFIG = {
     wounded_hp       = 0.35,      -- unary_hitpoints below this = wounded
     wounded_pull_m   = 80,        -- disengage distance when caught in melee
     wounded_retry_ms = 12000,     -- cooldown between disengage hops
+    -- cohesion: fast units must not solo-dive targets the line can't support
+    -- (battle 1152 feedback: 猛冲脱离部队). Anchor = centroid of the line
+    -- (melee/monster/lord); engagement only legal inside the leash, anything
+    -- further gets a clamped advance to the leash edge instead.
+    cohesion_leash_m  = 170,      -- engage targets must be within this of centroid
+    cohesion_regroup_m = 240,     -- beyond this (and not in melee): walk back
+    rundown_leash_mult = 1.3,     -- routers are chased only near the line
+    hunt_leash_mult    = 1.6,     -- cav/flyer backline hunts get extra slack
     dodge            = true,      -- scatter units out of enemy ability AoE
     dodge_radius_m   = 45,        -- scatter if within this of the ability target
     dodge_dest_m     = 60,        -- scatter destination distance from blast centre
@@ -664,6 +672,51 @@ local function order_return(su, unit, anchor, now_ms)
     order_move_pos(su, unit, ap, now_ms, "screen-return")
 end
 
+-- move toward `pos` but never past `radius` from `anchor` (the line centroid):
+-- fast units converge at the leash edge and re-engage once the blob arrives
+-- instead of diving in unsupported. Converges because the centroid follows
+-- the line as it walks up to the ring.
+local function order_clamped_advance(su, unit, pos, now_ms, tag, anchor, radius)
+    local dest = pos
+    if anchor then
+        local ok_c, cd = pcall(function() return pos:distance_xz(anchor) end)
+        if ok_c and cd and cd > radius then
+            local ok_dx, dx = pcall(function() return pos:get_x() - anchor:get_x() end)
+            local ok_dz, dz = pcall(function() return pos:get_z() - anchor:get_z() end)
+            if ok_dx and ok_dz and is_number(dx) and is_number(dz) then
+                local len = math.sqrt(dx * dx + dz * dz)
+                if len > 1 then
+                    local ok_v, nv = pcall(function()
+                        return v(anchor:get_x() + dx / len * radius,
+                                 anchor:get_z() + dz / len * radius)
+                    end)
+                    if ok_v and nv then dest = nv end
+                end
+            end
+        end
+    end
+    return order_move_pos(su, unit, dest, now_ms, tag)
+end
+
+-- is `e` close enough to ANY delegated unit to be a supported target?
+-- The leash is measured to the nearest friendly, not the centroid — a wide
+-- battle line's flanks sit far from the centre but still fight supported.
+-- A target beyond the leash of every friendly is a solo dive by definition.
+local function within_leash(e, delegated, mult)
+    if not delegated or #delegated == 0 then return true end
+    local ok_p, ep = pcall(function() return e:position() end)
+    if not (ok_p and ep) then return false end
+    local leash = CONFIG.cohesion_leash_m * (mult or 1)
+    for _, od in ipairs(delegated) do
+        local ok_op, op = pcall(function() return od.unit:position() end)
+        if ok_op and op then
+            local ok_d, dd = pcall(function() return ep:distance_xz(op) end)
+            if ok_d and dd and dd <= leash then return true end
+        end
+    end
+    return false
+end
+
 
 local function set_behaviour_once(su, unit, behaviour, flag_key)
     local uid = tostring(unit:unique_ui_id())
@@ -1054,11 +1107,14 @@ end
 
 TASK_EXEC.hunt_backline = function(d, ctx)
     if not task_ready(d, ctx) then return end
-    -- flyers prefer enemy flyers/artillery over ground backline
+    -- flyers prefer enemy flyers/artillery over ground backline; hunts get
+    -- leash slack but a backline target across the map from every friendly
+    -- is still a solo dive — deny it
     if d.role == "flyer" then
         local t = best_scored(d.unit, ctx.enemies_airarty, function(e)
             local dist = unit_dist(d.unit, e)
             if dist > CONFIG.flyer_hunt_range_m then return -math.huge end
+            if not within_leash(e, ctx.delegated, CONFIG.hunt_leash_mult) then return -math.huge end
             return sv_of(e) - dist * 0.2
         end)
         if t then
@@ -1069,6 +1125,7 @@ TASK_EXEC.hunt_backline = function(d, ctx)
     local t = best_scored(d.unit, ctx.enemies_ranged, function(e)
         local dist = unit_dist(d.unit, e)
         if dist > CONFIG.flank_hunt_range_m then return -math.huge end
+        if not within_leash(e, ctx.delegated, CONFIG.hunt_leash_mult) then return -math.huge end
         return sv_of(e) - dist * 0.2 + counter_of(d.role, ctx.erole[e])
     end)
     if t then
@@ -1122,11 +1179,14 @@ end
 
 TASK_EXEC.attack = function(d, ctx)
     if not task_ready(d, ctx) then return end
+    local anchor = ctx.ally_centroid
+    local friends = ctx.delegated
     -- finish off routing units first when we're mobile: free kills and they
-    -- can't rally (community: run routers down with cavalry)
+    -- can't rally — but only near the line; chasing routers across the map
+    -- is exactly how fast units get isolated (run-down gets extra slack)
     if (d.role == "cav" or d.role == "flyer" or d.role == "cav_shot") then
         local r = nearest_router(d.unit, ctx)
-        if r then
+        if r and within_leash(r, friends, CONFIG.rundown_leash_mult) then
             order_attack(d.su, d.unit, r, ctx.now_ms, "run-down")
             return
         end
@@ -1143,20 +1203,33 @@ TASK_EXEC.attack = function(d, ctx)
         return s
     end)
     if t then
-        order_attack(d.su, d.unit, t, ctx.now_ms, "engage")
+        if within_leash(t, friends, 1) then
+            order_attack(d.su, d.unit, t, ctx.now_ms, "engage")
+        else
+            -- beyond the leash: converge at the leash edge and wait for the
+            -- line — the centroid follows the blob forward so contact still
+            -- develops, just never as a solo dive
+            local ok_p, tp = pcall(function() return t:position() end)
+            if ok_p and tp then
+                order_clamped_advance(d.su, d.unit, tp, ctx.now_ms,
+                    "hold-line", anchor, CONFIG.cohesion_leash_m)
+            end
+        end
         return
     end
     -- every candidate capped or out of range: piling on beats standing idle
     local e2 = nearest_enemy(d.unit)
     if e2 then
-        if is_visible_to_us(e2) then
+        if is_visible_to_us(e2) and within_leash(e2, friends, 1) then
             order_attack(d.su, d.unit, e2, ctx.now_ms, "engage-forced", true)
         else
-            -- can't attack what we can't see (stalk/out of sight): march to
-            -- contact — a move order is always legal, spots the hidden army
+            -- hidden or beyond leash: march toward contact clamped to the
+            -- leash edge — move orders are legal on stalked units and keep
+            -- the whole army advancing as one blob
             local ok_p, ep = pcall(function() return e2:position() end)
             if ok_p and ep then
-                order_move_pos(d.su, d.unit, ep, ctx.now_ms, "advance")
+                order_clamped_advance(d.su, d.unit, ep, ctx.now_ms,
+                    "advance", anchor, CONFIG.cohesion_leash_m)
             end
         end
     end
@@ -1404,6 +1477,42 @@ local function bait_step(d, ctx)
     return true -- loitering in the provoke band; hold
 end
 
+-- cohesion regroup: a unit whose NEAREST delegated friendly is beyond
+-- cohesion_regroup_m is isolated — walk it back toward the blob. Measured to
+-- the nearest friend rather than the centroid so wide-line flank units (who
+-- have neighbours ~45m away) don't false-positive. The bait unit is exempt
+-- (separating is its job); artillery never repositions; units in contact
+-- fight it out.
+local regroup_at = {}
+local function cohesion_step(d, ctx)
+    local anchor = ctx.ally_centroid
+    if not anchor or d.role == "artillery" then return false end
+    local uid = tostring(d.unit:unique_ui_id())
+    if bait_uid == uid then return false end
+    if not ctx.delegated or #ctx.delegated < 3 then return false end
+    local ok_m, melee = pcall(function() return d.unit:is_in_melee() end)
+    if ok_m and melee then return false end
+    local ok_p, up = pcall(function() return d.unit:position() end)
+    if not (ok_p and up) then return false end
+    local nearest = math.huge
+    for _, od in ipairs(ctx.delegated) do
+        if od.unit ~= d.unit then
+            local ok_op, op = pcall(function() return od.unit:position() end)
+            if ok_op and op then
+                local ok_d, dd = pcall(function() return up:distance_xz(op) end)
+                if ok_d and dd and dd < nearest then nearest = dd end
+            end
+        end
+    end
+    if nearest <= CONFIG.cohesion_regroup_m then return false end
+    local last = regroup_at[uid] or 0
+    if (ctx.now_ms - last) < 4000 then return true end
+    if order_move_pos(d.su, d.unit, anchor, ctx.now_ms, "regroup") then
+        regroup_at[uid] = ctx.now_ms
+    end
+    return true
+end
+
 
 local function issue_planner_directive(now_ms, doctrine, delegated, enemies)
     if not planner or doctrine == "none" then return end
@@ -1648,10 +1757,40 @@ local function tick()
             end
             local base = order_dest[uid0]
             if base then
-                local ok_n, np = pcall(function() return unit:ordered_position() end)
+                -- movement gate: while the unit is walking, ordered_position
+                -- reports path waypoints along the route, NOT the order
+                -- destination — np drifting 30m+ from our recorded dest is
+                -- guaranteed mid-transit and means nothing (battle 1215/1224:
+                -- every hold-line march produced reclaim batches with np =
+                -- en-route waypoints). Only a SETTLED unit's ordered_position
+                -- is evidence of a foreign order; reclaim then costs the walk
+                -- time, which is acceptable for correctness.
+                local ok_mv, mv = pcall(function() return unit:is_moving() end)
+                local ok_n, np = nil, nil
+                if not (ok_mv and mv) then
+                    ok_n, np = pcall(function() return unit:ordered_position() end)
+                end
                 if ok_n and np then
                     local ok_d, dd = pcall(function() return np:distance_xz(base) end)
                     local moved = ok_d and dd and dd > CONFIG.reclaim_move_m
+                    local pc_flag = "?"
+                    if moved then
+                        -- control flag gate [需验证]: planner/uc orders never
+                        -- set is_player_controlled — if it reads false the flip
+                        -- was engine-side and np is planner noise; re-baseline
+                        -- and move on. If the API actually means "controllable"
+                        -- it stays true and the spatial rules below carry on.
+                        local ok_pc, pc = pcall(function()
+                            return unit:is_player_controlled()
+                        end)
+                        pc_flag = ok_pc and tostring(pc) or "err"
+                        if ok_pc and pc == false then
+                            moved = false
+                            order_dest[uid0] = np
+                            out_log("suppressed-nonplayer " .. unit:type()
+                                .. " (" .. uid0 .. ")")
+                        end
+                    end
                     if moved and atk_target_uid[uid0] then
                         -- attack-ordered units: ordered_position follows the
                         -- moving target. Suppress only when the new destination
@@ -1711,6 +1850,18 @@ local function tick()
                         end
                     end
                     if moved then
+                        -- directive fan-out window: for ~5s after ANY planner
+                        -- directive refresh the engine re-orders every unit to
+                        -- spread-out waypoints (defend positions can sit far
+                        -- outside the 120m spatial ring — battle 1210). During
+                        -- the window all flips are planner noise; a real grab
+                        -- is simply detected on the next tick once it expires.
+                        if directive_ms
+                            and (now_ms - directive_ms) < 5000 then
+                            moved = false
+                        end
+                    end
+                    if moved then
                         -- directive flap: attack_unit/defend_position releases
                         -- control then re-orders every unit — a fresh
                         -- ordered_position near the directive target is the
@@ -1726,9 +1877,32 @@ local function tick()
                         end
                         if dp then
                             local ok_d2, d2 = pcall(function() return np:distance_xz(dp) end)
-                            if ok_d2 and d2 and d2 <= 120 then
-                                moved = false
-                                order_dest[uid0] = np -- adopt the directive dest as baseline
+                            if ok_d2 and d2 then
+                                if d2 <= 120 then
+                                    moved = false
+                                    order_dest[uid0] = np -- adopt the directive dest as baseline
+                                else
+                                    -- march fan-out: planner waypoints en route
+                                    -- to the directive target keep landing for
+                                    -- many seconds after the refresh — np
+                                    -- meaningfully CLOSER to the target than
+                                    -- the unit = travelling under directive
+                                    -- orders. A real pull-back points away.
+                                    -- (battle 1215: mass reclaim 12s after a
+                                    -- refresh, np 170-430m from enemies)
+                                    local ok_up2, up2 = pcall(function()
+                                        return unit:position()
+                                    end)
+                                    if ok_up2 and up2 then
+                                        local ok_u2t, u2t = pcall(function()
+                                            return up2:distance_xz(dp)
+                                        end)
+                                        if ok_u2t and u2t and d2 <= u2t - 40 then
+                                            moved = false
+                                            order_dest[uid0] = np
+                                        end
+                                    end
+                                end
                             end
                         end
                         -- planner fan-out: an attack directive retargets units
@@ -1774,8 +1948,8 @@ local function tick()
                             end
                         end
                         out_log(string.format(
-                            "reclaimed-ordered %s (%s) d2e=%d",
-                            unit:type(), uid0, math.floor(d2e)))
+                            "reclaimed-ordered %s (%s) d2e=%d pc=%s",
+                            unit:type(), uid0, math.floor(d2e), pc_flag))
                         is_man = false
                     end
                 end
@@ -1953,13 +2127,33 @@ local function tick()
         end
     end
 
+    -- line centroid for the cohesion leash: mean position of the units that
+    -- define the battle line (melee/monster/lord); falls back to all managed
+    -- units so skirmish-only rosters still get an anchor
+    local ally_centroid = nil
+    do
+        local cx, cz, cn = 0, 0, 0
+        local function acc(u)
+            local ok_p, p = pcall(function() return u:position() end)
+            if ok_p and p then
+                cx = cx + p:get_x(); cz = cz + p:get_z(); cn = cn + 1
+            end
+        end
+        for _, d in ipairs(delegated) do
+            if d.role == "melee" or d.role == "monster" or d.role == "lord" then
+                acc(d.unit)
+            end
+        end
+        if cn == 0 then for _, d in ipairs(delegated) do acc(d.unit) end end
+        if cn > 0 then ally_centroid = v(cx / cn, cz / cn) end
+    end
     -- pass 2: abilities + role behaviour
     local ctx = {
         now_ms = now_ms, doctrine = doctrine, shooters = shooters,
         enemies = enemies, enemies_ranged = enemies_ranged,
         enemies_monster = enemies_monster, enemies_airarty = enemies_airarty,
         enemies_routing = enemies_routing,
-        erole = erole,
+        erole = erole, ally_centroid = ally_centroid, delegated = delegated,
     }
     for _, d in ipairs(delegated) do
         local su, unit = d.su, d.unit
@@ -2006,6 +2200,7 @@ local function tick()
             local ok_h, handled = pcall(function()
                 return wounded_step(d, ctx) or kite_step(d, ctx)
                     or bait_step(d, ctx) or cycle_charge_step(d, ctx)
+                    or cohesion_step(d, ctx)
             end)
             if not (ok_h and handled) then
                 local exec = TASK_EXEC[task] or TASK_EXEC.attack
