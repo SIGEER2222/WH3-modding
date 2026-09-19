@@ -2133,15 +2133,17 @@ local DELEGATE_TYPES = {
 -- 反大步兵靠 anti_large 旗标额外加成分（对骑兵和巨兽都生效，不止巨兽）；
 -- 近战线列怕骑兵冲、远程怕一切贴身；骑射是永远风筝的骚扰兵。
 local COUNTER_BONUS = {
-    melee     = { shooter = 30, artillery = 40, monster = -20, cav = -15 },
-    monster   = { melee = 20, shooter = 25, cav = 10, cav_shot = 15 },
+    melee     = { shooter = 30, artillery = 40, monster = -20, cav = -15,
+                  cav_shot = -20, flyer = -20 }, -- foot can't catch mounted/air
+    monster   = { melee = 20, shooter = 25, cav = 10, cav_shot = 15,
+                  artillery = 35 }, -- SEMs smash gun crews
     cav       = { shooter = 40, artillery = 50, monster = -30, melee = -10,
                   cav_shot = 35 },
-    cav_shot  = { melee = 10, artillery = 30, monster = -15 }, -- harass, avoid monsters
+    cav_shot  = { melee = 10, artillery = 30, monster = -15, shooter = 15 },
     flyer     = { artillery = 40, shooter = 30, monster = -20, cav_shot = 25 },
-    shooter   = { monster = 30, cav = 10, melee = 10 },  -- ranged focus melts big unarmoured things
+    shooter   = { monster = 30, cav = 10, melee = 10, flyer = 15 }, -- shoot down air
     artillery = { melee = 10, monster = 10 },
-    lord      = {},
+    lord      = { lord = 15, monster = -10, melee = -15 }, -- duel seekers, not chaff-clearers
 }
 local function counter_of(att_role, def_role)
     local row = COUNTER_BONUS[att_role]
@@ -5433,6 +5435,15 @@ local function assign_task(d, ctx)
 end
 
 -- task executors; ctx = {now_ms, doctrine, shooters, enemies, ...}
+local function nearest_router(unit, ctx)
+    local r, rd = nil, CONFIG.rundown_range_m
+    for _, e in ipairs(ctx.enemies_routing or {}) do
+        local dist = unit_dist(unit, e)
+        if dist < rd then r, rd = e, dist end
+    end
+    return r
+end
+
 local TASK_EXEC = {}
 
 TASK_EXEC.protect_gunline = function(d, ctx)
@@ -5541,13 +5552,8 @@ TASK_EXEC.attack = function(d, ctx)
     if not task_ready(d, ctx) then return end
     -- finish off routing units first when we're mobile: free kills and they
     -- can't rally (community: run routers down with cavalry)
-    if (d.role == "cav" or d.role == "flyer" or d.role == "cav_shot")
-        and ctx.enemies_routing then
-        local r, rd = nil, CONFIG.rundown_range_m
-        for _, e in ipairs(ctx.enemies_routing) do
-            local dist = unit_dist(d.unit, e)
-            if dist < rd then r, rd = e, dist end
-        end
+    if (d.role == "cav" or d.role == "flyer" or d.role == "cav_shot") then
+        local r = nearest_router(d.unit, ctx)
         if r then
             order_attack(d.su, d.unit, r, ctx.now_ms, "run-down")
             return
@@ -5578,6 +5584,8 @@ end
 TASK_EXEC.harass = function(d, ctx)
     set_behaviour_once(d.su, d.unit, "skirmish")
     if not task_ready(d, ctx) then return end
+    local r = nearest_router(d.unit, ctx)
+    if r then order_attack(d.su, d.unit, r, ctx.now_ms, "run-down"); return end
     local t = best_scored(d.unit, ctx.enemies, function(e)
         local dist = unit_dist(d.unit, e)
         if dist > CONFIG.harass_range_m then return -math.huge end

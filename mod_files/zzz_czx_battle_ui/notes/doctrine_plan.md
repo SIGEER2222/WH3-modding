@@ -4,6 +4,11 @@
 > 本文档为功能级设计说明，实现细节以 `script/battle/mod/czx_battle_auto_ability.lua` 为准；
 > 生成器模板 `tools/gen_auto_ability.py` 与源文件保持逐字节同步。
 >
+> **2026-09-19 v1.5.5（克制矩阵补全）**：`monster→artillery +35`（巨兽砸炮组）、
+> `lord` 行补 `lord+15/monster-10/melee-15`（领主找决斗、不绞肉）、`melee→cav_shot/
+> flyer -20`（步兵不追追不上的目标）、`shooter→flyer +15`（对空）、`cav_shot→shooter
+> +15`；骑射 harass 也吃追溃（`nearest_router` 提取共用）。
+>
 > **2026-09-19 v1.5.4（战术层补洞）**：法师类领主/英雄（`mage` 旗标）不再
 > free_engagement 送脸，除 rush 外一律 `sheltered`——贴射手线、只拦 70m 内贴身敌；
 > `kite_step` 威胁角色加 `flyer`（敌方空军俯冲后排也触发撤退）；屏线/拦截的
