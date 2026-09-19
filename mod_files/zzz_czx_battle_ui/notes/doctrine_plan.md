@@ -4,9 +4,11 @@
 > 本文档为功能级设计说明，实现细节以 `script/battle/mod/czx_battle_auto_ability.lua` 为准；
 > 生成器模板 `tools/gen_auto_ability.py` 与源文件保持逐字节同步。
 >
-> **2026-09-19 v1.5.3**：`wounded_pull` 触发时把单位移出 planner sunits——否则
-> standing directive 每 20s 刷新会把撤退中的伤员拖回战线（与 reclaim 修复同类的
-> 指令覆盖）；血量恢复后重新入列，日志 `wounded-back`。
+> **2026-09-19 v1.5.3**：伤员处理改为**脱战跳步**——hp < `wounded_hp`(0.35) 且仍
+> 在近战的高价值单位（lord/monster/cav/highvalue）朝远离最近敌人的方向跳出
+> `wounded_pull_m`(80m)，脱离近战立刻回任务层继续打；每 `wounded_retry_ms`(12s)
+> 最多一跳。战斗内血量不回复，"撤到后场等回血"等于永久减员，已废弃；planner
+> 成员资格全程不动。
 >
 > **2026-09-18 v1.1（脱离 AI General 依赖）**：新增 `ensure_delegation`——开局 ~3s 自动
 > 把本地军全量交给 `script_ai_planner("czx_auto")`（野战白名单 gated，攻城不托管），

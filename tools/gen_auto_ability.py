@@ -165,9 +165,10 @@ local CONFIG = {
     kite_fallback    = true,      -- shooters retreat when a melee enemy closes in
     kite_threat_m    = 30,        -- enemy this close triggers fallback
     kite_dest_m      = 60,        -- fallback distance from the threat
-    wounded_pullout  = true,      -- badly hurt high-value units withdraw
+    wounded_pullout  = true,      -- badly hurt high-value units hop out of melee
     wounded_hp       = 0.35,      -- unary_hitpoints below this = wounded
-    wounded_recover_hp = 0.55,    -- re-engage above this
+    wounded_pull_m   = 80,        -- disengage distance when caught in melee
+    wounded_retry_ms = 12000,     -- cooldown between disengage hops
     dodge            = true,      -- scatter units out of enemy ability AoE
     dodge_radius_m   = 45,        -- scatter if within this of the ability target
     dodge_dest_m     = 60,        -- scatter destination distance from blast centre
@@ -238,7 +239,7 @@ end
 local overridden = {}         -- [uid] = {at=ms, idle_at=ms} temp player control, auto-returns
 local charge_state = {}       -- [uid] = {phase="in"|"out", at=ms} cav cycle-charge
 local role_of = {}            -- [uid] = role, snapshot map for order arming
-local wounded_pull = {}       -- [uid] = true while a wounded unit is held out of melee
+local wounded_pull = {}       -- [uid] = battle-ms of last disengage hop
 local dodge_at = {}           -- [uid] = last dodge-order ms
 local cmd_seen = {}           -- [command name] = count, probe throttle
 local in_task_pass = false    -- true while our own uc orders are being issued
@@ -857,8 +858,10 @@ local function cycle_charge_step(d, ctx)
     return false
 end
 
--- wounded pull-out: high-value units below the hp threshold withdraw toward the
--- planner centre until recovered. Returns true when it holds the unit this tick.
+-- wounded disengage: high-value units below the hp threshold hop out of melee
+-- when caught in it, then go straight back to the task layer once clear — hp
+-- doesn't regen mid-battle, so parking them out back is just losing the unit.
+-- Planner membership untouched; the standing directive can keep using them.
 local function wounded_step(d, ctx)
     if not CONFIG.wounded_pullout then return false end
     local uid = tostring(d.unit:unique_ui_id())
@@ -866,46 +869,20 @@ local function wounded_step(d, ctx)
         and not d.highvalue then return false end -- highvalue flag pulls elites of any role
     local ok_h, hp = pcall(function() return d.unit:unary_hitpoints() end)
     if not (ok_h and is_number(hp)) then return false end
-    if not wounded_pull[uid] then
-        if hp < CONFIG.wounded_hp then
-            local ok_m, melee = pcall(function() return d.unit:is_in_melee() end)
-            if ok_m and melee then
-                wounded_pull[uid] = true
-                -- leave the planner or the next directive refresh drags it back
-                -- into the fight (same stomp the reclaim path removes for)
-                if planner then
-                    pcall(function() planner:remove_sunits(d.su) end)
-                end
-            end
-        end
-    else
-        if hp > CONFIG.wounded_recover_hp then
-            wounded_pull[uid] = nil
-            -- healed: hand it back so standing directives reach it again
-            if planner then pcall(function() planner:add_sunits(d.su) end) end
-            out_log("wounded-back " .. d.unit:type() .. " (" .. uid .. ")")
-        end
+    local ok_m, melee = pcall(function() return d.unit:is_in_melee() end)
+    if hp >= CONFIG.wounded_hp or not (ok_m and melee) then
+        wounded_pull[uid] = nil -- healthy, or clear of melee: normal tasking
+        return false
     end
-    if not wounded_pull[uid] then return false end
-    -- hold the withdrawal: keep moving toward own army centre
-    local ok_c, centre = pcall(function() return planner and planner:get_centre_point() end)
-    if not (ok_c and centre) then return false end -- no anchor: let the task layer have it
-    if ok_c and centre then
-        local ok_d, dist = pcall(function() return d.unit:position():distance_xz(centre) end)
-        local ok_v, moving = pcall(function() return d.unit:is_moving() end)
-        if ok_d and dist and dist > 40 and not (ok_v and moving) then
-            local ok, err = pcall(function()
-                local ok_b, bearing = pcall(function() return d.unit:bearing() end)
-                local deg = (ok_b and is_number(bearing)) and bearing * 180 / math.pi or 0
-                local ok_w, width = pcall(function() return d.unit:ordered_width() end)
-                d.su.uc:goto_location_angle_width(centre, deg, (ok_w and is_number(width)) and width or 20, true)
-                d.su.uc:release_control()
-            end)
-            if ok then
-                note_our_order(uid, ctx.now_ms)
-                out_log("wounded-pull " .. d.unit:type() .. " (" .. uid .. ") hp=" .. math.floor(hp * 100) .. "%")
-            end
-        end
+    -- wounded AND still in melee: hop away from the nearest enemy, throttled
+    local last = wounded_pull[uid] or 0
+    if (ctx.now_ms - last) < CONFIG.wounded_retry_ms then return true end
+    local threat = nearest_of(d.unit, ctx.enemies)
+    if not threat then return false end
+    local ok_p, tp = pcall(function() return threat:position() end)
+    if not (ok_p and tp) then return false end
+    if order_flee_pos(d.su, d.unit, tp, CONFIG.wounded_pull_m, ctx.now_ms, "wounded-pull") then
+        wounded_pull[uid] = ctx.now_ms
     end
     return true
 end
