@@ -871,10 +871,20 @@ local function wounded_step(d, ctx)
             local ok_m, melee = pcall(function() return d.unit:is_in_melee() end)
             if ok_m and melee then
                 wounded_pull[uid] = true
+                -- leave the planner or the next directive refresh drags it back
+                -- into the fight (same stomp the reclaim path removes for)
+                if planner then
+                    pcall(function() planner:remove_sunits(d.su) end)
+                end
             end
         end
     else
-        if hp > CONFIG.wounded_recover_hp then wounded_pull[uid] = nil end
+        if hp > CONFIG.wounded_recover_hp then
+            wounded_pull[uid] = nil
+            -- healed: hand it back so standing directives reach it again
+            if planner then pcall(function() planner:add_sunits(d.su) end) end
+            out_log("wounded-back " .. d.unit:type() .. " (" .. uid .. ")")
+        end
     end
     if not wounded_pull[uid] then return false end
     -- hold the withdrawal: keep moving toward own army centre
