@@ -2117,9 +2117,14 @@ local directive_pos = nil     -- defend_position anchor (attack uses live target
 -- every uc order we issue flips the unit to script control and rewrites
 -- ordered_position; record it so the reclaim fingerprint doesn't flag our
 -- own orders as player takeovers. target_uid kept for attack-order checks.
-local function note_our_order(uid, now_ms, target_uid)
+local function note_our_order(uid, now_ms, target_uid, dest)
     our_order_ms[uid] = now_ms
-    order_dest[uid] = nil           -- disarm until the order settles
+    -- record our destination as the fingerprint baseline: the prev_ai
+    -- transition next tick compares live ordered_position against this, so a
+    -- missing baseline made it fall back to prev_ordered (the PRE-order
+    -- destination) and flag our own orders as player takeovers — mass
+    -- reclaimed-ordered one tick after every batch order (battle 1041/1056)
+    order_dest[uid] = dest
     atk_target_uid[uid] = target_uid
 end
 -- handoff / micro state
@@ -5090,7 +5095,11 @@ local function order_attack(su, unit, e, now_ms, tag, force)
         su.uc:release_control()
     end)
     if ok then
-        note_our_order(uid, now_ms, euid)
+        -- baseline = the target's position at order time; ordered_position
+        -- follows the moving target so drift is handled by the chase
+        -- exemption in the fingerprint, not this snapshot
+        local ok_tp, tp = pcall(function() return e:position() end)
+        note_our_order(uid, now_ms, euid, (ok_tp and tp) or nil)
         focus_count[euid] = (focus_count[euid] or 0) + 1
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
@@ -5115,7 +5124,7 @@ local function order_move_pos(su, unit, pos, now_ms, tag)
         su.uc:release_control()
     end)
     if ok then
-        note_our_order(uid, now_ms)
+        note_our_order(uid, now_ms, nil, pos)
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
         if tag then out_log(tag .. " " .. unit:type() .. " (" .. uid .. ")") end
@@ -5341,7 +5350,7 @@ local function order_flee_pos(su, unit, from_pos, dist_m, now_ms, tag)
         su.uc:release_control()
     end)
     if ok then
-        note_our_order(uid, now_ms)
+        note_our_order(uid, now_ms, nil, dest)
         kicked_at[uid] = now_ms
         idle_since[uid] = nil
         out_log(tag .. " " .. unit:type() .. " (" .. uid .. ")")
@@ -5787,7 +5796,7 @@ local function formation_lineup(delegated, enemies, now_ms)
                 d.su.uc:release_control()
             end)
             if ok then
-                note_our_order(tostring(d.unit:unique_ui_id()), now_ms)
+                note_our_order(tostring(d.unit:unique_ui_id()), now_ms, nil, dest)
                 placed = placed + 1
             end
         end
