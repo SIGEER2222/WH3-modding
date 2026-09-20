@@ -2,8 +2,6 @@
 #battle_currency_units_cost_values_tables;0;db/battle_currency_units_cost_values_tables/!!czx_swarm_units
 425.0	supplies_currency	czx_feilong
 1000.0	supplies_currency	czx_zhanglang
-300.0	supplies_currency	czx_kerrigan
-300.0	supplies_currency	czx_kerrigan_lord
 800.0	supplies_currency	czx_baolongshou
 900.0	supplies_currency	czx_inf_tank
 900.0	supplies_currency	czx_dehaka

@@ -1,7 +1,0 @@
-dilemma_key	id	option_key	value	target
-#cdir_events_dilemma_option_junctions_tables;1;db/cdir_events_dilemma_option_junctions_tables/!!czx_swarm_expansion
-dilemma_czx_kerrigan	789900011	VAR_MISSION_LENGTH_INFINITE		default
-dilemma_czx_kerrigan	789900012	VAR_CHANCE	100	default
-dilemma_czx_kerrigan	789900013	CND_FIRST_ROUND	2	default
-dilemma_czx_kerrigan	789900014	CND_CULTURE	wh_main_emp_empire	default
-dilemma_czx_kerrigan	789900015	CND_UNIQUE		default

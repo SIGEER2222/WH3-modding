@@ -16,12 +16,10 @@
    复用 donor 的 entity / variant / 兵牌 / 武器 / spacing / 属性组。
 3. **蟑螂（`czx_zhanglang`）**：donor = 古墓巨蝎
    `wh2_dlc09_tmb_mon_tomb_scorpion_0`（单实体巨兽）。
-4. **凯瑞甘英雄/领主版**：
-   - 英雄：`czx_kerrigan`，`wizard` agent。
-   - 领主版：`czx_kerrigan_lord`，`general` / `legendary_lords`，目前接入 Unit Viewer、自定义战斗和技能链，不修改 startpos。
-   - 两者都复用暗精女术士 `wh2_main_def_sorceress_dark` 的战斗 donor。
-   - 英雄和领主分别使用独立技能 set，避免覆盖原版技能树。
-5. **本地定制兵牌**：飞龙、蟑螂、凯瑞甘英雄/领主均改用 `czx_*.png` 本地生成卡片，不再直接使用 donor unit card。
+4. ~~凯瑞甘英雄/领主版~~ **已于 2026-09-19 移除**：`czx_kerrigan` /
+   `czx_kerrigan_lord` 全部 DB 行、脚本、Loc 与模型资源已删除。
+   刀锋女王改由「英灵召唤 (Summon Servant)」（Workshop 3552538974）提供。
+5. **本地定制兵牌**：飞龙、蟑螂改用 `czx_*.png` 本地生成卡片，不再直接使用 donor unit card。
 6. **SC2 语义被动**：飞龙/蟑螂挂载再生，跳虫/雷兽挂载狂热，作为 Mutalisk/Roach/Zergling/Ultralisk 的第一版 SC2 语义映射。
 
 ## 招募方式
@@ -29,8 +27,7 @@
 - 飞龙、蟑螂沿用本体的 `wh_main_emp_forges_1~4`（帝国锻造厂）招募，
   并加入 `wh_main_group_empire` / `wh_main_group_empire_reikland`
   军事编组与帝国自定义战斗权限，同时挂入本体 `skv_chongzu` unit set。
-- 凯瑞甘英雄通过 `faction_agent_permitted_subtypes`（agent=`wizard`）
-  共享帝国法师容量招募；领主版仅先接入 Unit Viewer/自定义战斗，不修改 startpos。
+
 
 ## 已知取舍 / 待验证
 
@@ -42,10 +39,7 @@
   （`wh2_dlc09_tmb_mon_carrion_0`，含 crumbling 等亡灵特性），
   若不希望虫群单位带亡灵特性，需新建属性组。
 - `[需验证]` 蟑螂沿用了古墓巨蝎的亡灵属性组，同上。
-- `[需验证]` 凯瑞甘已有独立英雄/领主技能 set 和三个 SC2 语义技能节点，但底层主动效果仍复用暗精 Chillwind、Bladewind、Soul Stealer 的 WH3 effect 链。
-- `[需资源]` 当前本地没有 SC2 `.m3`/`SC2Mod` 或可转换的 Zerg 模型源；飞龙、蟑螂和凯瑞甘仍使用 WH3 donor 模型/动作。需要提供合法 SC2 模型源后，才能继续做 M3→WH3 variantmesh/wsmodel/rigid_model_v2 转换。
-- `[需验证]` 凯瑞甘坐骑技能树节点（dark steed / cold one / dark pegasus）
-  因未给她配置对应 `land_units.mount`，战役里可能仅显示但无法使用。
+- `[需资源]` 当前本地没有 SC2 `.m3`/`SC2Mod` 或可转换的 Zerg 模型源；飞龙、蟑螂仍使用 WH3 donor 模型/动作。需要提供合法 SC2 模型源后，才能继续做 M3→WH3 variantmesh/wsmodel/rigid_model_v2 转换。
 - 本体另有 `!!ia_all_factions.pack` 全派系补丁；该补丁只覆盖
   gou/leishou/cishe，不会覆盖新单位——如需全派系，可再做一个
   `czx` 全派系补丁（3318 行建筑表模式）。
@@ -79,5 +73,5 @@
 
 - SC2 风格的真实 3D 模型/variantmesh；当前仍使用 donor 模型和动作。
 - 专用 porthole / minspec porthole 图片。
-- 将飞龙弹射攻击、蟑螂酸性喷吐、凯瑞甘灵能技能进一步拆成独立 projectile/effect/character skill 链。
+- 将飞龙弹射攻击、蟑螂酸性喷吐进一步拆成独立 projectile/effect/character skill 链。
 - 若需要战役领主开局，再补 Empire startpos 或独立虫群 faction；当前领主版只接入 Unit Viewer/自定义战斗。

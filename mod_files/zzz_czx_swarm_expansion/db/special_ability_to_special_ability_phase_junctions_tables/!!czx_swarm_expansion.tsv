@@ -4,4 +4,3 @@ order	phase	special_ability	target_self	target_friends	target_enemies
 1	czx_ability_roach_regenerative_tissue	czx_ability_roach_regenerative_tissue	true	false	false
 1	czx_ability_zergling_adrenal_glands	czx_ability_zergling_adrenal_glands	true	false	false
 1	czx_ability_ultralisk_frenzied	czx_ability_ultralisk_frenzied	true	false	false
-1	czx_ability_kerrigan_psionic_presence	czx_ability_kerrigan_psionic_presence	true	false	false

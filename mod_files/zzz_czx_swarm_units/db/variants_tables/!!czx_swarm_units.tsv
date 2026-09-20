@@ -2,8 +2,6 @@
 #variants_tables;6;db/variants_tables/!!czx_swarm_units
 czx_feilong		czx_feilong		1.0	0.5	0.05	
 czx_zhanglang		czx_zhanglang		1.0	1.0	0.0	
-czx_kerrigan		czx_kerrigan		1.0	1.15	0.05	
-czx_kerrigan_lord		czx_kerrigan		1.0	1.15	0.05	
 czx_jibian		czx_jibian		1.0	1.0	0.05	
 czx_hd_green		czx_hd_green		1.0	1.0	0.05	
 czx_hd_white		czx_hd_white		1.0	1.0	0.05	

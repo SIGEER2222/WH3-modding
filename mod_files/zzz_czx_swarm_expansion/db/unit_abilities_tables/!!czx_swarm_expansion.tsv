@@ -4,4 +4,3 @@ czx_ability_mutalisk_regeneration	false	wh_main_unit_passive_regeneration		wh_ty
 czx_ability_roach_regenerative_tissue	false	wh_main_unit_passive_regeneration		wh_type_regeneration		wh_main_anc_group_common	false	false	passive		false
 czx_ability_zergling_adrenal_glands	false	wh_main_unit_passive_frenzy		wh_type_augment		wh_main_anc_group_uncommon	false	false	passive		false
 czx_ability_ultralisk_frenzied	false	wh_main_unit_passive_frenzy		wh_type_augment		wh_main_anc_group_uncommon	false	false	passive		false
-czx_ability_kerrigan_psionic_presence	false	wh_main_passive_aura_of_warding		wh_type_augment		wh_main_anc_group_rare	false	false	passive		false

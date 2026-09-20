@@ -4,7 +4,6 @@
 -1.0	positive	czx_ability_roach_regenerative_tissue		false	false	0.0	0.0	0.0	1.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0010000000474974513	0.0	false	0.0
 -1.0	positive	czx_ability_zergling_adrenal_glands		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
 -1.0	positive	czx_ability_ultralisk_frenzied		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
--1.0	positive	czx_ability_kerrigan_psionic_presence		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
 -1.0	positive	czx_ability_zergling_metabolic_boost		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
 -1.0	positive	czx_ability_hydralisk_grooved_spines		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0
 -1.0	positive	czx_ability_ultralisk_chitinous_plating		false	false	0.0	0.0	0.0	0.0	0	0	false	0.0	0.0	false	0				false	true	true	0.0			false	0.0	0.0	false	0.0

@@ -1,4 +1,0 @@
-﻿art_set_id	level	age	portrait	season	uniform	card	info	sea_uniform	navy_uniform	land_animation	sea_animation	navy_animation	id	land_animation_vfx_filter	sea_animation_vfx_filter	navy_animation_vfx_filter
-#campaign_character_arts_tables;0;db/campaign_character_arts_tables/!!czx_swarm_units													
-czx_kerrigan	0	0		none	czx_kerrigan			wh2_main_campaign_def_ship_agent	wh2_main_campaign_def_ship_agent	cam_lord_hu1b_elf_staff_and_sword	cam_light_ship_05	cam_light_ship_05	789900111	0	0	0
-czx_kerrigan_lord	0	0		none	czx_kerrigan_lord			wh2_main_campaign_def_ship_agent	wh2_main_campaign_def_ship_agent	cam_lord_hu1b_elf_staff_and_sword	cam_light_ship_05	cam_light_ship_05	789900112	0	0	0
