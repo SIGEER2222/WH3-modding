@@ -1,3 +1,29 @@
+## 2026-09-21 跨表悬空引用审计器 + 静态修复一批 + playset/AppData 卫生
+
+1. 新增 `tools/audit_dangling_refs.py`：对 `mod_files/` 全量做跨表悬空引用审计——自动从 vanilla gamedata 推断外键（源列值集 ⊆ 目标唯一列），另有 variantmesh 文件存在性、loc key 精确匹配（表名前缀按原版约定）、`show_advice`→advice_threads、battle_skeletons 声明、TSV 列数一致性等检查；报告落 `scratch/audit_dangling_refs_report.tsv`。最终 0 ERROR / 126 WARN（WARN 多为上游工坊包提供的 key 或归档测试包）。
+2. 据此修复：`zzz_czx_swarm_units` 补 `battle_skeletons_tables`（czx_marine/ms/dehaka1/stank01，按 donor 骨架 humanoid01/crab01/humanoid11b/steamtank01 复制改名，节点字段为前缀语义）+ `skv_chongzu` unit_set/`chong_zu` grouping/loc；swarm_expansion projectiles 行去掉多余尾列；cth 龙弩 elite/vanguard 补 `units_onscreen_name_*` loc；pokemon `fear/terror`→`causes_fear/causes_terror`（vanilla 属性名，原先静默失效）；digimon 权限表 `wh3_main_cth_the_northern_provinces`→`the_western_provinces`。
+3. `tools/build_pack.py zzz_czx_swarm_units --deploy` 重打部署为 `zzz_czx_swarm_units.pack`（含骨架声明）；playset 手术：删除新条目复位的 pos116 行与 pos54 旧 `units3` 行指向互换、删 2 个 pack 已消失的死引用（wyccc 汉化补全×2，内容以 `data\text\` 散 loc 存活），重排 position，同步 `enabled_order`——117→114 项、0 重复、0 missing。旧 `zzz_czx_swarm_units3.pack/.png` 移入 `scratch/prefs_backup_20260921/`。
+4. §10.14 同类复发实例：`.singleplayer.battle_preferences` 缓存军表又含已删除的 `czx_kerrigan` 与不在 playset 的 `pkm_025_pikachu`——已备份至 `scratch/prefs_backup_20260921/` 并删除（连同 `army_setups` 残留），游戏 06:29 重建的 prefs 只剩 vanilla key。**自造单位改名/删除时必须同步清 AppData 军表缓存**这条再次验证。
+5. DLC 补丁核对：`E:\Download\战锤III 8.0 dlc未加密补丁` 三件套与游戏目录完全一致（`steam_api64.dll`=980ea8cc cream 版、`steam_api64_o.dll`=40d0ae44 原版备份、`cream_api.ini` 相同），8.0 重装后补丁实际已就位，无需覆盖。
+6. 新工具 `scratch/mdmp_exc.py`：解析 .mdmp ExceptionStream 拿内层异常码/地址并按 ModuleList 基址换算 exe 偏移——比 stack.txt（只有模块名）信息量大，崩溃归因第一步。
+7. 遗留：`+0x1a0be3b` 在重装后、清 prefs、降画质后仍出现（zz_pkm 四分片 dbonly/animonly/nobin 同签名全崩，noanim 存活但同时段有 dump，基线对照待补）——若空 modlist 基线仍同签名崩，收敛到环境层（QQPinyin TSF/cream_api 对 8.0 兼容性）继续查。
+
+
+
+1. 09-21 01:03–06:39 约 80 个 dump，外层签名恒为 `Application Error 1000 / 0xc0000409 @ Warhammer3.exe+0x10da8f1`，异常流无内层 `0xc0000005`，`ExceptionParameters[0]=0x7`(`FAST_FAIL_FATAL_APP_EXIT`)——进程主动 fail-fast，与 §10.14/10.18 的空指针路径不同。
+2. 定案：每次崩溃同一秒命中 System `Event 2004`（内存资源耗尽），`Warhammer3.exe` 提交 40.5–46.5GB；本机物理内存 15.8GB、pagefile 40/48GB、提交上限约 63.8GB，另有 Devin/steamwebhelper 等占用数 GB。
+3. 触发开关：`preferences.script.txt` 被写成 `minimise_memory_usage false` + `gfx_texture_quality 3` + `gfx_unit_size 3`；通过全验证矩阵的 `preferences.script.txt.bak_reinstall_test` 是 `true` + `2`。已把 `minimise_memory_usage` 改回 `true`（备份 `preferences.script.txt.bak_20260921_065145`）。
+4. 归因文档新增 §10.19，判据固化：**先看 System 2004**，命中即 OOM，不要去二分 pack；无 2004 才回退到悬空单位 key / 缺 battle_skeletons 路线。
+
+## 2026-09-21 二次修正：只开 `minimise_memory_usage` 不足以救 OOM，必须同时降贴图/单位档位
+
+1. 反例：06:29–06:49 批次崩溃时 `minimise_memory_usage` 已是 true，但 `gfx_texture_quality`/`gfx_unit_size`/`gfx_unit_quality` 仍为 3(ultra)，`Warhammer3.exe` 照样提交 43.3/43.8/47.1GB 并被 Event 2004 判死——自造单位 pack 的 dds（swarm 170MB + digimon 69MB）单独就能吃光降内存后的余量。
+2. 键名修正：减负要动 `gfx_unit_size`（单位规模）与 `gfx_unit_quality`（单位细节）两个独立键，只改其中一个不够。
+3. 内层签名不唯一：本批同时出现 `0xe06d7363`(bad_alloc) 与 `0xc0000005 @ 0x14182fb2b`，都是同一 OOM 的不同落点；归因以 Event 2004 是否同秒为准，纠正 §10.11 表里把两行分开列的印象。
+4. 新增可复用工具 `tools/set_memory_safe_prefs.py [--level 2|1] [--dry]`：幂等把上述键设为安全值并备份 `.bak_*`，装机/画质被重置后跑一次即可。
+5. 写入时机坑：游戏实例运行中改 `preferences.script.txt`，其干净退出会把内存旧值写回文件、静默覆盖改动（实测 01:32 的 false 在 06:48 实例退出后变 true）；应在游戏关闭后改并复查，崩溃退出则不写盘。
+6. 归因文档 §10.19 追加修正小节；本次已把全部档位降到 level 2 并备份 `preferences.script.txt.bak_20260921_oom`。
+
 ## 2026-09-20 全局 Lua 回调护栏与原生崩溃边界
 
 1. 新增 `zzz_czx_global_lua_guard`：在 campaign/battle 脚本环境中尽早包住 `core:add_listener`，并尝试包住 `cm/bm` 的 callback 注册；异常按 tag 限流记录后返回，避免单个 Lua 回调中断事件泵。
