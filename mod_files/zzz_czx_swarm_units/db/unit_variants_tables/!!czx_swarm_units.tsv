@@ -1,7 +1,9 @@
 ﻿faction	name	unit	variant	unit_card
-#unit_variants_tables;5;db/unit_variants_tables/!!czx_swarm_units
+#unit_variants_tables;5;db/unit_variants_tables/!!czx_swarm_units				
 	czx_feilong	czx_feilong	czx_feilong	czx_feilong
 	czx_zhanglang	czx_zhanglang	czx_zhanglang	czx_zhanglang
+	czx_kerrigan	czx_kerrigan	czx_kerrigan	czx_kerrigan
+	czx_kerrigan_lord	czx_kerrigan_lord	czx_kerrigan_lord	czx_kerrigan_lord
 	czx_jibian	czx_jibian	czx_jibian	czx_jibian
 	czx_hd_green	czx_hd_green	czx_hd_green	czx_hd_green
 	czx_hd_white	czx_hd_white	czx_hd_white	czx_hd_white

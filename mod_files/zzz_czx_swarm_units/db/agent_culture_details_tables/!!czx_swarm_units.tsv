@@ -1,0 +1,4 @@
+﻿agent	culture	associated_unit	key	season	level	agent_recruited_movie	gender	icon	small_icon	recruitable_in_ui
+#agent_culture_details_tables;9;db/agent_culture_details_tables/!!czx_swarm_units										
+wizard	wh_main_emp_empire	czx_kerrigan	789900001		0		f		ui/campaign ui/agents/wh_main_wizard.png	true
+general	wh_main_emp_empire	czx_kerrigan_lord	789900002		0		f		ui/campaign ui/agents/wh_main_wizard.png	true

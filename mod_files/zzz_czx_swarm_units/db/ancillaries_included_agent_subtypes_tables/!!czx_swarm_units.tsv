@@ -1,0 +1,4 @@
+﻿agent_subtype	ancillary
+#ancillaries_included_agent_subtypes_tables;0;db/ancillaries_included_agent_subtypes_tables/!!czx_swarm_units	
+czx_kerrigan	czx_kerrigan_blades
+czx_kerrigan_lord	czx_kerrigan_blades

@@ -1,0 +1,10 @@
+﻿child_key	initial_descent_tiers	parent_key	parent_link_position	child_link_position	parent_link_position_offset	child_link_position_offset	link_type
+#character_skill_node_links_tables;3;db/character_skill_node_links_tables/!!czx_swarm_units							
+czx_skill_node_kerrigan_psionic_storm	0	czx_skill_node_kerrigan_psionic_lash	1	1	0.0	0.0	REQUIRED
+czx_skill_node_kerrigan_assimilation	0	czx_skill_node_kerrigan_psionic_storm	1	1	0.0	0.0	REQUIRED
+czx_skill_node_kerrigan_evolution_ii	0	czx_skill_node_kerrigan_evolution_i	1	1	0.0	0.0	REQUIRED
+czx_skill_node_kerrigan_evolution_iii	0	czx_skill_node_kerrigan_evolution_ii	1	1	0.0	0.0	REQUIRED
+czx_skill_node_kerrigan_crushing_grip	0	czx_skill_node_kerrigan_psionic_blast	1	1	0.0	0.0	REQUIRED
+czx_skill_node_kerrigan_immobilization_wave	0	czx_skill_node_kerrigan_crushing_grip	1	1	0.0	0.0	REQUIRED
+czx_skill_node_kerrigan_mend	0	czx_skill_node_kerrigan_immobilization_wave	1	1	0.0	0.0	REQUIRED
+czx_skill_node_kerrigan_wild_mutation	0	czx_skill_node_kerrigan_mend	1	1	0.0	0.0	REQUIRED

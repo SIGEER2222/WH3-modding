@@ -1,7 +1,9 @@
 ﻿exclude	unit_caste	unit_category	unit_class	unit_record	unit_set
-#unit_set_to_unit_junctions_tables;1;db/unit_set_to_unit_junctions_tables/!!czx_swarm_units
+#unit_set_to_unit_junctions_tables;1;db/unit_set_to_unit_junctions_tables/!!czx_swarm_units					
 false				czx_feilong	skv_chongzu
 false				czx_zhanglang	skv_chongzu
+false				czx_kerrigan	skv_chongzu
+false				czx_kerrigan_lord	skv_chongzu
 false				czx_jibian	skv_chongzu
 false				czx_hd_green	skv_chongzu
 false				czx_hd_white	skv_chongzu

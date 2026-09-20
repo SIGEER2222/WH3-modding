@@ -1,0 +1,15 @@
+<VARIANT_MESH>
+	<SLOT name="body" >
+		<VARIANT_MESH model="variantmeshes/wh_variantmodels/hu1e/kerrigan/kerrigan_base_0/kerrigan_base_0.wsmodel" >
+			<META_DATA>audio_entity_type:wh3_sla_cultist_LH</META_DATA>
+			<META_DATA>audio_armour_type:body</META_DATA>
+			<META_DATA>audio_melee_weapon_type:unarmed</META_DATA>
+		</VARIANT_MESH>
+	</SLOT>
+	<SLOT name="weapon_1" attach_point="be_prop_0" />
+	<SLOT name="weapon_2" attach_point="be_prop_1" />
+	<SLOT name="weapon_3" attach_point="be_prop_2" />
+	<SLOT name="weapon_4" attach_point="be_prop_3" />
+	<SLOT name="weapon_5" attach_point="be_prop_4" />
+	<SLOT name="weapon_6" attach_point="be_prop_5" />
+</VARIANT_MESH>
