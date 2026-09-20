@@ -1,0 +1,15 @@
+{
+  "title": "战役一日（演示剧本：外交+围城+领主+机制）",
+  "steps": [
+    { "event": "turn_start", "ctx": { "speaker": "settra" } },
+    { "event": "war_declared", "ctx": { "speaker": "skarbrand", "race": "khorne_daemon", "target_race": "kislev" } },
+    { "event": "chaos_rift", "ctx": { "region": "kislev" } },
+    { "event": "siege_started", "ctx": { "location": "naggarond" } },
+    { "event": "treaty_broken", "ctx": { "race": "skaven", "faction": "clan_mors" } },
+    { "event": "agent_report", "ctx": { "outcome": "success" } },
+    { "event": "lord_died", "ctx": { "lord": "某矮人督军", "location": "八峰山" } },
+    { "event": "quest_completed", "ctx": { "lord": "Belegar", "quest": "先祖之证" } },
+    { "event": "treasury_low", "ctx": {} },
+    { "event": "world_tick", "ctx": {} }
+  ]
+}

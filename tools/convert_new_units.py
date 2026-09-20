@@ -18,6 +18,8 @@ from convert_zerg_assets import MAT_TEMPLATE, WSMODEL, VMD
 
 ROOT = Path(r"E:\Code\WH3-modding")
 MOD = ROOT / "mod_files" / "zzz_czx_swarm_units"
+if '--mod' in sys.argv:
+    MOD = ROOT / "mod_files" / sys.argv[sys.argv.index('--mod') + 1]
 OUT = Path(r"E:\Code\WH3-modding\tools\_out")
 DONOR = Path(r"E:\Code\WH3-modding\tools\_donor\files")
 TEXCONV = Path(r"E:\Code\WH3-modding\tools\texconv.exe")
@@ -74,12 +76,13 @@ UNITS = [
          model_name="czx_baochong_01",
          audio_entity="wh2_tmb_scorpion", audio_armour="chitin",
          vmd_slots_extra=""),
-    dict(key="czx_mangshou", glb="mangshou_skinned.glb",
+    dict(key="czx_mangshou", glb="mangshou_czx_bound.glb",
          src_glb=r"E:\Download\莽兽.glb",
-         skel=r"E:\Code\WH3-modding\tools\_skel\crab01.json",
+         skel=r"E:\Code\WH3-modding\scratch\skel_czx_mangshou.json",
          donor_rmv2="cst_promethean_body_01.rigid_model_v2",
          pack_dir=r"variantmeshes\wh_variantmodels\cr1\czx\czx_mangshou",
          model_name="czx_mangshou_01",
+         rmv2_skel_name="czx_ms",
          audio_entity="wh2_tmb_scorpion", audio_armour="chitin",
          vmd_slots_extra=""),
     dict(key="czx_baolongshou", glb="baolongshou_skinned.glb",
@@ -99,12 +102,13 @@ UNITS = [
          rmv2_skel_name="czx_stank01",
          audio_entity="wh_war_machine_steamtank", audio_armour="heavy_metal",
          vmd_slots_extra=""),
-    dict(key="czx_dehaka", glb="dehaka_skinned.glb",
+    dict(key="czx_dehaka", glb="dehaka_czx_bound.glb",
          src_glb=r"E:\Download\德哈卡.glb",
-         skel=r"E:\Code\WH3-modding\tools\_skel\humanoid11b.json",
+         skel=r"E:\Code\WH3-modding\scratch\skel_czx_dehaka.json",
          donor_rmv2="bst_ghorgon_01.rigid_model_v2",
          pack_dir=r"variantmeshes\wh_variantmodels\hu11b\czx\czx_dehaka",
          model_name="czx_dehaka_01",
+         rmv2_skel_name="czx_dehaka1",
          audio_entity="wh2_tmb_scorpion", audio_armour="chitin",
          vmd_slots_extra=""),
     dict(key="czx_inf_diamondback", glb="inf_diamondback_skinned.glb",
@@ -114,6 +118,15 @@ UNITS = [
          pack_dir=r"variantmeshes\wh_variantmodels\sp1\czx\czx_inf_diamondback",
          model_name="czx_inf_diamondback_01",
          audio_entity="wh2_tmb_scorpion", audio_armour="chitin",
+         vmd_slots_extra=""),
+    dict(key="czx_dgm_wargreymon", glb="wargreymon_wgm001_bound.glb",
+         src_glb=r"E:\Code\WH3-modding\scratch\wargreymon.glb",
+         skel=r"E:\Code\WH3-modding\scratch\salzaar_digimon\skel_czx_wgm001.json",
+         donor_rmv2="emp_greatswords_body_01.rigid_model_v2",
+         pack_dir=r"variantmeshes\wh_variantmodels\hu1\czx\czx_dgm_wargreymon",
+         model_name="czx_dgm_wargreymon_01",
+         rmv2_skel_name="czx_wgm001",
+         audio_entity="wh2_tmb_scorpion", audio_armour="heavy_metal",
          vmd_slots_extra=""),
     dict(key="czx_inf_marine", glb="marine_czx_bound.glb",
          src_glb=r"E:\Download\被感染的枪兵.glb",
@@ -149,90 +162,100 @@ def extract_glb_textures(glb_path):
     return out
 
 
-def convert():
+def convert_unit(u):
     import subprocess
-    only = set(sys.argv[1:])
+    print('=' * 20, u['key'])
+    donor = parse_rmv2(DONOR / u['donor_rmv2'])
+    donor_model = donor['models'][0][0]
+
+    pos, nrm, uv, tan, idx, bone_idx, weights = glb_mesh(
+        Path(u.get('glb_path', OUT / u['glb'])), u['skel'])
+
+    pos_r = pos.copy(); pos_r[:, 0] *= -1
+    nrm_r = nrm.copy(); nrm_r[:, 0] *= -1
+    tan_r = tan.copy() if tan is not None else None
+    if tan_r is not None:
+        tan_r[:, 0] *= -1
+
+    d = donor_model['material']
+    d['textures'] = [(t, p) for t, p in d['textures']]
+    texdir = u['pack_dir'].replace('\\', '/') + '/tex'
+    new_tex = []
+    texbase = u['model_name']
+    for ttype, _ in d['textures']:
+        if ttype == 27:
+            new_tex.append((ttype, f"{texdir}/{texbase}_base_colour.dds"))
+        elif ttype == 1:
+            new_tex.append((ttype, f"{texdir}/{texbase}_normal.dds"))
+        elif ttype == 29:
+            new_tex.append((ttype, f"{texdir}/{texbase}_material_map.dds"))
+        elif ttype == 11:
+            new_tex.append((ttype, f"{texdir}/{texbase}_specular.dds"))
+        elif ttype == 3:
+            new_tex.append((ttype, f"{texdir}/{texbase}_mask.dds"))
+        else:
+            new_tex.append((ttype, f"{texdir}/{texbase}_base_colour.dds"))
+    d['tex_dir'] = texdir
+    d['textures'] = new_tex
+    d['model_name'] = u['model_name']
+
+    out_dir = MOD / u['pack_dir']
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rmv2_path = out_dir / (u['model_name'] + '.rigid_model_v2')
+    write_rmv2_v8(rmv2_path, u.get('rmv2_skel_name', donor['skeleton']),
+                  (pos_r, nrm_r, uv, tan_r, idx, bone_idx, weights),
+                  donor_model, lod_levels=1)
+
+    tex_dir = out_dir / 'tex'
+    tex_dir.mkdir(exist_ok=True)
+    imgs = extract_glb_textures(u['src_glb'])
+    if u.get('tex_override'):
+        imgs['base'] = Image.open(u['tex_override']).convert('RGBA')
+    pngs = {
+        f"{texbase}_base_colour": imgs.get('base', Image.new('RGBA', (16, 16), (255, 0, 255, 255))),
+        f"{texbase}_normal": imgs.get('normal', Image.new('RGBA', (16, 16), (128, 128, 255, 255))),
+        f"{texbase}_material_map": imgs.get('mr', Image.new('RGBA', (16, 16), (128, 128, 128, 255))),
+        f"{texbase}_mask": Image.new('RGBA', (16, 16), (0, 0, 0, 255)),
+        f"{texbase}_specular": Image.new('RGBA', (16, 16), (64, 64, 64, 255)),
+    }
+    for name, im in pngs.items():
+        im.save(tex_dir / (name + '.png'))
+    for name in pngs:
+        subprocess.run(
+            [str(TEXCONV), '-f', 'BC7_UNORM', '-y', '-o', str(tex_dir),
+             str(tex_dir / (name + '.png'))], check=True, capture_output=True)
+        (tex_dir / (name + '.png')).unlink()
+
+    mat_dir = out_dir / 'materials'
+    mat_dir.mkdir(exist_ok=True)
+    mat_name = f"{texbase}_weighted4_alpha_off.xml.material"
+    (mat_dir / mat_name).write_text(
+        MAT_TEMPLATE.format(name=mat_name[:-len('.material')],
+                            texdir=u['pack_dir'] + r'\tex', base=texbase),
+        encoding='utf-8')
+    (out_dir / (u['model_name'] + '.wsmodel')).write_text(
+        WSMODEL.format(geom=u['pack_dir'] + '\\' + u['model_name'] + '.rigid_model_v2',
+                       mat=u['pack_dir'] + '\\materials\\' + mat_name),
+        encoding='utf-8')
+    vmd_dir = MOD / 'variantmeshes' / 'variantmeshdefinitions'
+    vmd_dir.mkdir(parents=True, exist_ok=True)
+    (vmd_dir / (u['key'] + '.variantmeshdefinition')).write_text(
+        VMD.format(wsmodel=u['pack_dir'] + '\\' + u['model_name'] + '.wsmodel',
+                   aent=u['audio_entity'], aarm=u['audio_armour'],
+                   extra=u['vmd_slots_extra']),
+        encoding='utf-8')
+    print('wrote resources under', out_dir)
+
+
+def convert():
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
+    if '--mod' in sys.argv:
+        args.remove(sys.argv[sys.argv.index('--mod') + 1])
+    only = set(args)
     for u in UNITS:
         if only and u['key'] not in only:
             continue
-        print('=' * 20, u['key'])
-        donor = parse_rmv2(DONOR / u['donor_rmv2'])
-        donor_model = donor['models'][0][0]
-
-        pos, nrm, uv, tan, idx, bone_idx, weights = glb_mesh(OUT / u['glb'], u['skel'])
-
-        pos_r = pos.copy(); pos_r[:, 0] *= -1
-        nrm_r = nrm.copy(); nrm_r[:, 0] *= -1
-        tan_r = tan.copy() if tan is not None else None
-        if tan_r is not None:
-            tan_r[:, 0] *= -1
-
-        d = donor_model['material']
-        d['textures'] = [(t, p) for t, p in d['textures']]
-        texdir = u['pack_dir'].replace('\\', '/') + '/tex'
-        new_tex = []
-        texbase = u['model_name']
-        for ttype, _ in d['textures']:
-            if ttype == 27:
-                new_tex.append((ttype, f"{texdir}/{texbase}_base_colour.dds"))
-            elif ttype == 1:
-                new_tex.append((ttype, f"{texdir}/{texbase}_normal.dds"))
-            elif ttype == 29:
-                new_tex.append((ttype, f"{texdir}/{texbase}_material_map.dds"))
-            elif ttype == 11:
-                new_tex.append((ttype, f"{texdir}/{texbase}_specular.dds"))
-            elif ttype == 3:
-                new_tex.append((ttype, f"{texdir}/{texbase}_mask.dds"))
-            else:
-                new_tex.append((ttype, f"{texdir}/{texbase}_base_colour.dds"))
-        d['tex_dir'] = texdir
-        d['textures'] = new_tex
-        d['model_name'] = u['model_name']
-
-        out_dir = MOD / u['pack_dir']
-        out_dir.mkdir(parents=True, exist_ok=True)
-        rmv2_path = out_dir / (u['model_name'] + '.rigid_model_v2')
-        write_rmv2_v8(rmv2_path, u.get('rmv2_skel_name', donor['skeleton']),
-                      (pos_r, nrm_r, uv, tan_r, idx, bone_idx, weights),
-                      donor_model, lod_levels=1)
-
-        tex_dir = out_dir / 'tex'
-        tex_dir.mkdir(exist_ok=True)
-        imgs = extract_glb_textures(u['src_glb'])
-        pngs = {
-            f"{texbase}_base_colour": imgs.get('base', Image.new('RGBA', (16, 16), (255, 0, 255, 255))),
-            f"{texbase}_normal": imgs.get('normal', Image.new('RGBA', (16, 16), (128, 128, 255, 255))),
-            f"{texbase}_material_map": imgs.get('mr', Image.new('RGBA', (16, 16), (128, 128, 128, 255))),
-            f"{texbase}_mask": Image.new('RGBA', (16, 16), (0, 0, 0, 255)),
-            f"{texbase}_specular": Image.new('RGBA', (16, 16), (64, 64, 64, 255)),
-        }
-        for name, im in pngs.items():
-            im.save(tex_dir / (name + '.png'))
-        for name in pngs:
-            subprocess.run(
-                [str(TEXCONV), '-f', 'BC7_UNORM', '-y', '-o', str(tex_dir),
-                 str(tex_dir / (name + '.png'))], check=True, capture_output=True)
-            (tex_dir / (name + '.png')).unlink()
-
-        mat_dir = out_dir / 'materials'
-        mat_dir.mkdir(exist_ok=True)
-        mat_name = f"{texbase}_weighted4_alpha_off.xml.material"
-        (mat_dir / mat_name).write_text(
-            MAT_TEMPLATE.format(name=mat_name[:-len('.material')],
-                                texdir=u['pack_dir'] + r'\tex', base=texbase),
-            encoding='utf-8')
-        (out_dir / (u['model_name'] + '.wsmodel')).write_text(
-            WSMODEL.format(geom=u['pack_dir'] + '\\' + u['model_name'] + '.rigid_model_v2',
-                           mat=u['pack_dir'] + r'\materials\\' + mat_name),
-            encoding='utf-8')
-        vmd_dir = MOD / 'variantmeshes' / 'variantmeshdefinitions'
-        vmd_dir.mkdir(parents=True, exist_ok=True)
-        (vmd_dir / (u['key'] + '.variantmeshdefinition')).write_text(
-            VMD.format(wsmodel=u['pack_dir'] + '\\' + u['model_name'] + '.wsmodel',
-                       aent=u['audio_entity'], aarm=u['audio_armour'],
-                       extra=u['vmd_slots_extra']),
-            encoding='utf-8')
-        print('wrote resources under', out_dir)
+        convert_unit(u)
 
 
 if __name__ == '__main__':

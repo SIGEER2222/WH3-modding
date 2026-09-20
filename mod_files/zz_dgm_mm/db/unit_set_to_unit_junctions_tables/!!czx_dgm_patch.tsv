@@ -1,0 +1,4 @@
+exclude	unit_caste	unit_category	unit_class	unit_record	unit_set
+#unit_set_to_unit_junctions_tables;1;db/unit_set_to_unit_junctions_tables/!!czx_dgm_patch
+false				czx_dgm_agumon	skv_chongzu
+false				czx_dgm_gabumon	skv_chongzu

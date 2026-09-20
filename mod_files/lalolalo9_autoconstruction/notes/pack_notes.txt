@@ -1,0 +1,1 @@
+Lalolalo9 自动建设 MOD 的本地修改版：把开关 Lalolalo9AutoConstructionEnabled 默认值 0→1，新存档默认开启回合自动建设+升级，不用再每档手动启用；存档里手动关过的仍保持关。原包备份在 scratch/Lalolalo9Autoconstruction.pack.bak。

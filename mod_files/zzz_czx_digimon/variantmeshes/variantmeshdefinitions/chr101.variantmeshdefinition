@@ -1,0 +1,5 @@
+<VARIANT_MESH>
+	<SLOT name="body" >
+		<VARIANT_MESH model="variantmeshes/wh_variantmodels/hu1/chr101/chr101.rigid_model_v2"  imposter_model="variantmeshes/wh_variantmodels/hu1/chr101/chr101.rigid_model_v2" />
+	</SLOT>
+</VARIANT_MESH>

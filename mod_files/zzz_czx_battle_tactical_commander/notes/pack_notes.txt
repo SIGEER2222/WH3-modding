@@ -1,0 +1,1 @@
+战斗托管 AI v2：战旗式战术指挥器 + telemetry probe。阵容评估/双向克制/目标决策层 + Phase 2c delegated 状态机；含探针脚本，进局即采集 API 实测数据（CZX_PROBE / CZX 日志前缀）。

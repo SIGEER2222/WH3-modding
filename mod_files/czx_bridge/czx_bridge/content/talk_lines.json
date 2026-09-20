@@ -1,0 +1,414 @@
+{
+  "name": "czx_talk",
+  "description": "台本条目：kind=line 的被注入 UI；cond 为游戏条件。keys=事件类型；secondary_keys=附加条件。",
+  "scan_depth": 5,
+  "token_budget": 200,
+  "recursive_scanning": false,
+  "extensions": {},
+  "entries": [
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["skarbrand"],
+      "selective": true, "enabled": true,
+      "content": "血。血。血。——斯卡布兰德为你而来。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "skarbrand", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["skarbrand", "kislev"],
+      "selective": true, "enabled": true,
+      "content": "冰会化。血不会。颅座等着你们的沙皇。",
+      "insertion_order": 90, "priority": 70,
+      "extensions": { "czx": { "kind": "line", "speaker": "skarbrand", "channel": "dilemma", "cond": { "target_race": "kislev" } } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["malekith"],
+      "selective": true, "enabled": true,
+      "content": "纳迦隆德的耐心已到尽头。你的王座、你的土地、你的性命——不过是迟到的税。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "malekith", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["malekith", "high_elf"],
+      "selective": true, "enabled": true,
+      "content": "伪王的余孽。奥苏安的白塔将在黑旗下低头——这一次，不会再有圣火拦住我。",
+      "insertion_order": 80, "priority": 90,
+      "extensions": { "czx": { "kind": "line", "speaker": "malekith", "channel": "dilemma", "cond": { "target_race": "high_elf" } } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["thorgrim", "skaven"],
+      "selective": true, "enabled": true,
+      "content": "八峰山的每一笔账，今天开始清。鼠辈，把头洗干净。",
+      "insertion_order": 80, "priority": 90,
+      "extensions": { "czx": { "kind": "line", "speaker": "thorgrim", "channel": "dilemma", "cond": { "target_race": "skaven" } } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["thorgrim"],
+      "selective": true, "enabled": true,
+      "content": "卡拉克·安科的史官已备好新页。你们族名，将写进仇恨之书最厚的一章。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "thorgrim", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["settra"],
+      "selective": true, "enabled": true,
+      "content": "赛特拉宣你之罪。你的城归于朕，你的名归于沙。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "settra", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["queek"],
+      "selective": true, "enabled": true,
+      "content": "嘻嘻嘻——砍头者来收租了，人玩意！你的头，会放在好位置，yes-yes！",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "queek", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["katarin"],
+      "selective": true, "enabled": true,
+      "content": "祖国母亲不需要多余的敌人。但寒冬既然来了——基斯里夫从不在雪里低头。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "katarin", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["miao_ying"],
+      "selective": true, "enabled": true,
+      "content": "天命所归，不在刀兵；然长垣之内，不容豺狼。战书已至，便应这场劫。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "miao_ying", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["mannfred"],
+      "selective": true, "enabled": true,
+      "content": "活人总以为宣战是开始。对不死者而言，你们只是把自己的死期提前了一页。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "mannfred", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["ikit_claw"],
+      "selective": true, "enabled": true,
+      "content": "宣战-宣战！正好缺实验样本，yes-yes！次元石的账，用你们的城来结！",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "ikit_claw", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"],
+      "secondary_keys": ["chaos"],
+      "selective": true, "enabled": true,
+      "content": "诸神已厌倦等待。献上你的城与颅骨，或献上你的哀嚎——都一样。",
+      "insertion_order": 110, "priority": 30,
+      "extensions": { "czx": { "kind": "line", "speaker": "*", "race": "chaos", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["battle_start"],
+      "secondary_keys": ["thorgrim", "queek"],
+      "selective": true, "enabled": true,
+      "content": "Thorgrim: 八峰山的账，今天当面算。\nQueek: 嘿嘿，砍头者的架子上，正好缺一顶至高王的王冠，yes-yes！",
+      "insertion_order": 80, "priority": 90,
+      "extensions": { "czx": { "kind": "line", "speaker": "duo", "channel": "battle_bark", "cond": { "rival_pair": ["thorgrim", "queek"] } } }
+    },
+    {
+      "keys": ["battle_start"],
+      "secondary_keys": ["malekith", "tyrion"],
+      "selective": true, "enabled": true,
+      "content": "Malekith: 守护者。你守护的东西，从出生起就是我的。\nTyrion: 巫王。你母亲的信使昨天还在求援——这就是你的王威？",
+      "insertion_order": 80, "priority": 90,
+      "extensions": { "czx": { "kind": "line", "speaker": "duo", "channel": "battle_bark", "cond": { "rival_pair": ["malekith", "tyrion"] } } }
+    },
+    {
+      "keys": ["battle_start"],
+      "secondary_keys": ["skarbrand"],
+      "selective": true, "enabled": true,
+      "content": "杀！！全部杀光！颅座不收懦夫的骨！",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "skarbrand", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"],
+      "secondary_keys": ["settra"],
+      "selective": true, "enabled": true,
+      "content": "跪者免死。赛特拉今日心情尚可。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "settra", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["city_lost"],
+      "secondary_keys": ["belegar"],
+      "selective": true, "enabled": true,
+      "content": "安格朗德氏族的誓言，今日在石与血中偿清。八峰山——回家了。",
+      "insertion_order": 70, "priority": 95,
+      "extensions": { "czx": { "kind": "line", "speaker": "belegar", "channel": "dilemma", "cond": { "location": "eight_peaks", "side": "victor" } } }
+    },
+    {
+      "keys": ["city_lost"],
+      "enabled": true,
+      "content": "巫王的黑城燃起火光。纳迦隆德的千年傲慢，今夜矮了一截。",
+      "insertion_order": 70, "priority": 85,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "event_feed", "cond": { "location": "naggarond" } } }
+    },
+    {
+      "keys": ["city_lost"],
+      "secondary_keys": ["malekith"],
+      "selective": true, "enabled": true,
+      "content": "烧吧。我曾从圣火里走出来过——灰烬里再站起来一次的，永远是我。",
+      "insertion_order": 65, "priority": 90,
+      "extensions": { "czx": { "kind": "line", "speaker": "malekith", "channel": "dilemma", "cond": { "location": "naggarond", "side": "loser" } } }
+    },
+    {
+      "keys": ["world_tick"],
+      "enabled": true,
+      "content": "远方传来消息：{lord} 的军团仍在 {region} 鏖战，胜负未分。",
+      "insertion_order": 120, "priority": 20,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "event_feed", "template": true } }
+    },
+    {
+      "keys": ["world_tick"],
+      "enabled": true,
+      "content": "吟游诗人已在传唱 {lord} 的事迹；酒馆里没人信，但人人都在听。",
+      "insertion_order": 120, "priority": 20,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "event_feed", "template": true } }
+    },
+    {
+      "keys": ["world_tick"],
+      "enabled": true,
+      "content": "据斥候报，{region} 上空出现了不祥的裂缝之光，牧民已逃离。",
+      "insertion_order": 120, "priority": 20,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "event_feed", "template": true } }
+    },
+
+    {
+      "keys": ["war_declared"], "secondary_keys": ["karl_franz"], "selective": true, "enabled": true,
+      "content": "帝国的耐心不是没有限度的。你既已越过它——西格玛见证，此战由你挑起。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "karl_franz", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["grimgor"], "selective": true, "enabled": true,
+      "content": "宣战？好！俺最横的小子们正好闲着！",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "grimgor", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["tyrion"], "selective": true, "enabled": true,
+      "content": "奥苏安不主动寻求战争，但从不回避守护。你选择了这条路。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "tyrion", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["archaon"], "selective": true, "enabled": true,
+      "content": "终结已经开始。你的宣战只是替自己签了日期。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "archaon", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["greasus"], "selective": true, "enabled": true,
+      "content": "宣战？好生意。你的城、你的牲口、你的人——全部计入本次收入。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "greasus", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["ku_gath"], "selective": true, "enabled": true,
+      "content": "战争会让双方贴得很近——近到足够分享祖父的礼物。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "ku_gath", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["kairos"], "selective": true, "enabled": true,
+      "content": "你的宣战写在昨天的剧本里。你的败北写在明天的。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "kairos", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["nkari"], "selective": true, "enabled": true,
+      "content": "战争是最甜的诱惑。来，让我看看你能忍到第几次心跳。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "nkari", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["louen"], "selective": true, "enabled": true,
+      "content": "以湖之女神之名，巴托尼亚接下你的战书——骑士的枪尖只向不义。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "louen", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["snikch"], "selective": true, "enabled": true,
+      "content": "宣战文件？不需要。你的将军们会替我们宣布——以讣告的形式，yes-yes。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "snikch", "channel": "dilemma" } }
+    },
+    {
+      "keys": ["war_declared"], "secondary_keys": ["belegar"], "selective": true, "enabled": true,
+      "content": "安格朗德氏族不拒绝战争——尤其是通往八峰山方向的那种。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "belegar", "channel": "dilemma" } }
+    },
+
+    {
+      "keys": ["battle_start"], "secondary_keys": ["karl_franz"], "selective": true, "enabled": true,
+      "content": "士兵们！身后是帝国，身前是敌人——把界线画清楚。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "karl_franz", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"], "secondary_keys": ["louen"], "selective": true, "enabled": true,
+      "content": "以湖之女神之名！骑士们，冲锋的荣誉属于巴托尼亚！",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "louen", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"], "secondary_keys": ["greasus"], "selective": true, "enabled": true,
+      "content": "对面看着都能吃。开火前先想想哪块最肥。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "greasus", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"], "secondary_keys": ["ikit_claw"], "selective": true, "enabled": true,
+      "content": "所有武器——全部过载！引爆引爆引爆，yes-yes！",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "ikit_claw", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"], "secondary_keys": ["katarin"], "selective": true, "enabled": true,
+      "content": "冬天站在我们这边。让他们在雪里学会敬畏。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "katarin", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"], "secondary_keys": ["grimgor"], "selective": true, "enabled": true,
+      "content": "开打！别废话！小子们，碾过去！",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "grimgor", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"], "secondary_keys": ["archaon"], "selective": true, "enabled": true,
+      "content": "诸神在看着。让他们看看什么叫终结。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "archaon", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["battle_start"], "secondary_keys": ["miao_ying"], "selective": true, "enabled": true,
+      "content": "长垣不倒，震旦不退。列阵。",
+      "insertion_order": 100, "priority": 50,
+      "extensions": { "czx": { "kind": "line", "speaker": "miao_ying", "channel": "battle_bark" } }
+    },
+
+    {
+      "keys": ["lord_slain"], "secondary_keys": ["enemy"], "selective": true, "enabled": true,
+      "content": "敌将陨落。他们的线正在散——压上去。",
+      "insertion_order": 90, "priority": 60,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "battle_bark", "cond": { "side": "enemy" } } }
+    },
+    {
+      "keys": ["lord_slain"], "secondary_keys": ["ally"], "selective": true, "enabled": true,
+      "content": "我们的领主倒下了。稳住阵脚——他还没死透，我们也还没输。",
+      "insertion_order": 90, "priority": 60,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "battle_bark", "cond": { "side": "ally" } } }
+    },
+    {
+      "keys": ["lord_slain"], "secondary_keys": ["mannfred"], "selective": true, "enabled": true,
+      "content": "死亡对卡斯坦因只是暂住。你们可以开始数我还剩几次。",
+      "insertion_order": 85, "priority": 80,
+      "extensions": { "czx": { "kind": "line", "speaker": "mannfred", "channel": "battle_bark", "cond": { "side": "ally" } } }
+    },
+
+    {
+      "keys": ["monster_enters"], "enabled": true,
+      "content": "巨物进场。地面在抖——把长矛对准它，别对着天发呆。",
+      "insertion_order": 95, "priority": 55,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "battle_bark" } }
+    },
+    {
+      "keys": ["monster_enters"], "secondary_keys": ["enemy"], "selective": true, "enabled": true,
+      "content": "敌阵里放出了大家伙。炮兵——那就是你们今天存在的意义。",
+      "insertion_order": 90, "priority": 65,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "battle_bark", "cond": { "side": "enemy" } } }
+    },
+
+    {
+      "keys": ["mass_rout"], "secondary_keys": ["enemy"], "selective": true, "enabled": true,
+      "content": "他们开始跑了。追——但别追进埋伏里。",
+      "insertion_order": 90, "priority": 60,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "battle_bark", "cond": { "side": "enemy" } } }
+    },
+    {
+      "keys": ["mass_rout"], "secondary_keys": ["ally"], "selective": true, "enabled": true,
+      "content": "我方阵线松动。收拢，别让他们变成溃败。",
+      "insertion_order": 90, "priority": 60,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "battle_bark", "cond": { "side": "ally" } } }
+    },
+    {
+      "keys": ["mass_rout"], "secondary_keys": ["skaven"], "selective": true, "enabled": true,
+      "content": "鼠人在逃，跑得像受惊的……嗯，像他们自己。",
+      "insertion_order": 85, "priority": 70,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "battle_bark", "cond": { "side": "enemy", "target_race": "skaven" } } }
+    },
+
+    {
+      "keys": ["battle_result"], "secondary_keys": ["victory"], "selective": true, "enabled": true,
+      "content": "胜利。清点战场，救治伤员——然后想想下一场。",
+      "insertion_order": 80, "priority": 60,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "dilemma", "cond": { "result": "victory" } } }
+    },
+    {
+      "keys": ["battle_result"], "secondary_keys": ["defeat"], "selective": true, "enabled": true,
+      "content": "败了。收拢残部，记住今天——记住是为了不复读。",
+      "insertion_order": 80, "priority": 60,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "dilemma", "cond": { "result": "defeat" } } }
+    },
+    {
+      "keys": ["battle_result"], "secondary_keys": ["pyrrhic"], "selective": true, "enabled": true,
+      "content": "惨胜。赢是赢了，但代价写满了阵亡名册。",
+      "insertion_order": 80, "priority": 60,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "dilemma", "cond": { "result": "pyrrhic" } } }
+    },
+    {
+      "keys": ["battle_result"], "secondary_keys": ["skarbrand", "victory"], "selective": true, "enabled": true,
+      "content": "颅座！今天献上的，够数！",
+      "insertion_order": 75, "priority": 85,
+      "extensions": { "czx": { "kind": "line", "speaker": "skarbrand", "channel": "dilemma", "cond": { "result": "victory" } } }
+    },
+    {
+      "keys": ["battle_result"], "secondary_keys": ["thorgrim", "victory"], "selective": true, "enabled": true,
+      "content": "结清一笔。史官，划掉这行——下一页还有。",
+      "insertion_order": 75, "priority": 85,
+      "extensions": { "czx": { "kind": "line", "speaker": "thorgrim", "channel": "dilemma", "cond": { "result": "victory" } } }
+    },
+
+    {
+      "keys": ["agent_report"], "secondary_keys": ["success"], "selective": true, "enabled": true,
+      "content": "事务官回报：事成。对方的计划出现了'意外'。",
+      "insertion_order": 110, "priority": 40,
+      "extensions": { "czx": { "kind": "line", "speaker": "agent", "channel": "event_feed", "cond": { "outcome": "success" } } }
+    },
+    {
+      "keys": ["agent_report"], "secondary_keys": ["fail"], "selective": true, "enabled": true,
+      "content": "事务官回报：失手。人撤回来了，尾巴没甩掉之前别派下一件活。",
+      "insertion_order": 110, "priority": 40,
+      "extensions": { "czx": { "kind": "line", "speaker": "agent", "channel": "event_feed", "cond": { "outcome": "fail" } } }
+    },
+
+    {
+      "keys": ["grudge_cleared"], "secondary_keys": ["dwarf"], "selective": true, "enabled": true,
+      "content": "此账已清。史官落笔划销——墨迹未干，下一笔已在路上。",
+      "insertion_order": 85, "priority": 75,
+      "extensions": { "czx": { "kind": "line", "speaker": "narrator", "channel": "event_feed", "cond": { "race": "dwarf" } } }
+    },
+    {
+      "keys": ["grudge_cleared"], "secondary_keys": ["thorgrim"], "selective": true, "enabled": true,
+      "content": "一笔清讫。矮人的书从不缺页——缺的只是还没被清算的名字。",
+      "insertion_order": 80, "priority": 85,
+      "extensions": { "czx": { "kind": "line", "speaker": "thorgrim", "channel": "event_feed" } }
+    }
+  ]
+}

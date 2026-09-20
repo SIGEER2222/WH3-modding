@@ -128,19 +128,72 @@ def fit(skel_json, landmarks):
             wp_new[i] = wp_t[i]
     wp_new = np.array(wp_new)
 
-    # local pos = R_parent^-1 (world_i - world_parent); quats keep template's
+    # Re-aim each bone's world orientation at its continuation child.
+    # Keeping template quats after moving joints leaves every bone's local
+    # frame pointing along the DONOR's limb direction; clips then rotate
+    # limbs around wrong axes. For each bone we take the donor's aim dir
+    # (bone->continuation child) and swing the world quat so the same local
+    # aim now points at the NEW child position. Childless bones ride their
+    # parent's swing (rigid with chain end).
+    import re as _re
+
+    def swing_quat(a, b):
+        """Shortest-arc quat rotating normalized vec a -> b."""
+        na = np.linalg.norm(a); nb = np.linalg.norm(b)
+        if na < 1e-9 or nb < 1e-9:
+            return [0.0, 0.0, 0.0, 1.0]
+        a = a / na; b = b / nb
+        c = np.cross(a, b); d = float(np.dot(a, b))
+        if d < -0.999999:
+            ax = np.cross(a, [1.0, 0.0, 0.0])
+            if np.linalg.norm(ax) < 1e-6:
+                ax = np.cross(a, [0.0, 1.0, 0.0])
+            ax = ax / np.linalg.norm(ax)
+            return [ax[0], ax[1], ax[2], 0.0]
+        s = np.sqrt((1 + d) * 2); inv = 1.0 / s
+        return [c[0] * inv, c[1] * inv, c[2] * inv, s * 0.5]
+
+    def continuation_child(i):
+        ch = children[i]
+        if not ch:
+            return -1
+        base = _re.sub(r'_\d+$', '', bones[i]['name'])
+        pref = [c for c in ch if bones[c]['name'].startswith(base)]
+        if pref:
+            return pref[0]
+        interior = [c for c in ch if children[c]]
+        return interior[0] if interior else ch[0]
+
+    wq_new = [None] * n
+    swing = [[0.0, 0.0, 0.0, 1.0]] * n
+    for i, b in enumerate(bones):
+        p = b['parent']
+        parent_swing = swing[p] if p >= 0 else [0.0, 0.0, 0.0, 1.0]
+        c = continuation_child(i)
+        if c >= 0:
+            d_old = wp_t[c] - wp_t[i]
+            d_new = wp_new[c] - wp_new[i]
+            s = swing_quat(d_old, d_new)
+            # compose with parent swing so we also follow a moved parent chain
+            s = qmul(s, parent_swing)
+            swing[i] = s
+            wq_new[i] = qmul(s, wq_t[i])
+        else:
+            swing[i] = parent_swing
+            wq_new[i] = qmul(parent_swing, wq_t[i])
+
+    # local pos = R_parent^-1 (world_i - world_parent) with NEW quats
     local_pos, local_quat = [], []
-    # template local quats: qconj(wq_parent) * wq_i  (worlds unchanged)
     for i, b in enumerate(bones):
         p = b['parent']
         if p < 0:
             local_pos.append(list(wp_new[i]))
-            local_quat.append(list(wq_t[i]))
+            local_quat.append(list(wq_new[i]))
         else:
-            lp = qrot(qconj(wq_t[p]), list(wp_new[i] - wp_new[p]))
+            lp = qrot(qconj(wq_new[p]), list(wp_new[i] - wp_new[p]))
             local_pos.append(lp)
-            local_quat.append(list(qmul(qconj(wq_t[p]), wq_t[i])))
-    return wp_new, local_pos, local_quat
+            local_quat.append(list(qmul(qconj(wq_new[p]), wq_new[i])))
+    return wp_new, wq_new, local_pos, local_quat
 
 
 def write_skeleton(src_anim_path, dst_anim_path, new_name, local_pos, local_quat):
@@ -182,8 +235,9 @@ if __name__ == '__main__':
     # usage: fit_skeleton.py <skel.json> <landmarks.json> <out.json>
     skel = json.load(open(sys.argv[1]))
     lm = json.load(open(sys.argv[2]))
-    wp, lp, lq = fit(skel, lm)
+    wp, wq, lp, lq = fit(skel, lm)
     skel['world_pos_frame0'] = wp.tolist()
+    skel['world_quat_frame0'] = [list(q) for q in wq]
     skel['local_pos_frame0'] = lp
     skel['local_quat_frame0'] = lq
     json.dump(skel, open(sys.argv[3], 'w'))

@@ -1,0 +1,1 @@
+czx_bridge T1 遥测 agent：战斗中每秒把全战场单位快照与事件流写入游戏目录 czx_bridge_telemetry.jsonl，供外部 daemon（czx_bridge/app/bridge_daemon.py）解析。纯只读，不下指令、不碰控制权，对正常游玩零影响。

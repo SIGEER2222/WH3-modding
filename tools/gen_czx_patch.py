@@ -4,7 +4,11 @@
 Patch for the 虫群帝国 (Imperial Arbiter / skv_chongzu) WH3 mod:
 - cishe (刺蛇) unit size +50% (num_men 8 -> 12)
 - new units: czx_feilong (飞龙, carrion donor), czx_zhanglang (蟑螂, tomb scorpion donor)
-- new campaign hero/lord unit: czx_kerrigan and czx_kerrigan_lord (凯瑞甘, def sorceress_dark donor chain)
+
+凯瑞甘已移除（2026-09-19）：czx_kerrigan / czx_kerrigan_lord 全部删除，
+刀锋女王改由「英灵召唤 (Summon Servant)」workshop 3552538974 提供。
+注意：OUT 仍指向旧目录名 mod_files/czx_swarm_expansion；现行源码在
+mod_files/zzz_czx_swarm_expansion（含手工新增的 script/ui/variantmeshes）。
 """
 from pathlib import Path
 
@@ -106,24 +110,8 @@ ZHANGLANG_MU = ["", "0", "monster", "2", "false", "czx_zhanglang", "1", "0",
                 "false", "true", "3", "false", "false", "", "0.0", "true", "1",
                 "false"]
 
-KERRIGAN_MU = ["", "-1", "hero", "1", "false", "czx_kerrigan", "1", "0", "300",
-               "wh_main_shp_transport", "1", "1", "1", "1000", "czx_kerrigan",
-               "250", "heavy", "", "0", "false", "wh2_main_vo_culture_Dark_Elves",
-               "wh2_main_wizard_dark", "0", "true", "emp_general_foot", "",
-               "true", "", "300.0", "0.0", "false", "vo_culture_None", "true",
-               "wh2_main_vo_actor_Dark_Elves_Sorceress", "0", "true", "false",
-               "2", "false", "false", "", "0.0", "true", "1", "false"]
-
-KERRIGAN_LORD_MU = ["", "-1", "hero", "1", "false", "czx_kerrigan_lord", "1", "0", "300",
-                    "wh_main_shp_transport", "1", "1", "1", "1000", "czx_kerrigan_lord",
-                    "250", "heavy", "", "0", "false", "wh2_main_vo_culture_Dark_Elves",
-                    "wh2_main_wizard_dark", "0", "true", "emp_general_foot", "",
-                    "true", "", "300.0", "0.0", "false", "vo_culture_None", "true",
-                    "wh2_main_vo_actor_Dark_Elves_Sorceress", "0", "true", "false",
-                    "2", "false", "false", "", "0.0", "true", "1", "false"]
-
 w("main_units_tables", MU_H, 7,
-  [CISHE, FEILONG_MU, ZHANGLANG_MU, KERRIGAN_MU, KERRIGAN_LORD_MU])
+  [CISHE, FEILONG_MU, ZHANGLANG_MU])
 
 # ---------------------------------------------------------------- land_units
 LU_H = ("accuracy armour campaign_action_points category charge_bonus class "
@@ -166,32 +154,8 @@ ZHANGLANG_LU = ["0", "wh2_dlc10_bone_90", "2100", "inf_melee", "45", "inf_mel",
                 "medium", "medium", "domination_monsters", "", "", "melee",
                 "1.0", "1.0", "false", "false"]
 
-KERRIGAN_LU = ["10", "wh2_main_body_10", "2100", "inf_melee", "15", "com",
-               "czx_kerrigan", "czx_kerrigan", "hu1b_elf_staff_and_sword",
-               "wh2_main_def_infantry_hero_blood_low_kb_resist", "39", "30",
-               "60", "3412", "", "0", "wh2_main_def_sorceress_staff", "", "1",
-               "none", "czx_kerrigan", "wh_main_infantry", "trained", "", "",
-               "false", "40.0", "1500.0", "wh2_main_def_cha_sorceress_dark_0",
-               "60", "80", "0", "vo_sel_default", "vo_sel_melee",
-               "vo_sel_culture", "1.0", "small", "0", "0", "0", "0", "0", "0",
-               "15", "0", "mage_highvalue", "false", "true", "false", "false",
-               "high", "high", "domination_characters", "", "", "skirmish",
-               "1.0", "1.0", "false", "false"]
-
-KERRIGAN_LORD_LU = ["10", "wh2_main_body_10", "2100", "inf_melee", "15", "com",
-                    "czx_kerrigan_lord", "czx_kerrigan_lord", "hu1b_elf_staff_and_sword",
-                    "wh2_main_def_infantry_hero_blood_low_kb_resist", "39", "30",
-                    "60", "3412", "", "0", "wh2_main_def_sorceress_staff", "", "1",
-                    "none", "czx_kerrigan_lord", "wh_main_infantry", "trained", "", "",
-                    "false", "40.0", "1500.0", "wh2_main_def_cha_sorceress_dark_0",
-                    "60", "80", "0", "vo_sel_default", "vo_sel_melee",
-                    "vo_sel_culture", "1.0", "small", "0", "0", "0", "0", "0", "0",
-                    "15", "0", "mage_highvalue", "false", "true", "false", "false",
-                    "high", "high", "domination_characters", "", "", "skirmish",
-                    "1.0", "1.0", "false", "false"]
-
 w("land_units_tables", LU_H, 54,
-  [FEILONG_LU, ZHANGLANG_LU, KERRIGAN_LU, KERRIGAN_LORD_LU])
+  [FEILONG_LU, ZHANGLANG_LU])
 
 # ---------------------------------------------------------------- variants
 w("unit_variants_tables",
@@ -199,18 +163,13 @@ w("unit_variants_tables",
   [["", "czx_feilong", "czx_feilong", "wh2_dlc09_tmb_carrion",
     "czx_feilong"],
    ["", "czx_zhanglang", "czx_zhanglang", "wh2_dlc09_tmb_scorpion",
-    "czx_zhanglang"],
-   ["", "czx_kerrigan", "czx_kerrigan", "wh2_main_def_sorceress",
-    "czx_kerrigan"],
-   ["", "czx_kerrigan_lord", "czx_kerrigan_lord", "wh2_main_def_sorceress",
-    "czx_kerrigan_lord"]])
+    "czx_zhanglang"]])
 
 # ---------------------------------------------------------------- descriptions
 for t in ("unit_description_short_texts_tables",
           "unit_description_historical_texts_tables"):
     w(t, ["key"], 0,
-      [["czx_feilong"], ["czx_zhanglang"], ["czx_kerrigan"],
-       ["czx_kerrigan_lord"]])
+      [["czx_feilong"], ["czx_zhanglang"]])
 
 # ---------------------------------------------------------------- recruitment
 BUA_H = "building\tunit\tXP\tkey\tconditions\tfaction\tenabled".split("\t")
@@ -235,24 +194,18 @@ UCB_H = ("faction\tgeneral_unit\tunit\tsiege_unit_attacker\tsiege_unit_defender"
          "\tcampaign_exclusive\tarmory_item_set\tsupports_upgrades").split("\t")
 rows = [["wh_main_emp_empire", "false", u, "true", "true", "", "", "", "false",
          "", "false"] for u in ("czx_feilong", "czx_zhanglang")]
-rows += [["wh_main_emp_empire", "true", "czx_kerrigan", "true", "true",
-          "ui/portraits/units/no_culture/czx_kerrigan.png", "", "", "false", "", "false"],
-         ["wh_main_emp_empire", "true", "czx_kerrigan_lord", "true", "true",
-          "ui/portraits/units/no_culture/czx_kerrigan_lord.png", "", "", "false", "", "false"]]
 w("units_custom_battle_permissions_tables", UCB_H, 11, rows)
 
 w("unit_set_to_unit_junctions_tables",
   "exclude\tunit_caste\tunit_category\tunit_class\tunit_record\tunit_set"
   .split("\t"), 1,
   [["false", "", "", "", u, "skv_chongzu"]
-   for u in ("czx_feilong", "czx_zhanglang", "czx_kerrigan", "czx_kerrigan_lord")])
+   for u in ("czx_feilong", "czx_zhanglang")])
 
 w("battle_currency_units_cost_values_tables",
   "cost_value\tcurrency_type\titem_type".split("\t"), 0,
   [["425.0", "supplies_currency", "czx_feilong"],
-   ["1000.0", "supplies_currency", "czx_zhanglang"],
-   ["300.0", "supplies_currency", "czx_kerrigan"],
-   ["300.0", "supplies_currency", "czx_kerrigan_lord"]])
+   ["1000.0", "supplies_currency", "czx_zhanglang"]])
 
 SC2_UNIT_ABILITIES = (
     ("czx_ability_mutalisk_regeneration", "wh_main_unit_passive_regeneration", 789900101),
@@ -318,127 +271,7 @@ w("land_units_to_unit_abilites_junctions_tables",
    ["czx_ability_roach_regenerative_tissue", "czx_zhanglang"],
    ["czx_ability_zergling_adrenal_glands", "gou"],
    ["czx_ability_ultralisk_frenzied", "leishou"],
-   ["wh3_main_unit_passive_single_entity", "czx_zhanglang"],
-   ["wh3_main_unit_passive_single_entity", "czx_kerrigan"],
-   ["wh3_main_unit_passive_single_entity", "czx_kerrigan_lord"]])
-
-# ---------------------------------------------------------------- kerrigan hero
-AS_H = ("key\tauto_generate\tis_caster\tsmall_icon\tassociated_unit_override"
-        "\taudio_voiceover_actor_group\tshow_in_ui\tcap\thas_female_name"
-        "\tcan_gain_xp\tloyalty_is_applicable\tcontributes_to_agent_cap"
-        "\trecruitment_category\tmagic_lore\tnames_group\tcan_be_loaned"
-        "\trecruitable\tsaving_settings\taudio_vo_culture_override"
-        "\tspam_click_vo_enabled\tcan_equip_ancillaries\tcost"
-        "\trecruitment_button_active_icon_path"
-        "\trecruitment_button_background_icon_path"
-        "\taudio_force_contextual_vo").split("\t")
-w("agent_subtypes_tables", AS_H, 3,
-  [["czx_kerrigan", "true", "true",
-    "ui/campaign ui/agents/wh2_main_lore_dark_magic.png", "czx_kerrigan",
-    "wh2_main_vo_actor_Dark_Elves_Sorceress", "true", "-1", "true", "true",
-    "true", "true", "", "", "czx_kerrigan", "true", "true",
-    "can_be_saved_loaded", "", "false", "true", "800", "", "", "false"],
-   ["czx_kerrigan_lord", "false", "true", "",
-    "czx_kerrigan_lord", "wh2_main_vo_actor_Dark_Elves_Sorceress", "true", "-1",
-    "false", "true", "false", "true", "legendary_lords", "", "czx_kerrigan",
-    "false", "true", "cannot_be_loaded_in_campaign", "", "false", "true", "1100",
-    "", "", "false"]])
-
-ACD_H = ("agent\tculture\tassociated_unit\tkey\tseason\tlevel"
-         "\tagent_recruited_movie\tgender\ticon\tsmall_icon"
-         "\trecruitable_in_ui").split("\t")
-w("agent_culture_details_tables", ACD_H, 9,
-  [["wizard", "wh_main_emp_empire", "czx_kerrigan", "789900001", "", "0", "",
-    "f", "", "ui/campaign ui/agents/wh_main_wizard.png", "true"],
-   ["general", "wh_main_emp_empire", "czx_kerrigan_lord", "789900002", "", "0", "",
-    "f", "", "ui/campaign ui/agents/wh_main_wizard.png", "true"]])
-
-EMPIRE_FACTIONS = (
-    "wh_main_emp_empire",
-    "wh2_dlc13_emp_golden_order",
-    "wh2_dlc13_emp_the_huntmarshals_expedition",
-    "wh3_main_emp_cult_of_sigmar",
-    "wh3_dlc27_emp_empire_dm")
-FAPS_H = "agent\tfaction\tsubtype\tmod_disabled".split("\t")
-w("faction_agent_permitted_subtypes_tables", FAPS_H, 1,
-  [["wizard", f, "czx_kerrigan", "false"] for f in EMPIRE_FACTIONS] +
-  [["general", f, "czx_kerrigan_lord", "false"] for f in EMPIRE_FACTIONS])
-
-# 凯瑞甘技能树：使用独立 key，并把暗精 donor 的三个可用法术效果链复制到
-# 独立的 SC2 语义技能节点，避免覆盖原版暗精女术士。
-KERRIGAN_SKILL_SETS = (
-    ("czx_skill_node_set_kerrigan", "wizard", "czx_kerrigan"),
-    ("czx_skill_node_set_kerrigan_lord", "general", "czx_kerrigan_lord"),
-)
-KERRIGAN_SKILLS = (
-    ("czx_kerrigan_psionic_lash", "wh2_main_skill_magic_dark_chillwind",
-     "czx_skill_node_kerrigan_psionic_lash", "wh2_main_skill_node_def_sorceress_dark_magic_0"),
-    ("czx_kerrigan_psionic_storm", "wh2_main_skill_magic_dark_bladewind",
-     "czx_skill_node_kerrigan_psionic_storm", "wh2_main_skill_node_def_sorceress_dark_magic_1_3"),
-    ("czx_kerrigan_assimilation", "wh2_main_skill_magic_dark_soul_stealer",
-     "czx_skill_node_kerrigan_assimilation", "wh2_main_skill_node_def_sorceress_dark_magic_3_2"),
-)
-
-# Copy only the donor skill/effect rows needed by the independent SC2-themed tree.
-skill_rows = []
-node_rows = []
-effect_rows = []
-hint_rows = []
-skill_header = node_header = effect_header = hint_header = None
-for skill_key, donor_skill, node_key, donor_node in KERRIGAN_SKILLS:
-    header, row = cloned_row("character_skills_tables", donor_skill, skill_key)
-    skill_header = header
-    skill_rows.append(row)
-    header, row = cloned_row("character_skill_nodes_tables", donor_node, node_key)
-    node_header = header
-    row[header.index("character_skill_key")] = skill_key
-    row[header.index("indent")] = "2"
-    row[header.index("tier")] = str(len(node_rows))
-    node_rows.append(row)
-    try:
-        header, rows = cloned_field_rows("character_skill_level_to_effects_junctions_tables",
-                                        "character_skill_key", donor_skill, skill_key)
-        effect_header = header
-        effect_rows.extend(rows)
-    except KeyError:
-        pass
-    try:
-        header, rows = cloned_field_rows("character_skill_utilization_hints_junctions_tables",
-                                        "key", donor_skill, skill_key)
-        hint_header = header
-        hint_rows.extend(rows)
-    except KeyError:
-        pass
-
-w("character_skills_tables", skill_header, 5, skill_rows)
-w("character_skill_nodes_tables", node_header, 6, node_rows)
-if effect_rows:
-    w("character_skill_level_to_effects_junctions_tables", effect_header, 1, effect_rows)
-if hint_rows:
-    w("character_skill_utilization_hints_junctions_tables", hint_header, 0, hint_rows)
-
-w("character_skill_node_links_tables",
-  "child_key\tinitial_descent_tiers\tparent_key\tparent_link_position\tchild_link_position\tparent_link_position_offset\tchild_link_position_offset\tlink_type".split("\t"),
-  3,
-  [["czx_skill_node_kerrigan_psionic_storm", "0", "czx_skill_node_kerrigan_psionic_lash", "1", "1", "0.0", "0.0", "REQUIRED"],
-   ["czx_skill_node_kerrigan_assimilation", "0", "czx_skill_node_kerrigan_psionic_storm", "1", "1", "0.0", "0.0", "REQUIRED"]])
-
-CSNS_H = ("agent_key\tcampaign_key\tfaction_key\tkey\tsubculture\tfor_army"
-          "\tfor_navy\tagent_subtype_key").split("\t")
-w("character_skill_node_sets_tables", CSNS_H, 2,
-  [[agent, "", "", skill_set, "", "false", "false", subtype]
-   for skill_set, agent, subtype in KERRIGAN_SKILL_SETS])
-
-skill_items = [[skill_set, node_key, "false"]
-               for skill_set, _, _ in KERRIGAN_SKILL_SETS
-               for _, _, node_key, _ in KERRIGAN_SKILLS]
-w("character_skill_node_set_items_tables",
-  "set\titem\tmod_disabled".split("\t"), 0, skill_items)
-
-
-w("names_groups_tables", ["key"], 0, [["czx_kerrigan"]])
-w("names_tables", "id\tnames_group\ttype\tgender\tfrequency".split("\t"), 0,
-  [["789900001", "czx_kerrigan", "forename", "f", "1"]])
+   ["wh3_main_unit_passive_single_entity", "czx_zhanglang"]])
 
 # ---------------------------------------------------------------- loc
 loc = OUT / "text" / "db" / "czx_swarm_expansion_CN.loc.tsv"
@@ -446,32 +279,14 @@ loc.parent.mkdir(parents=True, exist_ok=True)
 loc_rows = [
     ("land_units_onscreen_name_czx_feilong", "飞龙（异龙）", ""),
     ("land_units_onscreen_name_czx_zhanglang", "蟑螂（劫掠者）", ""),
-    ("land_units_onscreen_name_czx_kerrigan", "凯瑞甘", ""),
-    ("land_units_onscreen_name_czx_kerrigan_lord", "凯瑞甘（领主）", ""),
     ("unit_description_short_texts_text_czx_feilong",
      "虫群的空中猎手，遮天蔽日地扑向敌人。", ""),
     ("unit_description_short_texts_text_czx_zhanglang",
      "厚重的甲壳下是虫群不知疲倦的毁灭之力。", ""),
-    ("unit_description_short_texts_text_czx_kerrigan",
-     "刀锋女王，虫群意志的化身。", ""),
-    ("unit_description_short_texts_text_czx_kerrigan_lord",
-     "统御虫群的刀锋女王。", ""),
     ("unit_description_historical_texts_text_czx_feilong",
      "异龙是虫群最常见的飞行生物，成群结队地撕开敌人的阵线。", ""),
     ("unit_description_historical_texts_text_czx_zhanglang",
      "蟑螂可以在恶劣环境中持续作战，用强酸与利爪碾碎猎物。", ""),
-    ("unit_description_historical_texts_text_czx_kerrigan",
-     "莎拉·凯瑞甘，被虫群改造的人类幽灵特工，如今统御整个虫群。", ""),
-    ("unit_description_historical_texts_text_czx_kerrigan_lord",
-     "刀锋女王以虫群之心统领战场，令敌军在灵能风暴中崩溃。", ""),
-    ("agent_subtypes_onscreen_name_override_czx_kerrigan", 
-     "凯瑞甘（刀锋女王）", ""),
-    ("agent_subtypes_onscreen_name_override_czx_kerrigan_lord",
-     "凯瑞甘（刀锋女王·领主）", ""),
-    ("agent_subtypes_description_text_override_czx_kerrigan", 
-     "虫群之心，刀锋女王。她的意志即是虫群的意志。", ""),
-    ("agent_subtypes_description_text_override_czx_kerrigan_lord",
-     "以灵能和虫群意志统治战场的刀锋女王。", ""),
     ("unit_abilities_onscreen_name_czx_ability_mutalisk_regeneration",
      "组织再生", ""),
     ("unit_abilities_tooltip_text_czx_ability_mutalisk_regeneration",
@@ -488,19 +303,6 @@ loc_rows = [
      "狂暴甲壳", ""),
     ("unit_abilities_tooltip_text_czx_ability_ultralisk_frenzied",
      "雷兽不易被常规控制效果打断。", ""),
-    ("character_skills_localised_name_czx_kerrigan_psionic_lash",
-     "灵能鞭挞", ""),
-    ("character_skills_localised_description_czx_kerrigan_psionic_lash",
-     "以灵能撕裂敌阵，释放刀锋女王的远程心灵打击。", ""),
-    ("character_skills_localised_name_czx_kerrigan_psionic_storm",
-     "灵能风暴", ""),
-    ("character_skills_localised_description_czx_kerrigan_psionic_storm",
-     "召唤持续扩散的灵能风暴，粉碎密集敌军。", ""),
-    ("character_skills_localised_name_czx_kerrigan_assimilation",
-     "吸收", ""),
-    ("character_skills_localised_description_czx_kerrigan_assimilation",
-     "从敌人的生命与力量中汲取能量，强化刀锋女王的持续作战能力。", ""),
-    ("names_name_789900001", "凯瑞甘", ""),
 ]
 lines = ["key\ttext\ttooltip",
          "#Loc;1;text/db/czx_swarm_expansion_CN.loc"]

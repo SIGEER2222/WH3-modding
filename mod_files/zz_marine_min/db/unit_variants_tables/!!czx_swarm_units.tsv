@@ -1,0 +1,4 @@
+﻿faction	name	unit	variant	unit_card
+#unit_variants_tables;5;db/unit_variants_tables/!!czx_swarm_units
+	czx_inf_tank	czx_inf_tank	czx_inf_marine	czx_inf_tank
+	czx_inf_marine	czx_inf_marine	czx_inf_marine	czx_inf_marine

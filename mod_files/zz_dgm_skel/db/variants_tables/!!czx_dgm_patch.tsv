@@ -1,0 +1,4 @@
+﻿variant_name	tech_folder	variant_filename	low_poly_filename	mount_scale	scale	scale_variation	super_low_poly_filename
+#variants_tables;6;db/variants_tables/!!czx_dgm_patch.tsv
+czx_dgm_agumon		czx_dgm_agumon		1.0	1.526	0.05	
+czx_dgm_gabumon		czx_dgm_gabumon		1.0	0.162	0.05	

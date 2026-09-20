@@ -1,0 +1,190 @@
+{
+  "name": "wh3_world",
+  "description": "WH3 世界观书：派系/机制/地名/恩怨条目。keys=触发词；constant=常注入底色。",
+  "scan_depth": 10,
+  "token_budget": 400,
+  "recursive_scanning": false,
+  "extensions": {},
+  "entries": [
+    {
+      "keys": ["__always__"],
+      "content": "基调：战锤旧世界，哥特奇幻+黑色幽默；无人纯善纯恶；禁现代腔/网络梗。",
+      "constant": true, "enabled": true, "insertion_order": 1, "priority": 100,
+      "extensions": { "czx": { "kind": "lore" } }
+    },
+    {
+      "keys": ["skaven", "queek", "snikch", "ikit", "throt", "skrolk", "tretch"],
+      "content": "鼠人：地下帝国、十三议会、大角鼠；语癖 yes-yes/人玩意；对内背刺对外投机。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "skaven" } }
+    },
+    {
+      "keys": ["dwarf", "thorgrim", "belegar", "ungrim", "thorek", "grombrindal", "malakai", "eight_peaks"],
+      "content": "矮人：仇恨之书记账式复仇；重誓约、恨背叛；八峰山是贝勒加一族执念祖地。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "dwarf" } }
+    },
+    {
+      "keys": ["malekith", "tyrion", "teclis", "naggarond", "ulthuan", "phoenix"],
+      "content": "巫王 vs 凤凰王双子：奥苏安归属的千年战争；马雷基斯未过圣火之劫是怨毒之源。",
+      "enabled": true, "insertion_order": 40, "priority": 90,
+      "extensions": { "czx": { "kind": "lore", "rivalry": "sundering" } }
+    },
+    {
+      "keys": ["khorne", "skarbrand", "arbaal"],
+      "content": "恐虐：血与颅骨，厌弃魔法诡计；斯卡布兰德弑主被逐，怒及旧主。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "khorne_daemon" } }
+    },
+    {
+      "keys": ["nurgle", "kugath", "epidemius", "tamurkhan", "festus"],
+      "content": "纳垢：腐败的慈爱，祖父的拥抱；瘟疫即礼物，绝望中的喜悦。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "nurgle_daemon" } }
+    },
+    {
+      "keys": ["slaanesh", "nkari", "sigvald", "dechala", "azazel"],
+      "content": "色孽：极致与堕落的诱惑美学；完美王子西格瓦尔德自恋成狂。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "slaanesh_daemon" } }
+    },
+    {
+      "keys": ["tzeentch", "kairos", "changeling", "vilitch"],
+      "content": "奸奇：变化与阴谋；卡洛斯双头，一头说过去一头说未来；万变即道。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "tzeentch_daemon" } }
+    },
+    {
+      "keys": ["cathay", "miao_ying", "zhao_ming", "yuan_bo", "bastion"],
+      "content": "震旦：天龙化人、阴阳和谐；长城长垣戍北抗混沌；兄妹角力于职责。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "cathay" } }
+    },
+    {
+      "keys": ["kislev", "katarin", "kostaltyn", "boris", "ostankya", "ursun"],
+      "content": "基斯里夫：冰与正教前线；冰女王与大正教派冷战；熊神乌尔松。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "kislev" } }
+    },
+    {
+      "keys": ["empire", "karl_franz", "volkmar", "gelt", "elspeth", "wulfhart", "altdorf", "sigmar"],
+      "content": "帝国：西格玛信仰+黑火药+钢铁；选帝侯内斗；凡人韧性对抗黑暗。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "empire" } }
+    },
+    {
+      "keys": ["vampire", "mannfred", "vlad", "isabella", "kemmler", "sylvania"],
+      "content": "希尔瓦尼亚：贵族式不死傲慢；卡斯坦因家的魅力与背刺；曼弗雷德永恒篡位。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "vampire_counts" } }
+    },
+    {
+      "keys": ["tomb_kings", "settra", "khalida", "arkhan", "khatep", "nehekhara", "nagash"],
+      "content": "古墓王：永恒王权即职责；赛特拉永不屈膝；与纳加什、吸血鬼血仇。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "tomb_kings" } }
+    },
+    {
+      "keys": ["ogre", "greasus", "skrag", "golgfag", "maw"],
+      "content": "食人魔：吃与钱的佣兵经济学；大胃神教；金牙重金主义。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "ogre_kingdoms" } }
+    },
+    {
+      "keys": ["greenskin", "grimgor", "azhag", "skarsnik", "wurrzag", "grom", "gorbad", "waaagh"],
+      "content": "绿皮：最大最横就是道理；Gork又莽又奸、Mork又奸又莽；Waaagh即信仰。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "greenskins" } }
+    },
+    {
+      "keys": ["bretonnia", "louen", "fay", "repanse", "grail", "couronne"],
+      "content": "巴托尼亚：骑士道神圣外衣下的傲慢，湖之女神信仰；农民是耗材的黑色幽默。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "bretonnia" } }
+    },
+    {
+      "keys": ["lizardmen", "mazdamundi", "kroq", "kroak", "tehenhauin", "sotek", "old_ones"],
+      "content": "蜥蜴人：冷血几何学，一切按古圣大计划；史兰半神，战士即兵器；索提戈信徒专猎鼠人。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "lizardmen" } }
+    },
+    {
+      "keys": ["wood_elf", "orion", "durthu", "drycha", "athel_loren", "wild_hunt"],
+      "content": "木精灵：艾索洛伦的排外狂怒；野性狩猎开启时森林本身即武器。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "wood_elves" } }
+    },
+    {
+      "keys": ["beastmen", "khazrak", "malagor", "morghur", "taurox", "herdstone"],
+      "content": "野兽人：混沌之子的纯粹憎恨；兽群石为坛，毁文明渎神祠为天职。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "beastmen" } }
+    },
+    {
+      "keys": ["norsca", "wulfrik", "throgg", "sayl"],
+      "content": "诺斯卡：劫掠者文化，为四神猎巨兽立功业；乌尔弗里克天赋毒舌见谁骂谁。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "norsca" } }
+    },
+    {
+      "keys": ["warriors_of_chaos", "archaon", "kholek", "sigvald", "valkia", "vilitch", "festus", "azazel", "belakor"],
+      "content": "混沌勇士：末日天启骑士团；永世神选艾查恩；贝拉克是被四神用完即弃的第一亲王。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "warriors_of_chaos" } }
+    },
+    {
+      "keys": ["chaos_dwarf", "astragoth", "drazhoath", "zhatan", "hashut"],
+      "content": "混沌矮人：哈苏特公牛神的工业地狱；奴隶高炉；矮人固执的黑暗镜像。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "chaos_dwarfs" } }
+    },
+    {
+      "keys": ["vampire_coast", "harkon", "aranessa", "noctilus", "cylostra", "sartosa"],
+      "content": "吸血鬼海岸：亡灵海盗的盐渍疯狂；卢瑟·哈肯多重人格舰队；深海歌后西洛斯特拉。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "vampire_coast" } }
+    },
+    {
+      "keys": ["dark_elf", "druchii", "morathi", "hellebron", "malus", "lokhir", "rakarth"],
+      "content": "黑暗精灵：残忍美学+奴隶帝国；莫拉丝的阴谋从不眠；哈尔·冈西血夜不息。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "dark_elf" } }
+    },
+    {
+      "keys": ["high_elf", "asur", "alarielle", "alith_anar", "eltharion", "imrik", "caledor"],
+      "content": "高等精灵：优雅傲慢的极致；永恒女王与爱、影王与复仇、卡勒多与龙。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "high_elf" } }
+    },
+    {
+      "keys": ["daemon_prince", "legions_of_chaos"],
+      "content": "混沌恶魔亲王：四神恩典集于一身者；贝拉克为第一个，也是被弃者。",
+      "enabled": true, "insertion_order": 50, "priority": 80,
+      "extensions": { "czx": { "kind": "lore", "race": "daemons_of_chaos" } }
+    },
+    {
+      "keys": ["eight_peaks", "karak_eight_peaks"],
+      "content": "八峰山：矮人安格朗德氏族祖地，被夜地精史卡斯尼克占据；贝勒加毕生执念。",
+      "enabled": true, "insertion_order": 30, "priority": 95,
+      "extensions": { "czx": { "kind": "lore", "place": "eight_peaks" } }
+    },
+    {
+      "keys": ["grudge", "grudges"],
+      "content": "仇恨之书：矮人把每条恩怨记账，偿清一条才销一笔；机制产出即独白素材。",
+      "enabled": true, "insertion_order": 60, "priority": 70,
+      "extensions": { "czx": { "kind": "lore", "mechanic": "grudges" } }
+    },
+    {
+      "keys": ["harmony", "yin", "yang", "compass"],
+      "content": "震旦阴阳：失衡时朝廷谏言；罗盘指向牵动龙族兄妹的职守分配。",
+      "enabled": true, "insertion_order": 60, "priority": 70,
+      "extensions": { "czx": { "kind": "lore", "mechanic": "harmony" } }
+    },
+    {
+      "keys": ["chaos_rift", "rift"],
+      "content": "混沌裂缝：裂缝开启时四神低语全图广播；恐惧氛围是天然叙事钩子。",
+      "enabled": true, "insertion_order": 60, "priority": 70,
+      "extensions": { "czx": { "kind": "lore", "mechanic": "chaos_rifts" } }
+    }
+  ]
+}

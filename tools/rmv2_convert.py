@@ -209,26 +209,88 @@ def read_accessor(js, binbuf, idx):
     return arr
 
 
-def glb_mesh(glb_path, skeleton_json):
-    """Return dict with positions(normals/tangents/uv/indices) + rmv bone indices/weights."""
-    js, binbuf = read_glb(glb_path)
-    prim = js['meshes'][0]['primitives'][0]
-    at = prim['attributes']
-    pos = read_accessor(js, binbuf, at['POSITION']).astype(np.float64)
-    nrm = read_accessor(js, binbuf, at['NORMAL']).astype(np.float64)
-    uv = read_accessor(js, binbuf, at['TEXCOORD_0']).astype(np.float64)
-    tan = read_accessor(js, binbuf, at['TANGENT']).astype(np.float64) if 'TANGENT' in at else None
-    joints = read_accessor(js, binbuf, at['JOINTS_0'])
-    weights = read_accessor(js, binbuf, at['WEIGHTS_0']).astype(np.float64)
-    idx = read_accessor(js, binbuf, prim['indices']).reshape(-1)
+def _node_world_mats(js):
+    """world matrix per node (TRS or matrix)."""
+    def local(n):
+        if 'matrix' in n:
+            return np.array(n['matrix']).reshape(4, 4).T
+        t = n.get('translation', [0, 0, 0])
+        r = n.get('rotation', [0, 0, 0, 1])
+        s = n.get('scale', [1, 1, 1])
+        x, y, z, w = r
+        R = np.array([
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)]])
+        M = np.eye(4)
+        M[:3, :3] = R @ np.diag(s)
+        M[:3, 3] = t
+        return M
+    nodes = js['nodes']
+    world = {}
 
-    # joint mapping: skin.joints -> node -> name -> wh3 bone index
+    def walk(i, P):
+        world[i] = P @ local(nodes[i])
+        for c in nodes[i].get('children', []):
+            walk(c, world[i])
+    children = {c for n in nodes for c in n.get('children', [])}
+    for r in set(range(len(nodes))) - children:
+        walk(r, np.eye(4))
+    return world
+
+
+def glb_mesh(glb_path, skeleton_json):
+    """Merge every skinned mesh primitive -> (pos,nrm,uv,tan,idx,bone_idx,w).
+    Handles multi-mesh GLBs (was meshes[0].primitives[0] only)."""
+    js, binbuf = read_glb(glb_path)
     skel = json.load(open(skeleton_json, encoding='utf-8'))
     name2idx = {b['name']: i for i, b in enumerate(skel['bones'])}
-    skin = js['skins'][0]
-    joint_names = [js['nodes'][j]['name'] for j in skin['joints']]
-    joint_map = np.array([name2idx[n] for n in joint_names], dtype=np.uint8)
-    bone_idx = joint_map[joints]  # (n,4) wh3 indices
+    world = _node_world_mats(js)
+
+    P, N, U, T, I, B, W = [], [], [], [], [], [], []
+    voff = 0
+    for ni, n in enumerate(js['nodes']):
+        if 'mesh' not in n:
+            continue
+        skin_i = n.get('skin')
+        # rig2 exports keep scale on the armature node: apply world matrix
+        M = world.get(ni, np.eye(4))
+        R = M[:3, :3]
+        jmap = None
+        if skin_i is not None:
+            jnames = [js['nodes'][j].get('name', '') for j in
+                      js['skins'][skin_i]['joints']]
+            jmap = np.array([name2idx.get(nm, 0) for nm in jnames],
+                            dtype=np.uint8)
+        for prim in js['meshes'][n['mesh']].get('primitives', []):
+            at = prim['attributes']
+            if 'JOINTS_0' not in at or 'POSITION' not in at:
+                continue
+            pos = read_accessor(js, binbuf, at['POSITION']).astype(np.float64)
+            pos = pos @ R.T + M[:3, 3]
+            nrm = read_accessor(js, binbuf, at['NORMAL']).astype(np.float64) \
+                if 'NORMAL' in at else np.tile([0, 0, 1], (len(pos), 1))
+            nrm = nrm @ R.T
+            uv = read_accessor(js, binbuf, at['TEXCOORD_0']).astype(np.float64) \
+                if 'TEXCOORD_0' in at else np.zeros((len(pos), 2))
+            if 'TANGENT' in at:
+                tan = read_accessor(js, binbuf, at['TANGENT']).astype(np.float64)
+                tan[:, :3] = tan[:, :3] @ R.T
+            else:
+                tan = None
+            joints = read_accessor(js, binbuf, at['JOINTS_0'])
+            w = read_accessor(js, binbuf, at['WEIGHTS_0']).astype(np.float64)
+            idx = read_accessor(js, binbuf, prim['indices']).reshape(-1) \
+                if 'indices' in prim else np.arange(len(pos))
+            P.append(pos); N.append(nrm); U.append(uv)
+            T.append(tan); I.append(idx + voff)
+            B.append(jmap[joints] if jmap is not None else joints)
+            W.append(w)
+            voff += len(pos)
+    pos = np.vstack(P); nrm = np.vstack(N); uv = np.vstack(U)
+    idx = np.concatenate(I); weights = np.vstack(W)
+    bone_idx = np.vstack(B)
+    tan = np.vstack(T) if all(t is not None for t in T) else None
     return pos, nrm, uv, tan, idx, bone_idx, weights
 
 

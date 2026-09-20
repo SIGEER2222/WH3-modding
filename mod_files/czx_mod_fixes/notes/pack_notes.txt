@@ -1,0 +1,1 @@
+杂项修复合集：修 quanpaixijingyingbingjiakuai 三个绿皮精英兵脚本语法错；补发 zhaohuanxiaojiejie 召唤小姐姐军队技能效果包（老档补挂）；修 nanu_dynamic_rors 中文端本地化脚本崩溃；骑士王 dilemma 补弹（秩序派系）。

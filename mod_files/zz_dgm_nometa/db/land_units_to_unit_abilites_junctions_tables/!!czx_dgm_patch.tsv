@@ -1,0 +1,8 @@
+﻿ability	land_unit
+#land_units_to_unit_abilites_junctions_tables;0;db/land_units_to_unit_abilites_junctions_tables/!!czx_dgm_patch.tsv
+czx_dgm_ab_agumon_1	czx_dgm_agumon
+czx_dgm_ab_agumon_2	czx_dgm_agumon
+czx_dgm_ab_agumon_3	czx_dgm_agumon
+czx_dgm_ab_gabumon_1	czx_dgm_gabumon
+czx_dgm_ab_gabumon_2	czx_dgm_gabumon
+czx_dgm_ab_gabumon_3	czx_dgm_gabumon

@@ -14,7 +14,10 @@
 # game meshes: "Bone Heat Weighting: failed to find solution".)
 #
 # Usage:
-#   blender -b -P blender_rig2.py -- <skel.json> <in.glb> <out.glb> <fit_axis> [exclude_regex] [save.blend] [yaw_deg] [rules_json]
+#   blender -b -P blender_rig2.py -- <skel.json> <in.glb> <out.glb> <fit_axis> [exclude_regex] [save.blend] [yaw_deg] [rules_json] ['keep']
+# 'keep' (argv[8]): input GLB carries vertex groups already named after the
+# target skeleton bones (synthetic skin from glb_bindspace) — those verts
+# keep their source artist weights instead of the auto-bound rows.
 # save.blend (optional): also save the armature+mesh+weights as a .blend for
 # manual weight-painting; paint, then re-export glTF (skinned) to re-convert.
 # yaw_deg (optional): rotate mesh this many degrees about Z BEFORE fitting —
@@ -22,6 +25,7 @@
 # (misaligned facing = limbs bind to opposite-side bones = mesh folds on anim).
 import bpy
 import json
+import os
 import sys
 import re
 import math
@@ -71,19 +75,72 @@ bpy.ops.object.mode_set(mode='OBJECT')
 
 # --- import + join + fit mesh ---
 bpy.ops.import_scene.gltf(filepath=IN_GLB)
+# drop helper meshes (icospheres, targets) — only when the source has an
+# armature to compare against (pre-baked static input keeps everything)
+_src_arms = [o for o in bpy.context.scene.objects
+             if o.type == 'ARMATURE' and o is not arm_obj]
+for o in [o for o in bpy.context.scene.objects if o.type == 'MESH']:
+    has_arm_mod = any(m.type == 'ARMATURE' for m in o.modifiers)
+    has_arm_par = (o.parent is not None and o.parent.type == 'ARMATURE') \
+        or bool(getattr(o, 'parent_bone', ''))
+    if _src_arms and not has_arm_mod and not has_arm_par:
+        print('drop unskinned helper mesh:', o.name)
+        bpy.data.objects.remove(o, do_unlink=True)
 meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
+# bake the EVALUATED (armature-deformed, rest-pose) mesh into data: source
+# GLBs often store skinned verts in a space that the armature inflates via
+# J*IBM (raw data can be ~6x off world). evaluated mesh = true world verts.
+dg = bpy.context.evaluated_depsgraph_get()
+for o in meshes:
+    ev = o.evaluated_get(dg)
+    me = bpy.data.meshes.new_from_object(ev, depsgraph=dg)
+    me.transform(o.matrix_world)
+    o.data = me
+    _d = np.array([tuple(v.co) for v in o.data.vertices])
+    print('baked(eval)', o.name, 'data', np.round(_d.min(0), 2),
+          np.round(_d.max(0), 2))
+    o.parent = None
+    o.matrix_world = Matrix.Identity(4)
+    for m in list(o.modifiers):
+        o.modifiers.remove(m)
+    o.vertex_groups.clear()
 for o in meshes:
     o.select_set(True)
 bpy.context.view_layer.objects.active = meshes[0]
 if len(meshes) > 1:
     bpy.ops.object.join()
 mesh = bpy.context.view_layer.objects.active
-bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+print('imported mesh world bbox:',
+      tuple(round(v, 2) for v in mesh.bound_box[0]),
+      tuple(round(v, 2) for v in mesh.bound_box[6]))
+_vs = np.array([tuple(v.co) for v in mesh.data.vertices])
+print('imported data bounds:', np.round(_vs.min(0), 2),
+      np.round(_vs.max(0), 2))
 
 # if the input was already skinned, strip old skinning so it doesn't fight
 # the new bind: delete imported armature objects, drop armature modifiers,
 # clear all vertex groups (re-created per-bone below; stale same-named
 # groups would be silently suffixed .001 and lose the weights)
+#
+# WEIGHTMAP (argv[8]): 'keep' = the input GLB already carries vertex groups
+# named after TARGET skeleton bones (synthetic skin emitted by
+# glb_bindspace). Snapshot them before clearing and let those verts keep the
+# source artist weights instead of the auto-bound rows — preserves
+# intentional bindings on non-humanoid extras (wings, capes, floating
+# weapons) where nearest-segment voting tears the mesh.
+src_w = None
+if len(argv) > 8 and argv[8] == 'keep':
+    # read the JOINED mesh: join already merged same-named groups, so vertex
+    # indices line up with the arrays built below
+    src_w = np.zeros((len(mesh.data.vertices), len(bones)),
+                     dtype=np.float64)
+    bone_idx = {b['name']: i for i, b in enumerate(bones)}
+    gn = [g.name for g in mesh.vertex_groups]
+    for v in mesh.data.vertices:
+        for g in v.groups:
+            bi = bone_idx.get(gn[g.index])
+            if bi is not None:
+                src_w[v.index, bi] += g.weight
 for o in [o for o in bpy.context.scene.objects
           if o.type == 'ARMATURE' and o is not arm_obj]:
     bpy.data.objects.remove(o, do_unlink=True)
@@ -91,6 +148,9 @@ mesh.vertex_groups.clear()
 for m in list(mesh.modifiers):
     if m.type == 'ARMATURE':
         mesh.modifiers.remove(m)
+_vs = np.array([tuple(v.co) for v in mesh.data.vertices])
+print('post-strip data bounds:', np.round(_vs.min(0), 2),
+      np.round(_vs.max(0), 2))
 
 if YAW_DEG:
     # rotate vertex data directly — ops transform_apply can silently no-op
@@ -113,24 +173,28 @@ if FIT_AXIS != 'nofit':
     axis_idx = {'x': 0, 'y': 1, 'z': 2}[FIT_AXIS] if FIT_AXIS != 'auto' else \
         max(range(3), key=lambda i: sk_size[i])
     scale = sk_size[axis_idx] / m_size[axis_idx]
-    mesh.scale = (scale, scale, scale)
-    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    m_ctr = (m_min + m_max) / 2
+    sk_ctr = (sk_min + sk_max) / 2
+    off = Vector((sk_ctr.x - m_ctr.x * scale,
+                  sk_ctr.y - m_ctr.y * scale,
+                  sk_min.z - m_min.z * scale))
+    # scale+translate vertex data directly — ops apply is unreliable headless
+    mesh.data.transform(Matrix.Translation(off) @ Matrix.Scale(scale, 4))
     bb = [Vector(c) for c in mesh.bound_box]
     m_min = Vector((min(v.x for v in bb), min(v.y for v in bb), min(v.z for v in bb)))
     m_max = Vector((max(v.x for v in bb), max(v.y for v in bb), max(v.z for v in bb)))
-    m_ctr = (m_min + m_max) / 2
-    sk_ctr = (sk_min + sk_max) / 2
-    mesh.location = Vector((sk_ctr.x - m_ctr.x, sk_ctr.y - m_ctr.y, sk_min.z - m_min.z))
-    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 print('MESH bounds after fit:', tuple(round(v, 2) for v in m_min),
       tuple(round(v, 2) for v in m_max))
 
 # --- weightable bones ---
+# RIG_EXCLUDE_BUILTIN env var overrides this builtin regex ('' = allow all).
+_builtin = os.environ.get('RIG_EXCLUDE_BUILTIN')
 EXCLUDE = re.compile(
+    _builtin if _builtin is not None else
     r'prop|cape|skirt|belt|sleeve|cloth|loincloth|flag|tabard|fx|icon|camera'
     r'|weapon|shield|quiver|scabbard|plume|tassel|feather|wing|hair|beard'
     r'|finger|thumb|attach|slot|mount|platform|antenna|eyestalk|banner|be_',
-    re.I)
+    re.I) if _builtin != '' else re.compile(r'(?!x)x')
 allowed_idx = [i for i, b in enumerate(bones)
                if not EXCLUDE.search(b['name'])
                and not (EXCLUDE_RE and EXCLUDE_RE.search(b['name']))]
@@ -232,6 +296,12 @@ for rnd in range(3):
             Wn[v] = 0.5 * W[v] + 0.5 * W[nb].mean(0)
     W = Wn
 
+# --- 3b) WEIGHTMAP override: verts with source artist weights keep them ---
+if src_w is not None:
+    have = src_w.sum(1) > 0
+    print('weightmap override verts:', int(have.sum()), '/', n)
+    W[have] = src_w[have]
+
 # --- 4) cap top-4, normalize, write vertex groups ---
 K = 4
 top = np.argpartition(-W, K - 1, axis=1)[:, :K]
@@ -252,6 +322,10 @@ mesh.parent = arm_obj
 mesh.parent_type = 'ARMATURE'
 n_w = sum(1 for v in mesh.data.vertices if len(v.groups) > 0)
 print('weighted verts:', n_w, '/', n)
+vs = np.array([tuple(v.co) for v in mesh.data.vertices])
+print('export data bounds:', np.round(vs.min(0), 2),
+      np.round(vs.max(0), 2), 'mesh.matrix_world scale',
+      round(mesh.matrix_world.to_scale()[0], 3))
 
 bpy.ops.export_scene.gltf(filepath=OUT_GLB, export_format='GLB',
                           export_skins=True, export_yup=True,

@@ -19,9 +19,9 @@ meshes = [o for o in bpy.context.scene.objects if o.type == 'MESH']
 mat = bpy.data.materials.new('meshmat')
 mat.use_nodes = True
 bs = mat.node_tree.nodes['Principled BSDF']
-bs.inputs['Base Color'].default_value = (0.45, 0.38, 0.5, 1)
+bs.inputs['Base Color'].default_value = (0.3, 0.22, 0.4, 1)
 bs.inputs['Roughness'].default_value = 0.85
-bs.inputs['Alpha'].default_value = 0.55
+bs.inputs['Alpha'].default_value = 0.8
 mat.surface_render_method = 'DITHERED'
 for m in meshes:
     m.data.materials.clear()

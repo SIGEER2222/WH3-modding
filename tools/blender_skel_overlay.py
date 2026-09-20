@@ -48,13 +48,41 @@ def chain_color(name):
     return (0.8, 0.8, 0.8, 1)
 
 
-# draw each bone as a cylinder head->tail
+# draw each bone as a cylinder head->first-child-head; childless bones
+# extend along the parent direction (Blender's tail_local is arbitrary for
+# imported glTF bones and draws misleading spikes)
+children = {}
+for b in arm.data.bones:
+    if b.parent:
+        children.setdefault(b.parent.name, []).append(b.name)
+B = {b.name: b for b in arm.data.bones}
+
+
+def bone_dir(name):
+    b = B[name]
+    h = arm.matrix_world @ b.head_local
+    if b.parent:
+        ph = arm.matrix_world @ b.parent.head_local
+        d = h - ph
+        if d.length > 0.01:
+            return d.normalized()
+    return Vector((0, 0, 1))
+
+
+def stick_end(b):
+    h = arm.matrix_world @ b.head_local
+    for cn in children.get(b.name, []):
+        if not sub or sub.search(cn):
+            return arm.matrix_world @ B[cn].head_local
+    return h + bone_dir(b.name) * 0.12
+
+
 nb = 0
 for b in arm.data.bones:
     if sub and not sub.search(b.name):
         continue
     h = arm.matrix_world @ b.head_local
-    t = arm.matrix_world @ b.tail_local
+    t = stick_end(b)
     d = t - h
     L = d.length
     if L < 0.01:

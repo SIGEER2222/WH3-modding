@@ -1,0 +1,13 @@
+{
+  "title": "八峰山收复战（演示剧本）",
+  "steps": [
+    { "event": "war_declared", "ctx": { "speaker": "thorgrim", "race": "dwarf", "target_race": "skaven" } },
+    { "event": "battle_start", "ctx": { "rival_pair": ["thorgrim", "queek"], "tags": ["thorgrim", "queek"] } },
+    { "event": "monster_enters", "ctx": { "side": "enemy" } },
+    { "event": "mass_rout", "ctx": { "side": "enemy", "target_race": "skaven" } },
+    { "event": "lord_slain", "ctx": { "side": "enemy" } },
+    { "event": "battle_result", "ctx": { "speaker": "thorgrim", "result": "victory" } },
+    { "event": "grudge_cleared", "ctx": { "race": "dwarf" } },
+    { "event": "world_tick", "ctx": {} }
+  ]
+}

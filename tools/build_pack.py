@@ -12,9 +12,13 @@ Output: mod_output/<mod_name>.pack (PFH5, uncompressed).
 """
 from __future__ import annotations
 
+import argparse
+import hashlib
 import json
+import os
 import re
 import shutil
+import sqlite3
 import struct
 import sys
 import time
@@ -29,8 +33,22 @@ PACK_PATH_OVERRIDES = {
         "script/campaign/mod/psw_03_tianfu_xiaoguo.lua": "script/campaign/mod/psw_天赋效果.lua",
     },
 }
-SCHEMA_DIR = Path.home() / "AppData" / "Roaming" / "FrodoWazEre" / "rpfm" / "config" / "schemas"
-SCHEMA_PATHS = sorted(SCHEMA_DIR.glob("schema_*.ron"))
+def _schema_paths() -> list[Path]:
+    sub = Path("AppData/Roaming/FrodoWazEre/rpfm/config/schemas")
+    dirs = [Path.home() / sub]
+    # WSL: Path.home() is the Linux home; also scan Windows profiles under /mnt/?/Users.
+    for mnt in Path("/mnt").glob("*/Users/*/"):
+        dirs.append(mnt / sub)
+    paths = []
+    for d in dirs:
+        try:
+            paths.extend(d.glob("schema_*.ron"))
+        except (PermissionError, OSError):
+            continue
+    return sorted(paths)
+
+
+SCHEMA_PATHS = _schema_paths()
 
 # Hard-coded schema for land_units_tables v54, discovered by parsing vanilla db.pack.
 LAND_UNITS_TABLES_V54_FIELDS = [
@@ -301,10 +319,80 @@ def encode_loc(rows) -> bytes:
     return bytes(out)
 
 
+# ------------------------------------------------------------- loc completeness gate
+# 单位 MOD 必须为每个新增单位提供完整说明（名称 + 短描述 + 长背景描述），
+# 技能同理。缺 key 或描述是占位符（与单位名相同/过短）时直接拒绝打包。
+MIN_HISTORICAL_LEN = 40  # 低于此长度视为存根（原版单位背景通常是整段文字）
+
+def check_unit_loc_coverage(db_rows: dict, loc_keys: dict, mod_name: str) -> None:
+    unit_keys = [r.get("unit", "").strip() for r in db_rows.get("main_units_tables", [])]
+    unit_keys = [k for k in unit_keys if k]
+    ability_keys = [r.get("key", "").strip() for r in db_rows.get("unit_abilities_tables", [])]
+    ability_keys = [k for k in ability_keys if k]
+    if not unit_keys and not ability_keys:
+        return
+
+    problems: list[str] = []
+    for key in unit_keys:
+        for prefix in (
+            f"units_onscreen_name_{key}",
+            f"land_units_onscreen_name_{key}",
+            f"unit_description_short_texts_text_{key}",
+            f"unit_description_historical_texts_text_{key}",
+        ):
+            if prefix not in loc_keys or not loc_keys[prefix].strip():
+                problems.append(f"缺少/为空: {prefix}")
+        hist = loc_keys.get(f"unit_description_historical_texts_text_{key}", "").strip()
+        short = loc_keys.get(f"unit_description_short_texts_text_{key}", "").strip()
+        name = loc_keys.get(f"units_onscreen_name_{key}", "").strip()
+        if hist and len(hist) < MIN_HISTORICAL_LEN:
+            problems.append(
+                f"背景描述过短({len(hist)}字<{MIN_HISTORICAL_LEN}): unit_description_historical_texts_text_{key}"
+            )
+        if short and name and short == name:
+            problems.append(f"短描述是占位符(等于单位名): unit_description_short_texts_text_{key}")
+        if hist and name and hist == name:
+            problems.append(f"背景描述是占位符(等于单位名): unit_description_historical_texts_text_{key}")
+    for key in ability_keys:
+        for prefix in (
+            f"unit_abilities_onscreen_name_{key}",
+            f"unit_abilities_tooltip_text_{key}",
+        ):
+            if prefix not in loc_keys or not loc_keys[prefix].strip():
+                problems.append(f"缺少/为空: {prefix}")
+
+    if problems:
+        listing = "\n".join("  - " + p for p in problems)
+        sys.exit(
+            f"error: {mod_name} 的单位/技能缺少完整说明 loc，已拒绝打包:\n{listing}\n"
+            "每个新增单位必须有: units_onscreen_name_*、land_units_onscreen_name_*、\n"
+            f"unit_description_short_texts_text_*、unit_description_historical_texts_text_* (>= {MIN_HISTORICAL_LEN} 字);\n"
+            "每个新增技能必须有: unit_abilities_onscreen_name_*、unit_abilities_tooltip_text_*。"
+        )
+
+
 # ------------------------------------------------------------- pack
-def pack_reserved_files(pack_notes: str = ""):
+def pack_dependencies(mod_root: Path) -> list[str]:
+    dep_file = mod_root / "notes" / "dependencies.txt"
+    if not dep_file.is_file():
+        return []
+    deps: list[str] = []
+    for raw_line in dep_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        deps.append(line)
+    return deps
+
+
+def pack_reserved_files(pack_notes: str = "", dependencies: list[str] | None = None):
     notes = (
         '{\n  "pack_notes": ' + json.dumps(pack_notes) + ',\n  "file_notes": {}\n}'
+    ).encode("utf-8")
+    deps = json.dumps(
+        [[True, dep] for dep in (dependencies or [])],
+        ensure_ascii=False,
+        indent=2,
     ).encode("utf-8")
     settings = (
         '{\n'
@@ -323,7 +411,7 @@ def pack_reserved_files(pack_notes: str = ""):
         "}"
     )
     return {
-        "dependencies_manager_v2.rpfm_reserved": b"[]",
+        "dependencies_manager_v2.rpfm_reserved": deps,
         "notes.rpfm_reserved": notes,
         "settings.rpfm_reserved": settings.encode("utf-8"),
     }
@@ -335,16 +423,23 @@ def build(mod_name: str, out_path: Path | None = None):
         out_path = ROOT / "mod_output" / f"{mod_name}.pack"
     schema = Schema()
     files: dict[str, bytes] = {}
+    db_rows: dict[str, list[dict[str, str]]] = {}
 
     for path in sorted((mod_root / "db").glob("*/*.tsv")):
         table, version, internal_path, rows = read_db_tsv(path)
         files[internal_path] = encode_db(table, version, rows, schema)
+        db_rows.setdefault(table, []).extend(rows)
         print(f"db {internal_path}: {len(rows)} rows")
 
+    loc_keys: dict[str, str] = {}
     for path in sorted((mod_root / "text").rglob("*.loc.tsv")):
         internal_path, rows = read_loc_tsv(path)
         files[internal_path] = encode_loc(rows)
+        for k, text, _tooltip in rows:
+            loc_keys[k] = text
         print(f"loc {internal_path}: {len(rows)} rows")
+
+    check_unit_loc_coverage(db_rows, loc_keys, mod_name)
 
     for path in sorted((mod_root / "text").rglob("*.loc")):
         internal = path.relative_to(mod_root).as_posix().replace("/", "\\")
@@ -363,9 +458,17 @@ def build(mod_name: str, out_path: Path | None = None):
 
     notes_path = mod_root / "notes" / "pack_notes.txt"
     pack_notes = notes_path.read_text(encoding="utf-8").strip() if notes_path.is_file() else ""
-    if pack_notes:
-        print(f"notes: {pack_notes[:60]}...")
-    files.update(pack_reserved_files(pack_notes))
+    if not pack_notes:
+        sys.exit(
+            "error: mod_files/%s/notes/pack_notes.txt missing or empty; "
+            "every mod must carry a description (goes into pack notes.rpfm_reserved "
+            "and Mod Manager user_mod_data)" % mod_name
+        )
+    print(f"notes: {pack_notes[:60]}...")
+    dependencies = pack_dependencies(mod_root)
+    if dependencies:
+        print(f"dependencies: {', '.join(dependencies)}")
+    files.update(pack_reserved_files(pack_notes, dependencies))
 
     entries = sorted(files.items(), key=lambda item: item[0])
     index = bytearray()
@@ -377,16 +480,18 @@ def build(mod_name: str, out_path: Path | None = None):
         index += b"\x00"
         data += content
 
+    dep_block = b"".join(dep.encode("utf-8") + b"\x00" for dep in dependencies)
     header = bytearray()
     header += b"PFH5"
     header += struct.pack("<I", 3)
-    header += b"\x00" * 8
+    header += struct.pack("<I", len(dependencies))
+    header += struct.pack("<I", len(dep_block))
     header += struct.pack("<I", len(entries))
     header += struct.pack("<I", len(index))
     header += struct.pack("<I", int(time.time()))
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_bytes(bytes(header + index + data))
+    out_path.write_bytes(bytes(header + dep_block + index + data))
 
     # validate
     blob = out_path.read_bytes()
@@ -404,7 +509,156 @@ def build(mod_name: str, out_path: Path | None = None):
         print("warning: no preview.png in mod_files/" + mod_name)
 
 
+# ------------------------------------------------------------- deploy
+GAME_DATA_DIR = Path(
+    r"E:\Program Files (x86)\Steam2\steamapps\common\Total War WARHAMMER III\data"
+)
+STATE_DB = Path(os.environ.get("APPDATA", "")) / "WycccModManager" / "state.db"
+PLAYSET_KEY = "current_playset_id:warhammer3"
+ENABLED_ORDER_KEY = "enabled_order:warhammer3"
+
+
+def local_mod_id(pack_path: Path) -> str:
+    canonical = str(pack_path.resolve()).replace("\\", "/").casefold()
+    return "local:data:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:18]
+
+
+def deploy(mod_name: str, pack_path: Path, alias: str = "",
+           deploy_name: str = "", replace_id: str = ""):
+    """Deploy pack + preview into game data/, then register in state.db:
+    upsert user_mod_data (alias+notes) and add to the current playset.
+    Fails outright when the Mod Manager display text is unavailable."""
+    mod_root = ROOT / "mod_files" / mod_name
+    notes = (mod_root / "notes" / "pack_notes.txt").read_text(
+        encoding="utf-8").strip()
+    if not alias:
+        alias_file = mod_root / "notes" / "alias.txt"
+        alias = alias_file.read_text(encoding="utf-8").strip() \
+            if alias_file.is_file() else ""
+    if not alias:
+        sys.exit(
+            "error: no alias for %s; write mod_files/%s/notes/alias.txt "
+            "(Mod Manager display name) or pass --alias" % (mod_name, mod_name))
+
+    deploy_name = deploy_name or f"{mod_name}.pack"
+    dst = GAME_DATA_DIR / deploy_name
+    for attempt in range(3):
+        try:
+            shutil.copy2(pack_path, dst)
+            break
+        except PermissionError:
+            if attempt == 2:
+                sys.exit(
+                    "error: %s is locked (game running?). "
+                    "Close the game, then rerun --deploy." % dst)
+            print(f"pack locked, retry {attempt + 1}/3 ...")
+            time.sleep(5)
+    preview = pack_path.with_suffix(".png")
+    if preview.is_file():
+        shutil.copy2(preview, dst.with_suffix(".png"))
+    print(f"deployed -> {dst}")
+
+    mod_id = local_mod_id(dst)
+    shutil.copy2(STATE_DB, str(STATE_DB) + f".bak_deploy_{mod_name}")
+    db = sqlite3.connect(STATE_DB)
+    now = int(time.time() * 1000)
+    db.execute(
+        "INSERT INTO user_mod_data(mod_id, alias, notes, updated_at) "
+        "VALUES(?, ?, ?, ?) ON CONFLICT(mod_id) DO UPDATE SET "
+        "alias=excluded.alias, notes=excluded.notes, updated_at=excluded.updated_at",
+        (mod_id, alias, notes, now))
+    print(f"user_mod_data <- {mod_id} | {alias}")
+
+    # Optional Mod Manager category: notes/mod_type.txt holds one type id or
+    # display name per line (language/ui/unit/feature/overhaul/visual or a
+    # custom type name like 补丁). Deploy stamps it into user_mod_data so the
+    # manager UI shows the right type without manual tagging.
+    type_file = mod_root / "notes" / "mod_type.txt"
+    if type_file.is_file():
+        wanted = [l.strip() for l in
+                  type_file.read_text(encoding="utf-8").splitlines()
+                  if l.strip() and not l.strip().startswith("#")]
+        if wanted:
+            builtin = {"language", "ui", "unit", "feature", "overhaul",
+                       "visual", "unknown"}
+            name2id = {}
+            for row in db.execute(
+                    "SELECT id, name FROM custom_mod_types"):
+                name2id[row[1].casefold()] = row[0]
+            for zh, en in {"语言包": "language", "UI": "ui", "单位": "unit",
+                           "功能": "feature", "大修": "overhaul",
+                           "美化": "visual", "未知": "unknown"}.items():
+                name2id.setdefault(zh.casefold(), en)
+            ids = []
+            for w in wanted:
+                tid = w if w in builtin else name2id.get(w.casefold(), w)
+                if tid not in ids:
+                    ids.append(tid)
+            db.execute(
+                "UPDATE user_mod_data SET mod_type=?, mod_types=? "
+                "WHERE mod_id=?",
+                (ids[0], json.dumps(ids, ensure_ascii=False), mod_id))
+            print(f"mod_type <- {ids}")
+
+    playset_id = db.execute(
+        "SELECT value FROM app_state WHERE key=?", (PLAYSET_KEY,)).fetchone()[0]
+    if replace_id:
+        cur = db.execute(
+            "UPDATE playset_items SET mod_id=? WHERE playset_id=? AND mod_id=?",
+            (mod_id, playset_id, replace_id))
+        print(f"playset_items replace {replace_id} -> {mod_id}: {cur.rowcount} row(s)")
+        row = db.execute(
+            "SELECT value FROM app_state WHERE key=?", (ENABLED_ORDER_KEY,)).fetchone()
+        order = json.loads(row[0]) if row else []
+        order = [mod_id if x == replace_id else x for x in order]
+        if mod_id not in order:
+            order.append(mod_id)
+        db.execute("UPDATE app_state SET value=? WHERE key=?",
+                   (json.dumps(order), ENABLED_ORDER_KEY))
+    else:
+        exists = db.execute(
+            "SELECT position FROM playset_items WHERE playset_id=? AND mod_id=?",
+            (playset_id, mod_id)).fetchone()
+        if exists:
+            print(f"already in playset at pos {exists[0]}")
+        else:
+            pos = db.execute(
+                "SELECT COALESCE(MAX(position)+1, 0) FROM playset_items "
+                "WHERE playset_id=?", (playset_id,)).fetchone()[0]
+            db.execute(
+                "INSERT INTO playset_items(playset_id, mod_id, position) "
+                "VALUES(?, ?, ?)", (playset_id, mod_id, pos))
+            print(f"playset_items insert at pos {pos}")
+        row = db.execute(
+            "SELECT value FROM app_state WHERE key=?", (ENABLED_ORDER_KEY,)).fetchone()
+        order = json.loads(row[0]) if row else []
+        if mod_id not in order:
+            order.append(mod_id)
+            db.execute("UPDATE app_state SET value=? WHERE key=?",
+                       (json.dumps(order), ENABLED_ORDER_KEY))
+    db.commit()
+    db.close()
+    print("state.db updated (backup: .bak_deploy_%s)" % mod_name)
+
+
 if __name__ == "__main__":
-    mod = sys.argv[1]
-    out = Path(sys.argv[2]) if len(sys.argv) > 2 else None
-    build(mod, out)
+    ap = argparse.ArgumentParser(description="Build a WH3 .pack from mod_files/<mod>/")
+    ap.add_argument("mod")
+    ap.add_argument("out", nargs="?", help="output .pack path (default mod_output/<mod>.pack)")
+    ap.add_argument("--deploy", action="store_true",
+                    help="copy to game data/, register in Mod Manager state.db "
+                         "(user_mod_data alias+notes + playset)")
+    ap.add_argument("--deploy-name", default="",
+                    help="deploy under a different pack filename, e.g. <mod>2.pack")
+    ap.add_argument("--alias", default="",
+                    help="Mod Manager display name (default: notes/alias.txt)")
+    ap.add_argument("--replace", default="", metavar="OLD_MOD_ID",
+                    help="replace this mod_id in the playset instead of appending")
+    args = ap.parse_args()
+
+    out = Path(args.out) if args.out else None
+    build(args.mod, out)
+    if args.deploy:
+        pack = out or ROOT / "mod_output" / f"{args.mod}.pack"
+        deploy(args.mod, pack, alias=args.alias,
+               deploy_name=args.deploy_name, replace_id=args.replace)

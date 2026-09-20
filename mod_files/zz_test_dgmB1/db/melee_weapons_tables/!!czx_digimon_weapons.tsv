@@ -1,0 +1,106 @@
+﻿bonus_v_large	bonus_v_infantry	key	damage	ap_damage	weapon_length	melee_weapon_type	audio_type	splash_attack_target_size	splash_attack_max_attacks	splash_attack_power_multiplier	building_damage_multiplier	ignition_amount	is_magical	contact_phase	collision_attack_max_targets	collision_attack_max_targets_cooldown	melee_attack_interval	scaling_damage	is_spell
+#melee_weapons_tables;25;db/melee_weapons_tables/!!czx_digimon_weapons																			
+0	0	czx_dgm_wpn_wargreymon	21	7	1.0	sword	creatures_big		1	1.0	0.75	0.0	true		0	10	4.300000190734863		false
+0	0	czx_dgm_wpn_agumon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.400000095367432		false
+25	0	czx_dgm_wpn_greymon	33	77	2.0	axe	creatures_claws	medium	3	1.2000000476837158	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+0	18	czx_dgm_wpn_omegamon	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	0	czx_dgm_wpn_guilmon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_veemon	21	9	1.0	axe	unarmed		1	1.0	1.0	0.0	false		0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_gabumon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_gomamon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_palmon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh_main_unit_contact_poison	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_renamon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false		0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_sunflowmon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh_main_unit_contact_poison	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_zubamon	21	9	1.0	axe	sword_medium		1	1.0	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.400000095367432		false
+25	0	czx_dgm_wpn_togemon	33	77	2.0	axe	unarmed	medium	3	1.2000000476837158	1.0	0.0	false	wh_main_unit_contact_poison	0	10	4.0		false
+0	0	czx_dgm_wpn_gatomon	21	9	1.0	axe	unarmed		1	1.0	1.0	0.0	true		0	10	4.400000095367432		false
+25	0	czx_dgm_wpn_growlmon	33	77	2.0	axe	creatures_claws	medium	3	1.2000000476837158	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+25	0	czx_dgm_wpn_geogreymon	33	77	2.0	axe	creatures_claws	medium	3	1.2000000476837158	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+25	0	czx_dgm_wpn_tyranomon	33	77	2.0	axe	creatures_claws	medium	3	1.2000000476837158	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+25	0	czx_dgm_wpn_veedramon	33	77	2.0	axe	creatures_claws	medium	3	1.2000000476837158	1.0	0.0	false		0	10	4.0		false
+25	0	czx_dgm_wpn_veemonex	33	77	2.0	axe	creatures_claws	medium	3	1.2000000476837158	1.0	0.0	false		0	10	4.0		false
+25	0	czx_dgm_wpn_vritramon	33	77	2.0	axe	creatures_claws	medium	3	1.2000000476837158	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+25	0	czx_dgm_wpn_duramon	33	77	2.0	axe	sword_huge	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_metalgreymon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_weregarurumon	33	77	2.0	axe	Medium_Metal_Fist	medium	3	1.2000000476837158	1.0	0.0	false		0	10	4.0		false
+25	0	czx_dgm_wpn_zudomon	33	77	2.0	axe	hammer_huge	medium	3	1.2000000476837158	1.0	0.0	false	wh2_dlc12_unit_passive_zzzap	0	10	4.0		false
+25	0	czx_dgm_wpn_wargrowlmon	33	77	2.0	axe	sword_huge	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_rizegreymon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_paildramon	33	77	2.0	axe	sword_huge	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_skullgreymon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	4.0		false
+25	0	czx_dgm_wpn_metaltyranomon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+25	0	czx_dgm_wpn_lilamon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_main_unit_contact_poison	0	10	4.0		false
+25	0	czx_dgm_wpn_blitzgreymon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh2_dlc12_unit_passive_zzzap	0	10	4.0		false
+25	0	czx_dgm_wpn_durandamon	33	77	2.0	axe	sword_huge	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_machinedramon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_chaosdramon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+25	0	czx_dgm_wpn_sakuyamon	33	77	2.0	axe	staff	medium	3	1.2000000476837158	1.0	0.0	true		0	10	4.0		false
+25	0	czx_dgm_wpn_vikemon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.0		false
+25	0	czx_dgm_wpn_fujinmon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+0	18	czx_dgm_wpn_wargreymonx	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	3.5		false
+0	18	czx_dgm_wpn_shinegreymon	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	false	wh3_main_unit_contact_warpflame	0	10	3.5		false
+0	18	czx_dgm_wpn_shinegreymonbm	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	false	wh3_main_unit_contact_warpflame	0	10	3.5		false
+0	18	czx_dgm_wpn_omegamonx	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_omegamonab	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	3.5		false
+0	18	czx_dgm_wpn_omegamonas	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_omegamond	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	3.5		false
+0	18	czx_dgm_wpn_omegamonm	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_gallantmon	120	300	10.0	axe	spear_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_gallantmoncm	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_gallantmonx	120	300	10.0	axe	spear_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_alphamon	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_jesmon	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_jesmonx	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_magnamon	120	300	10.0	axe	Medium_Metal_Fist	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_magnamonx	120	300	10.0	axe	Medium_Metal_Fist	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_imperialfm	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	3.5		false
+0	18	czx_dgm_wpn_imperialpm	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_ulforcev	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_ulforcevx	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_mastemon	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	3.5		false
+0	18	czx_dgm_wpn_zeedmillennium	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	3.5		false
+0	18	czx_dgm_wpn_lucemonfm	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	3.5		false
+0	18	czx_dgm_wpn_susanoomon	120	300	10.0	axe	sword_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	0	czx_dgm_wpn_biyomon	234	156	7.0	axe	creatures_claws	large	4	1.0	0.75	0.0	false		0	3	4.0		false
+0	0	czx_dgm_wpn_birdramon	234	156	7.0	axe	creatures_claws	large	4	1.0	0.75	0.0	false	wh3_main_unit_contact_warpflame	0	3	4.0		false
+0	0	czx_dgm_wpn_hououmon	234	156	7.0	axe	creatures_big	large	4	1.0	0.75	0.0	false	wh3_main_unit_contact_warpflame	0	3	4.0		false
+0	0	czx_dgm_wpn_patamon	29	13	1.0	axe	unarmed	medium	1	1.0	0.5	0.0	false		0	10	4.0		false
+0	0	czx_dgm_wpn_plotmon	29	13	1.0	axe	creatures_claws	medium	1	1.0	0.5	0.0	true		0	10	4.0		false
+0	0	czx_dgm_wpn_garurumon	29	13	1.0	axe	creatures_claws	medium	1	1.0	0.5	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+0	0	czx_dgm_wpn_ikkakumon	29	13	1.0	axe	creatures_claws	medium	1	1.0	0.5	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.0		false
+0	0	czx_dgm_wpn_kyubimon	29	13	1.0	axe	creatures_claws	medium	1	1.0	0.5	0.0	false	wh3_main_unit_contact_warpflame	0	10	4.0		false
+0	0	czx_dgm_wpn_zubaeagermon	29	13	1.0	axe	sword_medium	medium	1	1.0	0.5	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+0	0	czx_dgm_wpn_magnadramon	29	13	1.0	axe	creatures_big	medium	1	1.0	0.5	0.0	true		0	10	4.0		false
+0	0	czx_dgm_wpn_metalgarurumon	29	13	1.0	axe	creatures_big	medium	1	1.0	0.5	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.0		false
+0	0	czx_dgm_wpn_metalgarurumonx	29	13	1.0	axe	creatures_big	medium	1	1.0	0.5	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.0		false
+0	0	czx_dgm_wpn_tentomon	12	25	3.0	knife	creatures_claws		1	1.0	0.25	0.0	false	wh2_dlc12_unit_passive_zzzap	0	10	4.0		false
+0	0	czx_dgm_wpn_kabuterimon	12	25	3.0	knife	creatures_claws		1	1.0	0.25	0.0	false	wh2_dlc12_unit_passive_zzzap	0	10	4.0		false
+0	0	czx_dgm_wpn_megakabuterimon	12	25	3.0	knife	creatures_big		1	1.0	0.25	0.0	false	wh2_dlc12_unit_passive_zzzap	0	10	4.0		false
+0	0	czx_dgm_wpn_heraklekabuterimon	12	25	3.0	knife	creatures_big		1	1.0	0.25	0.0	false	wh2_dlc12_unit_passive_zzzap	0	10	4.0		false
+0	0	czx_dgm_wpn_dorumon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_lalamon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh_main_unit_contact_poison	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_tinkermon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_angemon	21	9	1.0	axe	staff		1	1.0	1.0	0.0	true		0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_dorugamon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.400000095367432		false
+0	0	czx_dgm_wpn_fairymon	21	9	1.0	axe	creatures_claws		1	1.0	1.0	0.0	false		0	10	4.400000095367432		false
+25	0	czx_dgm_wpn_garudamon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false		0	10	4.0		false
+25	0	czx_dgm_wpn_angewomon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	true		0	10	4.0		false
+25	0	czx_dgm_wpn_lilimon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_main_unit_contact_poison	0	10	4.0		false
+25	0	czx_dgm_wpn_magnaangemon	33	77	2.0	axe	sword_huge	medium	3	1.2000000476837158	1.0	0.0	true		0	10	4.0		false
+25	0	czx_dgm_wpn_taomon	33	77	2.0	axe	staff	medium	3	1.2000000476837158	1.0	0.0	true		0	10	4.0		false
+25	0	czx_dgm_wpn_jetsilphymon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.0		false
+25	0	czx_dgm_wpn_aerovdramon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false		0	10	4.0		false
+25	0	czx_dgm_wpn_cresgarurumon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.0		false
+25	0	czx_dgm_wpn_rosemon	33	77	2.0	axe	whip	medium	3	1.2000000476837158	1.0	0.0	true		0	10	4.0		false
+25	0	czx_dgm_wpn_rosemonbm	33	77	2.0	axe	sword_huge	medium	3	1.2000000476837158	1.0	0.0	true		0	10	4.0		false
+25	0	czx_dgm_wpn_dorugoramon	33	77	2.0	axe	creatures_big	medium	3	1.2000000476837158	1.0	0.0	false	wh_dlc06_unit_contact_sundered_armour	0	10	4.0		false
+0	18	czx_dgm_wpn_imperialdm	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	false	wh3_main_unit_contact_warpflame	0	10	3.5		false
+0	18	czx_dgm_wpn_seraphimon	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_ophanimon	120	300	10.0	axe	spear_huge	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+0	18	czx_dgm_wpn_ophanimonfm	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	3.5		false
+0	18	czx_dgm_wpn_lucemon	120	300	10.0	axe	creatures_big	medium	4	1.5	1.25	0.0	true		0	10	3.5		false
+18	0	czx_dgm_wpn_seadramon	23	52	2.0	spear	creatures_claws	medium	2	1.0	0.5	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.699999809265137		false
+18	0	czx_dgm_wpn_megaseadramon	23	52	2.0	spear	creatures_big	medium	2	1.0	0.5	0.0	false	wh2_dlc12_unit_passive_zzzap	0	10	4.699999809265137		false
+18	0	czx_dgm_wpn_metalseadramon	23	52	2.0	spear	creatures_big	medium	2	1.0	0.5	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.699999809265137		false
+18	0	czx_dgm_wpn_plesiomon	23	52	2.0	spear	creatures_big	medium	2	1.0	0.5	0.0	false	wh_dlc08_unit_contact_frostbite	0	10	4.699999809265137		false
+18	0	czx_dgm_wpn_apocalymon	23	52	2.0	spear	creatures_big	medium	2	1.0	0.5	0.0	true	wh_dlc06_unit_contact_discouraged	0	10	4.699999809265137		false

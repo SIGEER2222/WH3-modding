@@ -142,8 +142,17 @@ def donor_bind_locals(donor_skel):
     return lp, lq
 
 
+def _slerp_id(q, t):
+    """Interpolate identity -> q by t (damp a rotation delta)."""
+    if q[3] < 0:
+        q = [-c for c in q]
+    r = [q[0] * t, q[1] * t, q[2] * t, 1.0 + (q[3] - 1.0) * t]
+    n = sum(c * c for c in r) ** 0.5
+    return [c / n for c in r]
+
+
 def retarget_delta(clip, fit_skel, donor_skel, new_skel_name,
-                   ref='frame0'):
+                   ref='frame0', damp=None, pos_damp=None):
     """World-rotation-delta retarget for mismatched bind poses.
 
     For every rotation-tracked bone, the donor's world-space delta is
@@ -154,7 +163,16 @@ def retarget_delta(clip, fit_skel, donor_skel, new_skel_name,
     ref='bind': delta measured vs donor bind pose.
     Positions follow our bind local offsets; root/animroot copy the
     donor's world-space root motion scaled by bind height ratio.
+    damp: optional {name_regex: factor} — rotation deltas for matching
+    bones are blended toward identity (e.g. {'tail_': 0.5} tames whip
+    on much-longer-than-donor tails).
+    pos_damp: optional {name_regex: factor} — scales the donor's world
+    root-motion delta for matching root/animroot bones (e.g. {'^root$': 0.4}
+    reins in a donor leap that would fling a small unit sky-high).
     """
+    import re as _re
+    damp_re = [( _re.compile(k), v) for k, v in (damp or {}).items()]
+    pos_re = [( _re.compile(k), v) for k, v in (pos_damp or {}).items()]
     bones = clip['bones']
     bc = len(bones)
     name2i = {b['name']: i for i, b in enumerate(bones)}
@@ -212,26 +230,39 @@ def retarget_delta(clip, fit_skel, donor_skel, new_skel_name,
             for i, b in enumerate(bones):
                 par = b['parent']
                 j = di.get(b['name'])
+                dampf = next((v for rx, v in damp_re if rx.search(b['name'])), 1.0)
                 if par < 0:
                     if part['rb'][i] > 0 and j is not None:
                         rq0 = ref_wq[i] if ref == 'frame0' else ref_wq[j]
-                        wqo[i] = qmul(qmul(wqd[i], qinv_norm(rq0)), o_wq[i])
+                        dq = qmul(wqd[i], qinv_norm(rq0))
+                        if dampf < 1.0:
+                            dq = _slerp_id(dq, dampf)
+                        wqo[i] = qmul(dq, o_wq[i])
                     else:
                         wqo[i] = list(o_wq[i])
                     if b['name'] in ('root', 'animroot') and j is not None:
                         rp0 = ref_wp[i] if ref == 'frame0' else ref_wp[j]
-                        wpo[i] = [o_wp[i][k] + (wpd[i][k] - rp0[k]) * ratio for k in range(3)]
+                        pf = next((v for rx, v in pos_re
+                                   if rx.search(b['name'])), 1.0)
+                        wpo[i] = [o_wp[i][k] + (wpd[i][k] - rp0[k]) * ratio * pf
+                                  for k in range(3)]
                     else:
                         wpo[i] = list(o_wp[i])
                     continue
                 if part['rb'][i] > 0 and j is not None:
                     rq0 = ref_wq[i] if ref == 'frame0' else ref_wq[j]
-                    wqo[i] = qmul(qmul(wqd[i], qinv_norm(rq0)), o_wq[i])
+                    dq = qmul(wqd[i], qinv_norm(rq0))
+                    if dampf < 1.0:
+                        dq = _slerp_id(dq, dampf)
+                    wqo[i] = qmul(dq, o_wq[i])
                 else:
                     wqo[i] = qmul(wqo[par], sq[i])
                 if b['name'] in ('root', 'animroot') and j is not None:
                     rp0 = ref_wp[i] if ref == 'frame0' else ref_wp[j]
-                    wpo[i] = [o_wp[i][k] + (wpd[i][k] - rp0[k]) * ratio for k in range(3)]
+                    pf = next((v for rx, v in pos_re
+                               if rx.search(b['name'])), 1.0)
+                    wpo[i] = [o_wp[i][k] + (wpd[i][k] - rp0[k]) * ratio * pf
+                              for k in range(3)]
                 else:
                     o = qrot(wqo[par], sp[i])
                     wpo[i] = [wpo[par][k] + o[k] for k in range(3)]
@@ -308,7 +339,21 @@ if __name__ == '__main__':
     clip = load_clip(clip_path)
     skel = json.load(open(skel_path))
     new_name = skel.get('custom_name', skel['skeleton_name'])
-    clip, world = retarget(clip, skel, new_name)
+    if '--delta' in sys.argv:
+        # world-delta retarget: needs the DONOR skeleton for reference poses
+        donor = json.load(open(sys.argv[sys.argv.index('--delta') + 1]))
+        ref = 'bind'
+        if '--ref' in sys.argv:
+            ref = sys.argv[sys.argv.index('--ref') + 1]
+        damp = {}
+        if '--damp' in sys.argv:
+            for kv in sys.argv[sys.argv.index('--damp') + 1].split(','):
+                k, v = kv.split('=')
+                damp[k] = float(v)
+        clip, world = retarget_delta(clip, skel, donor, new_name,
+                                     ref=ref, damp=damp or None)
+    else:
+        clip, world = retarget(clip, skel, new_name)
     n = write_file(clip, out_path, zstd_compress=True)
     print('wrote', out_path, n, 'bytes,',
           sum(len(p['frames']) for p in clip['parts']), 'frames')
