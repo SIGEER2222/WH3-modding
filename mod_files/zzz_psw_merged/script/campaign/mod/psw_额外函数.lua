@@ -132,7 +132,7 @@ function psw_main_pickup(faction_name)
     local ex_jishu = 0
     
     
-    if final_tf_count >= 13 then
+    if final_tf_count >= 99 then
         advice_alice_tf_norsx()
         return
     end
@@ -1008,10 +1008,32 @@ function psw_main_nor_pool(faction_name, slot_number)
     
     ---------------------
     
+    --[merged] 抽中已拥有天赋时从当前池的未拥有子集重抽，避免点卡走"获取天赋失败"兜底
+    local function _tf_owned(key)
+        return psw_faction_has_effect_bundle(faction_name, "set_" .. tostring(key))
+            or psw_faction_has_effect_bundle(faction_name, "set_main_" .. tostring(key))
+            or (psw_main_data.global_data ~= nil and psw_main_data.global_data["set_main_" .. tostring(key)] == true)
+    end
+    if psw_nor_tf and _tf_owned(psw_nor_tf) then
+        local _avail = {}
+        for _, _t in ipairs(tf_pool) do
+            if not _tf_owned(_t) then
+                table.insert(_avail, _t)
+            end
+        end
+        if #_avail > 0 then
+            psw_nor_tf = _avail[cm:random_number(#_avail)]
+        else
+            psw_nor_tf = nil
+        end
+    end
+
     if slot:has_building() then
         cm:foreign_slot_instantly_dismantle_building(slot)
     end
-    cm:foreign_slot_instantly_upgrade_building(slot, psw_nor_tf)
+    if psw_nor_tf then
+        cm:foreign_slot_instantly_upgrade_building(slot, psw_nor_tf)
+    end
 end
 
 local psw_ceshi_tf_ex_pool = {
@@ -1430,10 +1452,31 @@ function psw_main_ex_pool(faction_name, slot_number, is_zhongduan, zhongduan_nam
     if not slot_n_list or slot_n_list:num_items() < slot_number then return end
     local slot = slot_n_list:item_at(slot_number-1)
     if not slot or slot:is_null_interface() then return end
+    --[merged] 抽中已拥有唯一天赋时从未拥有子集重抽，避免点卡走"获取天赋失败"兜底
+    local function _ex_tf_owned(key)
+        return psw_faction_has_effect_bundle(faction_name, "set_" .. tostring(key))
+            or psw_faction_has_effect_bundle(faction_name, "set_main_" .. tostring(key))
+            or (psw_main_data.global_data ~= nil and psw_main_data.global_data["set_main_" .. tostring(key)] == true)
+    end
+    if psw_ex_tf and _ex_tf_owned(psw_ex_tf) then
+        local _avail = {}
+        for _, _t in ipairs(psw_ex_tf_pool) do
+            if not _ex_tf_owned(_t) then
+                table.insert(_avail, _t)
+            end
+        end
+        if #_avail > 0 then
+            psw_ex_tf = _avail[cm:random_number(#_avail)]
+        else
+            psw_ex_tf = nil
+        end
+    end
     if slot:has_building() then
         cm:foreign_slot_instantly_dismantle_building(slot)
     end
-    cm:foreign_slot_instantly_upgrade_building(slot, psw_ex_tf)
+    if psw_ex_tf then
+        cm:foreign_slot_instantly_upgrade_building(slot, psw_ex_tf)
+    end
 end
 
 
@@ -4795,7 +4838,7 @@ psw_main_pickup = function(faction_name)
 
     local ex_jishu = 0
 
-    if final_tf_count >= 13 then
+    if final_tf_count >= 99 then
         advice_alice_tf_norsx()
         return
     end

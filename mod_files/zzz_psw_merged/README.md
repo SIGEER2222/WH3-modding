@@ -90,7 +90,23 @@ zzz_psw_merged.pack           ← 本补丁（更高覆盖优先级）
 | `psw_complete_fix.pack.bak` | 旧备份 | 未合并，保留备份 |
 | `psw_final_fix.pack.bak` | 旧备份 | 未合并，保留备份 |
 
-### 6. 拆除天赋提示弹窗修复（2026-09-12）
+### 6. 祈愿水晶 UI 对全派系可见（2026-09-13）
+
+主 MOD `psw_资源UI显示.lua` 只对 17 个 culture 白名单创建 `psw_main_qysj_holder` 顶栏组件；鼠人（`wh2_main_skv_skaven`）、帝国、诺斯卡、暗精、蜥蜴人、古墓王、吸血鬼海岸不在其中，水晶正常累积但不显示。
+
+修复：新增 `script/campaign/mod/psw_08_qysj_ui.lua`，对人类派系幂等补建该组件（已存在则跳过，与主 MOD 创建互不干扰）。
+
+### 7. Mixu 兼容补丁移到主包之后的 pack（2026-09-13）
+
+原 `zzz_psw_mixu_compat` 片段（4 张表）与主 MOD `psw_*` 片段存在同 key 行冲突（`PSW_HORDE`、各 `remove`/`permitted` 行）。实测 WH3 对**不同名片段的同 key 行**按 **pack 加载顺序、后者胜出**裁决（片段文件名含 `!` 前缀无效）——主包在 playset pos 106、本包 pos 94 → 主包 `slot_cap=14` 一直胜出，`slot_cap=30` 与 `psw_horde_*` 模板**从未生效**（日志实测 `BuildingSlotList` 只有 14 槽）。
+
+修复：4 个片段（改名 `!!czx_psw_mixu`）移到 `zzz_czx_auto_tools.pack`（playset pos 135，在主包之后）：
+- `PSW_HORDE` 使用 `psw_horde_primary/secondary` 模板，`slot_cap=30`
+- `horde_*` 通用模板上的 PSW 建筑链许可被 `remove` 行移除（不再泄漏给其他原版游牧）
+- 其他原版游牧 force 的 `slot_cap` 一并提升为 30
+- 注意：Lua 同路径覆盖仍需要本包排在主包**之前**，方向与 DB 行覆盖相反，所以 DB 补丁只能拆到别的 pack
+
+### 8. 拆除天赋提示弹窗修复（2026-09-12）
 
 `psw_06_chaichu.lua` 拆除成功后调用 `cm:show_advice("psw_chaichu_done")`，但此前包内缺少 advice DB 记录，loc 又误用 `advice_info_text_` 前缀 → 点击确认按钮弹出不可关闭的 "Placeholder Body" 模态框。
 

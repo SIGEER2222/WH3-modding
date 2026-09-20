@@ -927,6 +927,9 @@ function djs_my_night_jx()
     function(context)
         local faction_name = context:character():faction():name()
         local faction = cm:get_faction(faction_name)
+        if not faction or not psw_main_data.player_data[faction_name] then
+            return
+        end
         local yx_subtype = psw_main_data.player_data[faction_name].yx_subtype
         local psw_main_character = cm:get_most_recently_created_character_of_type(faction, "general", yx_subtype)
         local djs_meili = psw_main_data.player_data[faction_name].psw_meili
@@ -2668,8 +2671,17 @@ function azsyz_mlxs_jx()
     function(context)
         local faction_name = context:character():faction():name()
         local faction = context:character():faction()
-        local jishu_mofashaonv =  faction:pooled_resource_manager():resource("jishu_mofashaonv"):value()
-        local psw_moli =  faction:pooled_resource_manager():resource("psw_moli"):value()
+        if not psw_main_data.player_data[faction_name] then
+            return
+        end
+        local prm = faction:pooled_resource_manager()
+        local res_mfs = prm and prm:resource("jishu_mofashaonv")
+        local res_moli = prm and prm:resource("psw_moli")
+        if not (res_mfs and res_mfs.value and res_moli and res_moli.value) then
+            return
+        end
+        local jishu_mofashaonv =  res_mfs:value()
+        local psw_moli =  res_moli:value()
         local yx_subtype = psw_main_data.player_data[faction_name].yx_subtype
         local psw_main_character = cm:get_most_recently_created_character_of_type(faction, "general", yx_subtype)
         if jishu_mofashaonv >= 3 and psw_moli >= 10 then

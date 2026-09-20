@@ -816,6 +816,62 @@ local function psw_get_any(faction_name, key)
     return t and t[key]
 end
 
+-- 传送兜底：派系领袖不在图上带兵时（受伤/无军队），改用第一支可派遣的在图军队
+local function psw_char_deployable(char)
+    return char and not char:is_null_interface() and not char:is_wounded()
+        and not char:is_at_sea() and cm:char_is_general_with_army(char)
+end
+
+local function psw_tp_commander(faction)
+    local leader = faction:faction_leader()
+    if psw_char_deployable(leader) then
+        return leader
+    end
+    local mf_list = faction:military_force_list()
+    local fallback
+    for i = 0, mf_list:num_items() - 1 do
+        local force = mf_list:item_at(i)
+        if not force:is_null_interface() and not force:is_armed_citizenry() and force:has_general() then
+            local gen = force:general_character()
+            if psw_char_deployable(gen) then
+                local ok, ft = pcall(function() return force:force_type():key() end)
+                if ok and ft == "ARMY" then
+                    return gen
+                elseif not fallback then
+                    fallback = gen
+                end
+            end
+        end
+    end
+    return fallback
+end
+
+-- 阻止重生仪式目标兜底：存储的传奇领主 cqi 失效时，按 subtype 扫描魔王派系在图的传奇领主军队
+local psw_tfmw_wef_legend_pool = {
+    psw_tfmw_wef_boss_jiemei = true,
+    psw_tfmw_wef_boss_duersu = true,
+    psw_tfmw_wef_boss_daicha = true,
+    psw_tfmw_wef_boss_airuier = true,
+    psw_tfmw_wef_boss_kedier = true,
+}
+local function psw_csys_target_character(mw_faction)
+    local cqi = psw_main_data.global_data.creat_sszm_mf_cqi
+    local char = cqi and cm:get_character_by_cqi(cqi)
+    if psw_char_deployable(char) then
+        return char
+    end
+    if mw_faction and not mw_faction:is_null_interface() then
+        local char_list = mw_faction:character_list()
+        for i = 0, char_list:num_items() - 1 do
+            local c = char_list:item_at(i)
+            if psw_char_deployable(c) and psw_tfmw_wef_legend_pool[c:character_subtype_key()] then
+                return c
+            end
+        end
+    end
+    return nil
+end
+
 
 -- ERE WE GO
 
@@ -1065,13 +1121,11 @@ local faction_leader=faction:faction_leader()
 if not p.set_psw_hero_select then
                                                            
             if faction_name ~= "wh3_dlc24_tze_the_deceivers" and faction_name ~= "wh2_dlc13_lzd_spirits_of_the_jungle" and faction_name ~= "wh3_dlc27_nor_sayl" and faction_name ~= "wh3_dlc27_sla_the_tormentors" and faction_name ~= "wh3_dlc27_sla_masque_of_slaanesh" and faction_name ~= "wh3_dlc27_hef_aislinn" then
-                if faction_leader:is_null_interface() or faction_leader:is_wounded() or faction_leader:is_at_sea() then
-                    alice_dlc6_character_get_false()
-                    return
-                end
+                local leader_bad = faction_leader:is_null_interface() or faction_leader:is_wounded() or faction_leader:is_at_sea()
                 local hero_region = faction:home_region()
-                
-                if (hero_region:is_null_interface()) or (hero_region == nil) or (hero_region:is_abandoned()) then
+                local region_null = hero_region:is_null_interface()
+                out("[psw_debug] faction=" .. tostring(faction_name) .. " leader_bad=" .. tostring(leader_bad) .. " region=" .. tostring(not region_null and hero_region:name() or "none") .. " abandoned=" .. tostring(not region_null and hero_region:is_abandoned()))
+                if (region_null) or (hero_region == nil) or (hero_region:is_abandoned()) then
                     alice_dlc6_character_get_false()
                     return
                 end
@@ -2349,67 +2403,90 @@ core:add_listener(
             
 ------------------ 世界BOSS传送 --------------------
         elseif dilemma_key == "dilemma_tf_duoren_tp" and choice == "FIRST" then
-            local faction_leader_x, faction_leader_y = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(faction_leader), true, 1)
-            
-            local boss_current_x = psw_main_data.global_data.jws_boss_location_x
-            local boss_current_y = psw_main_data.global_data.jws_boss_location_y
-            local boss_tp_num = psw_mowang_data.tp_boss_num
-            if boss_tp_num == 2 then
-                boss_current_x = psw_main_data.global_data.sznw_boss_location_x
-                boss_current_y = psw_main_data.global_data.sznw_boss_location_y
-                psw_main_data.global_data.psw_tfmw_is_tp_boss2 = true
-            elseif boss_tp_num == 3 then
-                boss_current_x = psw_main_data.global_data.lyzm_boss_location_x
-                boss_current_y = psw_main_data.global_data.lyzm_boss_location_y
-                psw_main_data.global_data.psw_tfmw_is_tp_boss3 = true
-            elseif boss_tp_num == 4 then
-                local mw_fac_leader = mw_faction:faction_leader()
-                local mwx , mwy = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(mw_fac_leader), true, 10)
-                boss_current_x = mwx
-                boss_current_y = mwy
-                psw_main_data.global_data.psw_tfmw_is_tp_boss_end = true
+            local tp_commander = psw_tp_commander(faction)
+            if not tp_commander then
+                out("### PSW duoren_tp FIRST skipped: no deployable army for " .. faction_name .. " ###")
             else
-                psw_main_data.global_data.psw_tfmw_is_tp_boss1 = true
+                local faction_leader_x, faction_leader_y = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(tp_commander), true, 1)
+
+                local boss_current_x = psw_main_data.global_data.jws_boss_location_x
+                local boss_current_y = psw_main_data.global_data.jws_boss_location_y
+                local boss_tp_num = psw_mowang_data.tp_boss_num
+                if boss_tp_num == 2 then
+                    boss_current_x = psw_main_data.global_data.sznw_boss_location_x
+                    boss_current_y = psw_main_data.global_data.sznw_boss_location_y
+                    psw_main_data.global_data.psw_tfmw_is_tp_boss2 = true
+                elseif boss_tp_num == 3 then
+                    boss_current_x = psw_main_data.global_data.lyzm_boss_location_x
+                    boss_current_y = psw_main_data.global_data.lyzm_boss_location_y
+                    psw_main_data.global_data.psw_tfmw_is_tp_boss3 = true
+                elseif boss_tp_num == 4 then
+                    local mw_commander = mw_faction and psw_tp_commander(mw_faction)
+                    if mw_commander then
+                        local mwx , mwy = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(mw_commander), true, 10)
+                        boss_current_x = mwx
+                        boss_current_y = mwy
+                    end
+                    psw_main_data.global_data.psw_tfmw_is_tp_boss_end = true
+                else
+                    psw_main_data.global_data.psw_tfmw_is_tp_boss1 = true
+                end
+                psw_boss_main_ms_smsx_add(faction_name)
+                psw_main_miansicf(faction_name)
+                local tp_to_boss_x, tp_to_boss_y = cm:find_valid_spawn_location_for_character_from_position(faction_name, boss_current_x, boss_current_y, true, 10)
+
+                cm:teleport_to(cm:char_lookup_str(tp_commander), tp_to_boss_x, tp_to_boss_y)
+
+                psw_main_data.player_data[faction_name].faction_leader_x = faction_leader_x
+                psw_main_data.player_data[faction_name].faction_leader_y = faction_leader_y
+                psw_main_data.player_data[faction_name].boss_tp_commander_cqi = tp_commander:command_queue_index()
             end
-            psw_boss_main_ms_smsx_add(faction_name)
-            psw_main_miansicf(faction_name)
-            local tp_to_boss_x, tp_to_boss_y = cm:find_valid_spawn_location_for_character_from_position(faction_name, boss_current_x, boss_current_y, true, 10)
-            
-            cm:teleport_to(cm:char_lookup_str(faction_leader), tp_to_boss_x, tp_to_boss_y)
-            
-            psw_main_data.player_data[faction_name].faction_leader_x = faction_leader_x
-            psw_main_data.player_data[faction_name].faction_leader_y = faction_leader_y
-            
+
         elseif dilemma_key == "dilemma_tf_duoren_tp" and choice == "SECOND" then
             local faction_leader_current_x = psw_get_num(faction_name, "faction_leader_x")
             local faction_leader_current_y = psw_get_num(faction_name, "faction_leader_y")
+            local tp_commander = cm:get_character_by_cqi(psw_get_num(faction_name, "boss_tp_commander_cqi"))
+            if not psw_char_deployable(tp_commander) then
+                tp_commander = psw_tp_commander(faction)
+            end
             psw_boss_main_ms_smsx_delete(faction_name)
-            local tp_to_boss_1_x, tp_to_boss_2_x = cm:find_valid_spawn_location_for_character_from_position(faction_name, faction_leader_current_x, faction_leader_current_y, true, 1)
-            
-            local m, n = cm:find_valid_spawn_location_for_character_from_position(faction_name, tp_to_boss_1_x, tp_to_boss_2_x, true, 1)
-            cm:teleport_to(cm:char_lookup_str(faction_leader), m, n)
+            if tp_commander then
+                local tp_to_boss_1_x, tp_to_boss_2_x = cm:find_valid_spawn_location_for_character_from_position(faction_name, faction_leader_current_x, faction_leader_current_y, true, 1)
+                local m, n = cm:find_valid_spawn_location_for_character_from_position(faction_name, tp_to_boss_1_x, tp_to_boss_2_x, true, 1)
+                cm:teleport_to(cm:char_lookup_str(tp_commander), m, n)
+            end
         elseif dilemma_key == "dilemma_tf_duoren_tp" and choice == "THIRD" then
-            
+
 ------------------ 传奇野兽传送 --------------------
         elseif dilemma_key == "dilemma_tf_duoren_legend_tp" and choice == "FIRST" then
-            local csys_cqi = psw_main_data.global_data.creat_sszm_mf_cqi
-            local csys_character = cm:get_character_by_cqi(csys_cqi)
-            local leader_legend_x, ledear_legend_y = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(faction_leader), true, 1)
-            local m_legend, n_legend = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(csys_character), true, 10)
-            
-            cm:teleport_to(cm:char_lookup_str(faction_leader), m_legend, n_legend)
-            
-            
-            psw_main_data.player_data[faction_name].ledear_legend_y = ledear_legend_y
-            psw_main_data.player_data[faction_name].leader_legend_x = leader_legend_x
-            
+            local tp_commander = psw_tp_commander(faction)
+            local csys_character = psw_csys_target_character(mw_faction)
+            if not tp_commander or not csys_character then
+                out("### PSW legend_tp FIRST skipped: commander=" .. tostring(tp_commander ~= nil) .. " csys_target=" .. tostring(csys_character ~= nil) .. " ###")
+            else
+                local leader_legend_x, ledear_legend_y = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(tp_commander), true, 1)
+                local m_legend, n_legend = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(csys_character), true, 10)
+
+                cm:teleport_to(cm:char_lookup_str(tp_commander), m_legend, n_legend)
+
+
+                psw_main_data.player_data[faction_name].ledear_legend_y = ledear_legend_y
+                psw_main_data.player_data[faction_name].leader_legend_x = leader_legend_x
+                psw_main_data.player_data[faction_name].legend_tp_commander_cqi = tp_commander:command_queue_index()
+            end
+
         elseif dilemma_key == "dilemma_tf_duoren_legend_tp" and choice == "SECOND" then
             local crt_leader_legend_x = psw_get_num(faction_name, "leader_legend_x")
             local crt_ledear_legend_y = psw_get_num(faction_name, "ledear_legend_y")
-            
-            local tp_to_leader_1_x, tp_to_leader_2_x = cm:find_valid_spawn_location_for_character_from_position(faction_name, crt_leader_legend_x, crt_ledear_legend_y, true, 1)
+            local tp_commander = cm:get_character_by_cqi(psw_get_num(faction_name, "legend_tp_commander_cqi"))
+            if not psw_char_deployable(tp_commander) then
+                tp_commander = psw_tp_commander(faction)
+            end
             psw_boss_main_ms_smsx_delete(faction_name)
-            cm:teleport_to(cm:char_lookup_str(faction_leader), tp_to_leader_1_x, tp_to_leader_2_x)
+            if tp_commander then
+                local tp_to_leader_1_x, tp_to_leader_2_x = cm:find_valid_spawn_location_for_character_from_position(faction_name, crt_leader_legend_x, crt_ledear_legend_y, true, 1)
+                cm:teleport_to(cm:char_lookup_str(tp_commander), tp_to_leader_1_x, tp_to_leader_2_x)
+            end
             if not faction:has_effect_bundle("psw_dlc7_tfmw_wef_csys_mission_bundle") then
                 psw_main_data.player_data[faction_name].wef_csys_can_tp = false
             end
@@ -2820,7 +2897,8 @@ local can_use_dtnl_tf = {
 
 
 
-function psw_main_tfxz()
+function psw_main_tfxz_merged()
+    core:remove_listener("psw_main_tfxz")
     core:add_listener(
         "psw_main_tfxz",
         "ComponentLClickUp",
@@ -2866,7 +2944,7 @@ cm:add_first_tick_callback(
 
     --Whenever the game first starts, we run this function. Which calls an event listener
     function()
-        psw_main_tfxz()
+        psw_main_tfxz_merged()
     end
 )
 
@@ -2983,13 +3061,13 @@ local mc_gmz_tf_pool = {
 
 
 ------ 天赋选择 ------
+--[merged] 原版 psw_天赋.lua 加载更晚且先 remove_listener 同名监听器，会把这里注册的覆盖掉；
+-- 因此把条件/回调暴露成全局，由 zzz_psw_talent_fix.lua 的 first_tick 回调最后重新注册生效
 core:remove_listener("ui_psw_main_tfxz")
-core:add_listener("ui_psw_main_tfxz",
-    "UITrigger",
-    function(context)
+ui_psw_main_tfxz_merged_condition = function(context)
         return context:trigger():starts_with("psw_tf_")
-    end,
-    psw_pcall_wrapper(function(context)
+    end
+ui_psw_main_tfxz_merged_cb = psw_pcall_wrapper(function(context)
         local faction = cm:model():faction_for_command_queue_index(context:faction_cqi())
         local faction_name = faction:name()
         
@@ -8216,7 +8294,15 @@ core:add_listener("ui_psw_main_tfxz",
                 
                 
             elseif 1 == 1 then
-                
+
+                --[merged] 诊断：记录被拒绝的天赋键与原因，便于定位假"已满/失败"
+                local _owned = psw_faction_has_effect_bundle(faction_name, set)
+                    or psw_faction_has_effect_bundle(faction_name, set_main)
+                    or (psw_main_data.global_data ~= nil and psw_main_data.global_data["set_main_" .. tostring(dilemma_key)] == true)
+                out("[psw_tfxz] pick fallback: key=" .. tostring(dilemma_key)
+                    .. " owned=" .. tostring(_owned)
+                    .. " jishu_ex_count=" .. tostring(psw_get_num(faction_name, "jishu_ex_count")))
+
                 advice_alice_tf_yyytf()
                 local region_name = psw_get_any(faction_name, "region_name")
                 local tf_region = cm:get_region(region_name)
@@ -8228,6 +8314,13 @@ core:add_listener("ui_psw_main_tfxz",
                 cm:foreign_slot_instantly_dismantle_building(slot_2)
                 cm:foreign_slot_instantly_dismantle_building(slot_3)
                 should_add_pick_zhongmo = false
+                --[merged] 兜底拆空后延时补抽一轮，避免天赋槽全空
+                --（必须延时：同事件还有同名监听器要靠 main_yi_pick 锁去重，同步重抽会先解锁）
+                cm:callback(function()
+                    pcall(function()
+                        psw_main_pickup(faction_name)
+                    end)
+                end, 0.5)
     ------------------end--------------------
             end;
             
@@ -8257,6 +8350,5 @@ core:add_listener("ui_psw_main_tfxz",
             end
             
         end
-    end),
-    true
-)
+    end)
+core:add_listener("ui_psw_main_tfxz", "UITrigger", ui_psw_main_tfxz_merged_condition, ui_psw_main_tfxz_merged_cb, true)
