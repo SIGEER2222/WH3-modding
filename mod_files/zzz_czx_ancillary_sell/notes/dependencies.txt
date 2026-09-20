@@ -1,0 +1,2 @@
+# 装备面板出售补丁：依赖 xyz_ancillary_panel 工坊包（3253398688）
+!ancillary_panel.pack

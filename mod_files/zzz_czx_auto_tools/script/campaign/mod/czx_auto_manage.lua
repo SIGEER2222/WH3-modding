@@ -65,6 +65,16 @@ local function czx_auto_level_character(character)
     ModLog("[czx_auto] spent " .. tostring(spent) .. " skill points on char " .. tostring(char_cqi))
 end
 
+-- 事件触发瞬间技能点可能尚未入账，延迟重试一次
+local function czx_auto_level_deferred(char_cqi)
+    cm:callback(function()
+        local character = cm:get_character_by_cqi(char_cqi)
+        if character and not character:is_null_interface() then
+            czx_auto_level_character(character)
+        end
+    end, 1.0)
+end
+
 core:remove_listener("czx_auto_char_created")
 core:add_listener(
     "czx_auto_char_created",
@@ -76,7 +86,9 @@ core:add_listener(
         return faction and not faction:is_null_interface() and faction:is_human()
     end,
     function(context)
-        czx_auto_level_character(context:character())
+        local character = context:character()
+        czx_auto_level_character(character)
+        czx_auto_level_deferred(character:command_queue_index())
     end,
     true
 )
@@ -92,7 +104,9 @@ core:add_listener(
         return faction and not faction:is_null_interface() and faction:is_human()
     end,
     function(context)
-        czx_auto_level_character(context:character())
+        local character = context:character()
+        czx_auto_level_character(character)
+        czx_auto_level_deferred(character:command_queue_index())
     end,
     true
 )
@@ -158,11 +172,13 @@ core:add_listener(
     "czx_auto_region_acquired",
     "RegionFactionChangeEvent",
     function(context)
-        local new_faction = context:new_faction()
+        local region = context:region()
+        if not region or region:is_null_interface() then return false end
+        local new_faction = region:owning_faction()
         return new_faction and not new_faction:is_null_interface() and new_faction:is_human()
     end,
     function(context)
-        czx_auto_build_in_region(context:region(), context:new_faction())
+        czx_auto_build_in_region(context:region(), context:region():owning_faction())
     end,
     true
 )

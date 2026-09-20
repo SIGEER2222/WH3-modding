@@ -1,0 +1,13 @@
+key	text	tooltip
+#Loc;1;text/db/!!!czx_ancillary_sell.loc
+czx_ancillary_sell_one	Sell selected item (double-click a list entry to sell instantly)	
+czx_ancillary_sell_all	Sell all unequipped items in current filter (excl. legendary/crafted)	
+czx_ancillary_sell_checked	Sell all checked items	
+czx_ancillary_sell_check	Mark for batch selling	
+czx_ancillary_sell_gain	Sell for [[img:icon_treasury]][[/img]]	
+czx_ancillary_sell_equipped	This item is equipped on a character and cannot be sold	
+czx_ancillary_sell_not_owned	You do not own this item	
+czx_ancillary_sell_protected	Legendary/crafted items cannot be sold	
+czx_ancillary_sell_result	Sold %d items for [[img:icon_treasury]][[/img]]%d	
+czx_ancillary_sell_owned_on	Show only owned items (stacks with category/rarity/search)	
+czx_ancillary_sell_owned_off	Show the full item catalogue	

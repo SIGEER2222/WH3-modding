@@ -1,11 +1,19 @@
 -- czx_horde_paging.lua
 -- 游牧军队建筑面板翻页支持
+--
+-- 工作原理：horde_slot_list 的子组件由 CcoCampaignMilitaryForceHorde.BuildingSlotList
+-- 生成，数量 = military_force_type_horde_details.slot_cap。翻页不创建新槽，
+-- 只是把本页槽位 SetVisible(true) 并 MoveTo 到前两行网格位置，
+-- 其余槽位 SetVisible(false)。页数由实际槽数动态计算（不再固定 4 页）。
 
 local SLOTS_PER_PAGE = 14
-local MAX_PAGES = 4  -- 固定4页，避免动态计算失败
+local COLS_PER_PAGE = 7
 local _current_page = 1
 local _slot_list_ref = nil
 local _horde_view_ref = nil
+local _baseline = nil      -- {x0, y0, px, py}
+local _prev_btn = nil
+local _next_btn = nil
 
 local function log(msg)
     ModLog("[czx_paging] " .. msg)
@@ -49,24 +57,106 @@ local function get_slot_children(slot_list)
     return result
 end
 
+local function cco_call(ctx, expr)
+    local ok, v = pcall(function() return ctx:Call(expr) end)
+    if not ok then return "ERR" end
+    return v
+end
+
+-- 诊断：输出每个槽位上下文的关键属性（链 key / 是否空 / 是否应显示）
+local function dump_slots(slot_list)
+    local slots = get_slot_children(slot_list)
+    log("dump_slots total=" .. tostring(#slots))
+    safe_call(function()
+        local horde_ctx = slot_list:GetContextObject("CcoCampaignMilitaryForceHorde")
+        if horde_ctx then
+            log("BuildingSlotList.Size=" .. tostring(cco_call(horde_ctx, "BuildingSlotList.Size")))
+        end
+    end)
+    for i, slot in ipairs(slots) do
+        local ok_ctx, ctx = pcall(function() return slot:GetContextObject("CcoCampaignBuildingSlot") end)
+        if ok_ctx and ctx then
+            local bkey = "?"
+            local ok2, blr = pcall(function() return ctx:Call("BuildingContext.BuildingLevelRecordContext") end)
+            if ok2 and blr then
+                local ok3, k = pcall(function() return blr:Call("Key") end)
+                if ok3 then bkey = tostring(k) end
+            end
+            log(string.format("  slot %d: empty=%s show=%s primary=%s building=%s",
+                i,
+                tostring(cco_call(ctx, "IsEmpty")),
+                tostring(cco_call(ctx, "ShouldShowSlot")),
+                tostring(cco_call(ctx, "IsPrimary")),
+                bkey))
+        else
+            log("  slot " .. i .. ": no CcoCampaignBuildingSlot context")
+        end
+    end
+end
+
+local function measure_baseline(slots)
+    _baseline = nil
+    if #slots < 2 then return end
+    local ok1, x1, y1 = pcall(function() return slots[1]:Position() end)
+    local ok2, x2, y2 = pcall(function() return slots[2]:Position() end)
+    local ok3, w, h = pcall(function() return slots[1]:Dimensions() end)
+    if ok1 and ok2 and x1 and x2 and x2 ~= x1 then
+        _baseline = {
+            x0 = x1,
+            y0 = y1,
+            px = x2 - x1,
+            py = ((ok3 and h) or 138) + 5,
+        }
+        log("baseline x0=" .. tostring(_baseline.x0) .. " y0=" .. tostring(_baseline.y0)
+            .. " px=" .. tostring(_baseline.px) .. " py=" .. tostring(_baseline.py))
+    else
+        log("baseline measure failed")
+    end
+end
+
+local function update_page_buttons(max_page)
+    if _prev_btn then
+        safe_call(function() _prev_btn:SetVisible(max_page > 1) end)
+    end
+    if _next_btn then
+        safe_call(function() _next_btn:SetVisible(max_page > 1) end)
+    end
+end
+
 local function apply_page(slot_list, page)
     local slots = get_slot_children(slot_list)
     local total = #slots
+    local max_page = math.max(1, math.ceil(total / SLOTS_PER_PAGE))
+    if page > max_page then page = max_page end
+    if page < 1 then page = 1 end
     local start_idx = (page - 1) * SLOTS_PER_PAGE + 1
-    local end_idx = page * SLOTS_PER_PAGE  -- 不限制上限，空槽位隐藏
-    log("apply_page page=" .. page .. " total=" .. total .. " show=" .. start_idx .. "-" .. end_idx)
+    local end_idx = math.min(page * SLOTS_PER_PAGE, total)
+    log("apply_page page=" .. page .. "/" .. max_page .. " total=" .. total .. " show=" .. start_idx .. "-" .. end_idx)
+
     for i, slot in ipairs(slots) do
-        local show = (i >= start_idx and i <= end_idx)
-        safe_call(function() slot:SetVisible(show) end)
+        local in_page = i >= start_idx and i <= end_idx
+        safe_call(function() slot:SetVisible(in_page) end)
+        if in_page and _baseline then
+            local j = i - start_idx
+            local col = j % COLS_PER_PAGE
+            local row = math.floor(j / COLS_PER_PAGE)
+            local tx = _baseline.x0 + col * _baseline.px
+            local ty = _baseline.y0 + row * _baseline.py
+            safe_call(function() slot:SetMoveable(true) end)
+            safe_call(function() slot:MoveTo(tx, ty) end)
+        end
     end
     _current_page = page
+    update_page_buttons(max_page)
 end
 
 local function on_page_button_click(direction, slot_list)
+    local slots = get_slot_children(slot_list)
+    local max_page = math.max(1, math.ceil(#slots / SLOTS_PER_PAGE))
     local new_page = _current_page
     if direction == "prev" and _current_page > 1 then
         new_page = _current_page - 1
-    elseif direction == "next" and _current_page < MAX_PAGES then
+    elseif direction == "next" and _current_page < max_page then
         new_page = _current_page + 1
     end
     if new_page ~= _current_page then
@@ -137,10 +227,10 @@ local function create_page_buttons(horde_view)
     local next_x = vx + vw - 50
     local next_y = vy + 50
 
-    local prev = find_or_create_button(horde_view, "czx_prev_page", "ui/skins/default/czx_arrow_left.png", prev_x, prev_y)
-    local next = find_or_create_button(horde_view, "czx_next_page", "ui/skins/default/czx_arrow_right.png", next_x, next_y)
+    _prev_btn = find_or_create_button(horde_view, "czx_prev_page", "ui/skins/default/czx_arrow_left.png", prev_x, prev_y)
+    _next_btn = find_or_create_button(horde_view, "czx_next_page", "ui/skins/default/czx_arrow_right.png", next_x, next_y)
 
-    if not prev or not next then
+    if not _prev_btn or not _next_btn then
         log("failed to create page buttons")
         return false
     end
@@ -216,6 +306,8 @@ function init_paging(attempt)
     end
 
     _slot_list_ref = slot_list
+    measure_baseline(slots)
+    dump_slots(slot_list)
 
     _horde_view_ref = try_get_horde_view()
     if _horde_view_ref then
@@ -249,11 +341,12 @@ local function try_open_and_init()
 end
 
 local function on_units_panel_opened(context)
-    local panel_name = tostring(context:string())
+    local panel_name = tostring(context.string)
     if panel_name ~= "units_panel" then return end
 
     _slot_list_ref = nil
     _horde_view_ref = nil
+    _baseline = nil
 
     -- 延迟初始化，等待 UI 填充
     cm:callback(function()
@@ -265,12 +358,13 @@ local function on_units_panel_opened(context)
                 local ok3, mf = pcall(function() return char:military_force() end)
                 local ft_key = ""
                 if ok3 and mf and not mf:is_null_interface() then
-                    local ok4, ft = pcall(function() return mf:force_type() end)
+                    local ok4, ft = pcall(function() return mf:force_type():key() end)
                     if ok4 and ft then
-                        ft_key = ft:key() or ""
+                        ft_key = ft
                     end
                 end
-                if subtype == "yx_hero_xueli" or ft_key == "PSW_HORDE" then
+                log("units_panel opened: subtype=" .. tostring(subtype) .. " force_type=" .. tostring(ft_key))
+                if ft_key == "PSW_HORDE" or tostring(subtype):find("yx_hero") or tostring(subtype):find("yx_lmyx") then
                     init_paging()
                 end
             end
@@ -280,29 +374,30 @@ end
 
 local function scan_for_psw_horde()
     log("scanning for PSW_HORDE...")
+    local ok_name, local_name = pcall(function() return cm:get_local_faction_name(true) end)
+    if not ok_name or not local_name or local_name == "" then
+        return nil
+    end
     local world = cm:model():world()
     local faction_list = world:faction_list()
     for i = 0, faction_list:num_items() - 1 do
         local faction = faction_list:item_at(i)
-        if faction and not faction:is_null_interface() and faction:name() == "wh3_main_cth_the_northern_provinces" then
+        if faction and not faction:is_null_interface() and faction:name() == local_name then
             local ok_mfl, mf_list = pcall(function() return faction:military_force_list() end)
             if ok_mfl and mf_list then
                 local ok_n, n = pcall(function() return mf_list:num_items() end)
                 for j = 0, (n or 0) - 1 do
                     local ok_mf, mf = pcall(function() return mf_list:item_at(j) end)
                     if ok_mf and mf and not mf:is_null_interface() then
-                        local ok_ft, ft = pcall(function() return mf:force_type() end)
-                        if ok_ft and ft then
-                            local ok_k, k = pcall(function() return ft:key() end)
-                            if ok_k and k == "PSW_HORDE" then
-                                local ok_gen, gen = pcall(function() return mf:general_character() end)
-                                local cqi = nil
-                                if ok_gen and gen then
-                                    cqi = gen:command_queue_index()
-                                end
-                                log("PSW_HORDE cqi=" .. tostring(cqi))
-                                return cqi
+                        local ok_ft, k = pcall(function() return mf:force_type():key() end)
+                        if ok_ft and k == "PSW_HORDE" then
+                            local ok_gen, gen = pcall(function() return mf:general_character() end)
+                            local cqi = nil
+                            if ok_gen and gen then
+                                cqi = gen:command_queue_index()
                             end
+                            log("PSW_HORDE cqi=" .. tostring(cqi))
+                            return cqi
                         end
                     end
                 end
@@ -333,7 +428,7 @@ cm:add_first_tick_callback(function()
         "czx_paging_panel_opened",
         "PanelOpenedCampaign",
         function(context)
-            return context and tostring(context:string()) == "units_panel"
+            return context and tostring(context.string) == "units_panel"
         end,
         on_units_panel_opened,
         true
@@ -350,6 +445,7 @@ cm:add_first_tick_callback(function()
             log("tab_horde_buildings clicked, re-init paging")
             _slot_list_ref = nil
             _horde_view_ref = nil
+            _baseline = nil
             cm:callback(function() init_paging() end, 0.3)
         end,
         true
