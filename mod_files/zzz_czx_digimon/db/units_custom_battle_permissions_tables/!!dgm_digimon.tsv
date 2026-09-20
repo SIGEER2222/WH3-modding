@@ -1,4 +1,4 @@
-﻿faction	general_unit	unit	siege_unit_attacker	siege_unit_defender	general_portrait	general_uniform	set_piece_character	campaign_exclusive	armory_item_set	supports_upgrades
+faction	general_unit	unit	siege_unit_attacker	siege_unit_defender	general_portrait	general_uniform	set_piece_character	campaign_exclusive	armory_item_set	supports_upgrades
 #units_custom_battle_permissions_tables;11;db/units_custom_battle_permissions_tables/!!czx_dgm_patch.tsv
 wh2_dlc09_tmb_tomb_kings	false	dgm_chr050_agumon	true	true				false		false
 wh2_dlc11_cst_vampire_coast	false	dgm_chr050_agumon	true	true				false		false
@@ -8,7 +8,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr050_agumon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr050_agumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr050_agumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr050_agumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr050_agumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr050_agumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr050_agumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr050_agumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr050_agumon	true	true				false		false
@@ -33,7 +33,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr151_gabumon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr151_gabumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr151_gabumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr151_gabumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr151_gabumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr151_gabumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr151_gabumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr151_gabumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr151_gabumon	true	true				false		false
@@ -58,7 +58,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr307_biyomon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr307_biyomon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr307_biyomon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr307_biyomon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr307_biyomon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr307_biyomon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr307_biyomon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr307_biyomon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr307_biyomon	true	true				false		false
@@ -83,7 +83,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr343_gomamon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr343_gomamon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr343_gomamon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr343_gomamon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr343_gomamon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr343_gomamon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr343_gomamon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr343_gomamon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr343_gomamon	true	true				false		false
@@ -108,7 +108,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr361_salamon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr361_salamon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr361_salamon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr361_salamon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr361_salamon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr361_salamon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr361_salamon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr361_salamon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr361_salamon	true	true				false		false
@@ -133,7 +133,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr112_dorumon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr112_dorumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr112_dorumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr112_dorumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr112_dorumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr112_dorumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr112_dorumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr112_dorumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr112_dorumon	true	true				false		false
@@ -158,7 +158,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr121_vorvomon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr121_vorvomon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr121_vorvomon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr121_vorvomon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr121_vorvomon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr121_vorvomon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr121_vorvomon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr121_vorvomon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr121_vorvomon	true	true				false		false
@@ -183,7 +183,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr208_dracomon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr208_dracomon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr208_dracomon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr208_dracomon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr208_dracomon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr208_dracomon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr208_dracomon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr208_dracomon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr208_dracomon	true	true				false		false
@@ -208,7 +208,7 @@ wh2_main_lzd_lizardmen	false	dgm_g133_tinkermon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_g133_tinkermon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_g133_tinkermon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_g133_tinkermon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_g133_tinkermon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_g133_tinkermon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_g133_tinkermon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_g133_tinkermon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_g133_tinkermon	true	true				false		false
@@ -233,7 +233,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr326_greymon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr326_greymon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr326_greymon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr326_greymon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr326_greymon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr326_greymon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr326_greymon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr326_greymon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr326_greymon	true	true				false		false
@@ -258,7 +258,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr012_garurumon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr012_garurumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr012_garurumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr012_garurumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr012_garurumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr012_garurumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr012_garurumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr012_garurumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr012_garurumon	true	true				false		false
@@ -283,7 +283,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr308_birdramon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr308_birdramon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr308_birdramon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr308_birdramon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr308_birdramon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr308_birdramon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr308_birdramon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr308_birdramon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr308_birdramon	true	true				false		false
@@ -308,7 +308,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr344_ikkakumon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr344_ikkakumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr344_ikkakumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr344_ikkakumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr344_ikkakumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr344_ikkakumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr344_ikkakumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr344_ikkakumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr344_ikkakumon	true	true				false		false
@@ -333,7 +333,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr349_togemon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr349_togemon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr349_togemon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr349_togemon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr349_togemon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr349_togemon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr349_togemon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr349_togemon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr349_togemon	true	true				false		false
@@ -358,7 +358,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr548_unimon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr548_unimon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr548_unimon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr548_unimon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr548_unimon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr548_unimon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr548_unimon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr548_unimon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr548_unimon	true	true				false		false
@@ -383,7 +383,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr397_veedramon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr397_veedramon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr397_veedramon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr397_veedramon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr397_veedramon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr397_veedramon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr397_veedramon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr397_veedramon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr397_veedramon	true	true				false		false
@@ -408,7 +408,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr396_dorugamon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr396_dorugamon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr396_dorugamon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr396_dorugamon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr396_dorugamon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr396_dorugamon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr396_dorugamon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr396_dorugamon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr396_dorugamon	true	true				false		false
@@ -433,7 +433,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr209_coredramon_green	true	true				false		fal
 wh2_main_skv_skaven	false	dgm_chr209_coredramon_green	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr209_coredramon_green	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr209_coredramon_green	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr209_coredramon_green	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr209_coredramon_green	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr209_coredramon_green	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr209_coredramon_green	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr209_coredramon_green	true	true				false		false
@@ -458,7 +458,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr302_metalgreymon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr302_metalgreymon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr302_metalgreymon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr302_metalgreymon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr302_metalgreymon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr302_metalgreymon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr302_metalgreymon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr302_metalgreymon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr302_metalgreymon	true	true				false		false
@@ -483,7 +483,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr140_weregarurumon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr140_weregarurumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr140_weregarurumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr140_weregarurumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr140_weregarurumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr140_weregarurumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr140_weregarurumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr140_weregarurumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr140_weregarurumon	true	true				false		false
@@ -508,7 +508,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr101_angemon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr101_angemon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr101_angemon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr101_angemon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr101_angemon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr101_angemon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr101_angemon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr101_angemon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr101_angemon	true	true				false		false
@@ -533,7 +533,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr364_metaltyrannomon	true	true				false		fals
 wh2_main_skv_skaven	false	dgm_chr364_metaltyrannomon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr364_metaltyrannomon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr364_metaltyrannomon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr364_metaltyrannomon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr364_metaltyrannomon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr364_metaltyrannomon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr364_metaltyrannomon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr364_metaltyrannomon	true	true				false		false
@@ -558,7 +558,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr359_lillymon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr359_lillymon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr359_lillymon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr359_lillymon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr359_lillymon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr359_lillymon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr359_lillymon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr359_lillymon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr359_lillymon	true	true				false		false
@@ -583,7 +583,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr400_aeroveedramon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr400_aeroveedramon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr400_aeroveedramon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr400_aeroveedramon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr400_aeroveedramon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr400_aeroveedramon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr400_aeroveedramon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr400_aeroveedramon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr400_aeroveedramon	true	true				false		false
@@ -608,7 +608,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr229_kimeramon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr229_kimeramon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr229_kimeramon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr229_kimeramon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr229_kimeramon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr229_kimeramon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr229_kimeramon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr229_kimeramon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr229_kimeramon	true	true				false		false
@@ -633,7 +633,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr407_doruguremon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr407_doruguremon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr407_doruguremon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr407_doruguremon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr407_doruguremon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr407_doruguremon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr407_doruguremon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr407_doruguremon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr407_doruguremon	true	true				false		false
@@ -658,7 +658,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr004_crescemon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr004_crescemon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr004_crescemon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr004_crescemon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr004_crescemon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr004_crescemon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr004_crescemon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr004_crescemon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr004_crescemon	true	true				false		false
@@ -683,7 +683,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr039_lucemon_fm	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr039_lucemon_fm	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr039_lucemon_fm	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr039_lucemon_fm	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr039_lucemon_fm	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr039_lucemon_fm	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr039_lucemon_fm	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr039_lucemon_fm	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr039_lucemon_fm	true	true				false		false
@@ -708,7 +708,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr135_metalgarurumon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr135_metalgarurumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr135_metalgarurumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr135_metalgarurumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr135_metalgarurumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr135_metalgarurumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr135_metalgarurumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr135_metalgarurumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr135_metalgarurumon	true	true				false		false
@@ -733,7 +733,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr315_seraphimon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr315_seraphimon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr315_seraphimon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr315_seraphimon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr315_seraphimon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr315_seraphimon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr315_seraphimon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr315_seraphimon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr315_seraphimon	true	true				false		false
@@ -758,7 +758,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr027_blackwargreymon	true	true				false		fals
 wh2_main_skv_skaven	false	dgm_chr027_blackwargreymon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr027_blackwargreymon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr027_blackwargreymon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr027_blackwargreymon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr027_blackwargreymon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr027_blackwargreymon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr027_blackwargreymon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr027_blackwargreymon	true	true				false		false
@@ -783,7 +783,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr418_ulforceveedramon_x	true	true				false		f
 wh2_main_skv_skaven	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr418_ulforceveedramon_x	true	true				false		false
@@ -808,7 +808,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr105_gallantmon_cm	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr105_gallantmon_cm	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr105_gallantmon_cm	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr105_gallantmon_cm	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr105_gallantmon_cm	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr105_gallantmon_cm	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr105_gallantmon_cm	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr105_gallantmon_cm	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr105_gallantmon_cm	true	true				false		false
@@ -833,7 +833,7 @@ wh2_main_lzd_lizardmen	false	dgm_u133_zhuqiaomon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_u133_zhuqiaomon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_u133_zhuqiaomon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_u133_zhuqiaomon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_u133_zhuqiaomon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_u133_zhuqiaomon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_u133_zhuqiaomon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_u133_zhuqiaomon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_u133_zhuqiaomon	true	true				false		false
@@ -858,7 +858,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr329_ancientgreymon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr329_ancientgreymon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr329_ancientgreymon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr329_ancientgreymon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr329_ancientgreymon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr329_ancientgreymon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr329_ancientgreymon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr329_ancientgreymon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr329_ancientgreymon	true	true				false		false
@@ -883,7 +883,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr331_ancientgarurumon	true	true				false		fal
 wh2_main_skv_skaven	false	dgm_chr331_ancientgarurumon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr331_ancientgarurumon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr331_ancientgarurumon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr331_ancientgarurumon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr331_ancientgarurumon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr331_ancientgarurumon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr331_ancientgarurumon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr331_ancientgarurumon	true	true				false		false
@@ -908,7 +908,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr088_omnimon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr088_omnimon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr088_omnimon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr088_omnimon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr088_omnimon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr088_omnimon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr088_omnimon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr088_omnimon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr088_omnimon	true	true				false		false
@@ -933,7 +933,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr357_omnimon_x	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr357_omnimon_x	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr357_omnimon_x	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr357_omnimon_x	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr357_omnimon_x	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr357_omnimon_x	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr357_omnimon_x	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr357_omnimon_x	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr357_omnimon_x	true	true				false		false
@@ -958,7 +958,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr013_gallantmon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr013_gallantmon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr013_gallantmon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr013_gallantmon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr013_gallantmon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr013_gallantmon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr013_gallantmon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr013_gallantmon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr013_gallantmon	true	true				false		false
@@ -983,7 +983,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr094_shinegreymon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr094_shinegreymon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr094_shinegreymon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr094_shinegreymon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr094_shinegreymon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr094_shinegreymon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr094_shinegreymon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr094_shinegreymon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr094_shinegreymon	true	true				false		false
@@ -1008,7 +1008,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr448_omnimon_merciful_mode	true	true				false
 wh2_main_skv_skaven	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr448_omnimon_merciful_mode	true	true				false		false
@@ -1033,7 +1033,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr691_omnimon_alter_s	true	true				false		fals
 wh2_main_skv_skaven	false	dgm_chr691_omnimon_alter_s	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr691_omnimon_alter_s	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr691_omnimon_alter_s	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr691_omnimon_alter_s	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr691_omnimon_alter_s	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr691_omnimon_alter_s	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr691_omnimon_alter_s	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr691_omnimon_alter_s	true	true				false		false
@@ -1058,7 +1058,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr446_ophanimon_fm	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr446_ophanimon_fm	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr446_ophanimon_fm	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr446_ophanimon_fm	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr446_ophanimon_fm	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr446_ophanimon_fm	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr446_ophanimon_fm	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr446_ophanimon_fm	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr446_ophanimon_fm	true	true				false		false
@@ -1083,7 +1083,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr416_alphamon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr416_alphamon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr416_alphamon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr416_alphamon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr416_alphamon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr416_alphamon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr416_alphamon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr416_alphamon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr416_alphamon	true	true				false		false
@@ -1108,7 +1108,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr749_jesmon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr749_jesmon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr749_jesmon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr749_jesmon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr749_jesmon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr749_jesmon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr749_jesmon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr749_jesmon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr749_jesmon	true	true				false		false
@@ -1133,7 +1133,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr749_mr_jesmon_alt	true	true				false		false
@@ -1158,7 +1158,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr019_dorugoramon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr019_dorugoramon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr019_dorugoramon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr019_dorugoramon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr019_dorugoramon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr019_dorugoramon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr019_dorugoramon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr019_dorugoramon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr019_dorugoramon	true	true				false		false
@@ -1183,7 +1183,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr213_slayerdramon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr213_slayerdramon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr213_slayerdramon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr213_slayerdramon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr213_slayerdramon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr213_slayerdramon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr213_slayerdramon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr213_slayerdramon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr213_slayerdramon	true	true				false		false
@@ -1208,7 +1208,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr350_examon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr350_examon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr350_examon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr350_examon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr350_examon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr350_examon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr350_examon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr350_examon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr350_examon	true	true				false		false
@@ -1233,7 +1233,7 @@ wh2_main_lzd_lizardmen	false	dgm_chr451_ebemon	true	true				false		false
 wh2_main_skv_skaven	false	dgm_chr451_ebemon	true	true				false		false
 wh3_dlc23_chd_legion_of_azgorh	false	dgm_chr451_ebemon	true	true				false		false
 wh3_main_cth_cathay_mp	false	dgm_chr451_ebemon	true	true				false		false
-wh3_main_cth_the_northern_provinces	false	dgm_chr451_ebemon	true	true				false		false
+wh3_main_cth_the_western_provinces	false	dgm_chr451_ebemon	true	true				false		false
 wh3_main_dae_daemon_prince	false	dgm_chr451_ebemon	true	true				false		false
 wh3_main_kho_khorne	false	dgm_chr451_ebemon	true	true				false		false
 wh3_main_ksl_kislev	false	dgm_chr451_ebemon	true	true				false		false

@@ -2,14 +2,14 @@
 #unit_attributes_to_groups_junctions_tables;2;db/unit_attributes_to_groups_junctions_tables/!!pkm_pokemon
 strider	pkm_001_bulbasaur_attrs
 strider	pkm_003_venusaur_attrs
-fear	pkm_003_venusaur_attrs
-terror	pkm_003_venusaur_attrs
+causes_fear	pkm_003_venusaur_attrs
+causes_terror	pkm_003_venusaur_attrs
 strider	pkm_004_charmander_attrs
 strider	pkm_006_charizard_attrs
-fear	pkm_006_charizard_attrs
-terror	pkm_006_charizard_attrs
+causes_fear	pkm_006_charizard_attrs
+causes_terror	pkm_006_charizard_attrs
 strider	pkm_007_squirtle_attrs
 strider	pkm_009_blastoise_attrs
-fear	pkm_009_blastoise_attrs
-terror	pkm_009_blastoise_attrs
+causes_fear	pkm_009_blastoise_attrs
+causes_terror	pkm_009_blastoise_attrs
 strider	pkm_025_pikachu_attrs
