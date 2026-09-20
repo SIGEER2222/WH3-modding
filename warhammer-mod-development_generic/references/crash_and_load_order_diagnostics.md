@@ -339,3 +339,13 @@ pack 文件数在偏移 +16；索引从 +28 开始，每条 = `size(u32)` + `fla
 - Steam `content_log.txt` 先记录 `Validation: 1 chunks corrupt ... in file "steam_api64.dll"`，后续完整校验记录 `Validation: missing file "steam_api64.dll"`，并将 AppID 1142710 标记为 `Files Missing/Update Required`。
 - Steam 客户端重启后重新验证，扫描 90.54GB 游戏目录发现唯一不匹配项为该 298856B DLL，随后 commit 回游戏目录；恢复文件 SHA1=`40D0AE44E090DB49B2309FB152FBD3E11124A376`。若验证被 `App Running` 残留状态暂停，先通过 Steam 客户端重启清状态，再重新验证；不要从第三方下载 DLL。
 
+
+### 10.18 重装后复盘：`czx_inf_marine` 崩溃根因 = pack 缺 `battle_skeletons_tables`（2026-09-21 实测）
+
+- **根因**：`zzz_czx_swarm_units3.pack` 的 `battle_animations_table` 把 `czx_empire_sword_rifle` 映射到骨架 `czx_marine`，但 pack 内**根本没有 `battle_skeletons_tables`**（unit_sets/ui_unit_groupings 同样缺失）——单位在 battle init 解析动画→骨架时拿到空记录，C++ 空指针 `0xc0000005`。这解释了为何改 variant/模型没用：崩的不是网格，是骨架表缺失。
+- **版本号陷阱**：源 TSV 元数据写的是 `battle_skeletons_tables;56`、`unit_sets;5`、`ui_unit_groupings;3`，而当前版本游戏/db.pack 实际读 v17/v2/v1。按错版本编码会让游戏跳过整表或读错字段。导出 TSV 时以 pack 内真实 version 为准，不要信源文件头的旧戳。
+- **源与包漂移**：`mod_files/zzz_czx_swarm_units` 曾缺凯瑞甘 agent 全套（24 张 db + 45 个资源文件）——包是从更完整的旧源/RPFM 手工状态建的。新增 `tools/sync_pack_to_source.py <pack> <mod> [--wipe]`：把线上 pack 解码回源（真实版本戳、loc 行、全部资产），保证 `mod_files` 重建 == 部署包。
+- **同时修复**：`main_units` 里 `cishe`/`gou` 无对应 `land_units`、`leishou` 连 `main_units` 都没有却被 1200+ 行权限/建筑表引用——全删。
+- **验证矩阵（全部 `game_startup_mode battle/campaign` autotest，90–120s 无 dump）**：swarm 单包自定义战斗 ✓、digimon+swarm 自定义 ✓、114 项 playset + 原版兵种战斗 ✓、114 项 playset + 自定义兵种战斗 ✓、114 项 playset + IE 战役初始化并跑过回合处理 ✓。
+- **遗留**：`!!!wyccc_cn_localization_patch.pack` / `_batch2.pack` 两个本地汉化包全盘无源（`data_loose_quarantine` 只剩 png 和描述元数据），playset 中保持未解析占位；不影响战斗，只是 wyccc 系部分文本回退英文。
+- 工坊 `2789850037 @z_all_agent_actions`：重装后单独带它打原版战斗不再崩——此前的二分"罪魁"很可能也是文件损坏而非内容问题，全量 playset 下同样通过。

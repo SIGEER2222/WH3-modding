@@ -118,3 +118,4 @@ E:\Code\WH3-modding\
 - RPFM、日志、网页核验：`references/rpfm_and_verification_workflow.md`
 
 当用户反馈“这样不对”“RPFM 报错”“游戏日志报错”“以后按这个规则来”时，判断是否需要更新 development 指南。更新流程见 `docs/DEVELOPMENT_GUIDE_UPDATE_RULES.md`。
+- **2026-09-21 重装完成与最终归因**：游戏重装（83GB）+ 工坊 105 项回下 + Steam 校验修复 `steam_api64.dll`。**marine 崩溃根因实锤**：`zzz_czx_swarm_units3.pack` 的 `battle_animations_table` 引用骨架 `czx_marine`，但 pack 缺整张 `battle_skeletons_tables`（同缺 `unit_sets`/`ui_unit_groupings`）→ battle init 空指针。源 TSV 版本戳不可信（写 v56/5/3，游戏实际读 v17/2/1）。修复=旧包补三表+清 stale 单位（cishe/gou/leishou）+补 loc 缺口；`tools/sync_pack_to_source.py` 已把部署包反同步回 `mod_files/zzz_czx_swarm_units`（含凯瑞甘 agent 全套，此前源码缺失）。state.db 曾被截成 2 项，已从 `state.db.bak_deploy_ia_all_factions` 恢复 114 项 playset_items + enabled_order。验证矩阵全过：swarm/digimon+swarm/全 playset 自定义战斗 + 全 playset IE 战役初始化到回合处理。仍缺 `!!!wyccc_cn_localization_patch*.pack`×2（无源，纯文本，不崩）。
