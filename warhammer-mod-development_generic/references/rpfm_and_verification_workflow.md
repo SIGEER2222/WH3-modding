@@ -21,11 +21,13 @@
 
 需要从源文件生成 `.pack` 时，默认由 Codex 自动完成全流程：
 
-1. `python tools/build_pack.py <mod名>` 生成 `mod_output/<mod名>.pack`（PFH5；`text/**/*.loc.tsv` 编码为二进制 loc，`db/<table>/*.tsv` 按元数据行编码，其余路径原样复制）。
-2. 复制 `.pack` 到游戏 `data\` 目录。
-3. 备份 `%APPDATA%\WycccModManager\state.db` 到 `scratch/state_db_backups/`，把 `local:data:<路径sha256[:18]>` 插入当前 playset 的 `playset_items`（重写 position 为连续序号），并同步 `app_state` 的 `enabled_order:<game_id>`。
-4. 同路径 loc 遮蔽**靠前胜出**：本地汉化/覆盖补丁必须排在被覆盖包之前。
-5. 打包后执行临时反导出检查，检查完删除校验文件，避免后续误打包。
+1. `python tools/build_pack.py <mod名> --deploy` 一步完成全流程（旧的分步手工流程已废弃）：
+   - 打包：`mod_files/<mod名>/` → `mod_output/<mod名>.pack`（PFH5；`text/**/*.loc.tsv` 编码为二进制 loc，`db/<table>/*.tsv` 按元数据行编码，其余路径原样复制）。**`notes/pack_notes.txt` 缺失或为空直接失败**。
+   - 部署：复制 `.pack` + 预览 `.png` 到游戏 `data\`（包被运行中游戏锁定时重试 3 次后报错）。
+   - 注册：备份 `state.db`（`.bak_deploy_<mod名>`）→ upsert `user_mod_data`（`alias` 取 `notes/alias.txt` 或 `--alias`，**缺失直接失败**；`notes` 取 pack_notes）→ 把 `local:data:<sha256(规范化路径)[:18]>` 插入当前 playset 末尾并同步 `app_state.enabled_order:<game_id>`。
+   - 改名换版：`--deploy-name <新名>.pack --replace <旧mod_id>`（包路径变 → mod_id 变 → 旧 user_mod_data/playset 记录失效，必须 replace 重写）。
+2. 同路径 loc 遮蔽**靠前胜出**：本地汉化/覆盖补丁必须排在被覆盖包之前。
+3. 打包后执行临时反导出检查，检查完删除校验文件，避免后续误打包。
 
 仅当用户明确说要自己用 RPFM 打包时，才停在源文件并提供导入路径与检查清单。
 

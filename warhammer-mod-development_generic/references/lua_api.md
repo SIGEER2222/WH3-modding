@@ -117,6 +117,15 @@ end)
 
 注意：`PanelOpenedCampaign` / `ComponentLClickUp` 等事件的字符串参数在当前引擎是**字段** `context.string`，不是 `context:string()`；误写成方法调用会报 `attempt to call method 'string' (a string value)`，且该监听器条件函数内抛错会导致监听器整个不触发 `[实测/需随版本复查]`。
 
+## 同名监听器与脚本加载顺序（补丁型 MOD 必读）
+
+- `core:add_listener` 对同名监听器是**追加共存**而非覆盖（`lib_core.lua` 内部 `table.insert`），同名监听器按注册顺序依次触发；`core:remove_listener(name)` 会清掉**所有**同名监听器。
+- 所有 pack 的 `script/` 文件按**文件路径字典序**全局统一加载（UTF-8 字节序：`!` 前缀最前，ASCII 次之，中文名靠后，`zzz_*` 最后），与 pack 在 playset 中的位置无关。同路径文件才被 pack 顺序遮蔽（靠前胜出）。
+- 推论一：补丁包里的 `<ascii>_xxx.lua` 副本会**先于**主包的 `<中文名>.lua` 加载；若对方文件在文件作用域执行 `core:remove_listener("X") + add_listener("X",...)`，我们先注册的同名监听器会被**整个清掉**（死代码）。
+- 推论二：同名全局函数以后定义者为准，中文名文件里的定义会盖掉 ASCII 名文件里的同名定义。
+- 可靠覆盖手法：在补丁包里放一个 `zzz_*` 命名的文件，在 `cm:add_first_tick_callback` 里 `remove_listener + add_listener` 重新注册——`zzz_` 排序保证该回调在所有 `psw_*`/中文字符文件的 first-tick 之后执行，此时 remove 会把对方 first-tick 里注册的也一并清掉。
+- 若不想移除对方监听器只想先执行：同名共存时先注册者先触发，可在先触发的回调里设置互斥标记（如 effect bundle 锁）让后触发者早退。`[实测 2026-09 / WH3]`
+
 ## campaign_manager 常用 API
 
 生成前仍建议在本地 `gamedata/documentation/script` 或 `gamedata/script/` grep。
@@ -245,6 +254,53 @@ cm:force_diplomacy("faction:" .. faction:name(), "all", "all", false, false, tru
 
 用途边界：这是解决“某派系回合内存在坏原生对象导致 `0xC0000005` 崩溃”的最终手段——Lua 的 `pcall` 拦不住原生访问冲突，阻止该派系战斗（议和/锁宣战）也不够，因为回合内对军队对象的其他处理仍会触发；只有销毁对象本体才有效。副作用是该派系从战役中永久消失。
 
+### 传送角色（cm:teleport_to）
+
+`cm:teleport_to(cm:char_lookup_str(char), x, y)` 对**不在地图上带军的角色静默失效**——不报错、不移动，日志只写 `Teleporting [character_cqi:N] to [x, y]`。`faction:faction_leader()` 不保证可传送：派系领袖可能受伤休整、未带兵、或仅为嵌入其他军队的英雄形态 `[实测/需随版本复查]`。
+
+传送前必须先确认目标可派遣，领袖不可用时回退到第一支在图军队：
+
+```lua
+local function char_deployable(char)
+    return char and not char:is_null_interface() and not char:is_wounded()
+        and not char:is_at_sea() and cm:char_is_general_with_army(char)
+end
+
+local function tp_commander(faction)
+    local leader = faction:faction_leader()
+    if char_deployable(leader) then return leader end
+    local mf_list = faction:military_force_list()
+    local fallback
+    for i = 0, mf_list:num_items() - 1 do
+        local force = mf_list:item_at(i)
+        if not force:is_null_interface() and not force:is_armed_citizenry() and force:has_general() then
+            local gen = force:general_character()
+            if char_deployable(gen) then
+                local ok, ft = pcall(function() return force:force_type():key() end)
+                if ok and ft == "ARMY" then return gen
+                elseif not fallback then fallback = gen end
+            end
+        end
+    end
+    return fallback
+end
+```
+
+配套要点：
+
+- "传送到目标旁"用 `cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(target), true, radius)`；目标角色同样要先过 `char_deployable`，对存储的 cqi 用 `cm:get_character_by_cqi` 取不到时返回 `false`（不抛错）。
+- 若提供"传送回原位置"，去程应记录**实际被传送者**的 `command_queue_index()`，回程按 cqi 找回同一角色（领袖可能已回图/换人），cqi 失效再回退 `tp_commander`。
+- 排查"点了没反应"先看 `script_log_*.txt` 是否出现 `Teleporting` 行：有则分支已执行、只是目标 cqi 无军队；无则是 dilemma/监听器层面没走到。
+
+### roster 单位不是角色：grant_unit_to_character 授军单位 `[实测/需随版本复查]`
+
+`cm:grant_unit_to_character(cm:char_lookup_str(general), unit_key)` 把 `main_units` 单位直接塞进将领 roster。若该单位是 lord/hero 种姓（caste），它会以"指挥官级单位"参与战斗、可被指挥官限定类军队技能锁定，但**战役侧永远不是角色**：
+
+- `unit:associated_character()` / `unit:unit_commander()` 返回 null 接口；没有 `family_member`，没有 `character_details`，`agent_subtypes` 表不需要（也不应）有对应条目。
+- 典型实例：魔女 mod 的 `psw_tfmw_*_boss_*` 魔王单位（`psw_新BOSS.lua` 用 `grant_unit_to_character` 加进仪式军队）；日志表现为 `UnitCreated: unit=<key> ... -> no_commander`。
+- 凡是按 `family_member_cqi` 建身份的系统（监狱收监、战-役桥接按 roster index 回填 fm）对这类单位解析失败，现象是"标记/击杀都正常但事后没抓到"。必须把它当单位处理：记录 `unit_key`，需要放回地图时用 `cm:grant_unit_to_character` 重新授予某支有空位军队的将领（roster `force:unit_list():num_items() < 20`）。
+- 战役侧 `unit` 接口无法直接判断单位种姓；战斗侧 DB 标志（如 `unit_is_not_commander_class`）已在锁定阶段过滤，战役结果侧只需处理"精确目标匹配到 fm=0 单位"这一种情况，不要给普通兵种加 fm=0 桥接之外的特判。
+
 ### 存档值
 
 ```lua
@@ -366,6 +422,68 @@ WH3 的 twui 控件常通过 `<callbacks_with_context>` 绑定 Cco（component c
 - `PanelOpenedCampaign` 的 `context.string` 是布局名，注意 `character_panel` 与 `character_details_panel` 两种写法都出现过，监听时两者都要兼容；兜底方案是 `ComponentLClickUp` 上挂"面板是否已打开"条件 + `cm:callback` 延迟 0.1s 检查——打开面板的点击触发后回调执行时面板已建好。
 - `SimulateLClick` 会再次触发 `ComponentLClickUp`，监听器内必须做幂等检查（已勾选就不再点），避免自激循环。
 
+### 过回合显示选项面板（end turn display options）`[实测/需随版本复查]`
+
+战役 HUD 空格面板（spacebar options）里控制 AI 回合显示强度的组件树：
+
+```text
+settings_panel > camera_settings > dropdowns_list > {armies, heroes, fleets}
+    每行: dropdown_<row>_speed（速度）/ dropdown_<row>_camera（镜头）
+    下拉内: dy_selected_txt（当前值文本）+ popup_menu > popup_list > 选项行(含 row_tx 文本)
+同级按钮组（ButtonGroupButton 单选作用范围）:
+    apply_all / apply_allies / apply_current_faction / apply_enemies / apply_neutrals
+面板整体绑原生回调 CampaignEndTurnDisplayOptions（非 Cco，状态不在 metadata.json）
+```
+
+- 速度档位 loc key：`end_turn_camera_settings_{off,low,medium,high,veryhigh,normal,fast,follow}` = 关闭/较低/中等/较高/战略/快速/最快/影片；镜头列共用同一组档位文本。
+- 脚本化：`SimulateLClick` 点开下拉 → `popup_list` 的克隆行（排除模板 `row_example`）按 `row_tx:GetStateText()` 匹配目标档（如 "最快"/"Fastest"）再 `SimulateLClick`；先点 `apply_all` 把作用范围选成"全部派系"。参考实现 `mod_files/zzz_czx_fast_end_turn/`。
+- 文本读取：`uic:GetStateText()` 返回 `(unparsed_text, source)`；子节点遍历 `uic:ChildCount()` + `UIComponent(uic:Find(i))`。
+- 引擎 pref 运行时写入：`common.call_context_command("SetPrefAsBool('fast_forward_end_turns', true)")`（另有 SetPrefAsInt/SetPrefAsFloat）；`CcoCampaignPendingActionNotificationQueue.ToggleSupressNotificationType('<TYPE>', true)` 可抑制指定过回合通知（vanilla 用它压 `ALLIED_BUILDINGS_CONSTRUCTION_AVAILABLE`）。
+
+### 地图轮廓选项面板（campaign spacebar options）`[实测/需随版本复查]`
+
+战役地图右侧"轮廓/边界/额外信息"选项面板的组件树（twui 文件 `campaign_spacebar_options.twui.xml`，**运行时根组件 id 是 `campaign_space_bar_options`**，与布局名不同）：
+
+```text
+campaign_space_bar_options > background > options_list
+    header_overlay（"轮廓"节头，含 checkbox 总开关）
+    overlay_ownership / overlay_diplomatic_status / overlay_attitude / overlay_public_order /
+    overlay_growth / overlay_winds_of_magic / overlay_climate_suitability / overlay_attrition /
+    overlay_corruption（每行含 label + icon + radio_button，radio 绑 ButtonGroupButton）
+    header_campaign_borders / campaign_border_mode_parent / header_filter ...
+```
+
+- 隐藏某行（"屏蔽所有者"）：`slot:SetVisible(false)`——原版序章 `wh3_prologue_kislev_expedition_start.lua` 同款用法；面板重开后组件可能重建，需挂 `ComponentLClickUp` 守卫重隐。
+- 默认选中某轮廓：`radio_button` 子组件 `CurrentState()` 非 `selected*` 时 `SimulateLClick()`。
+- `RegionFactionChangeEvent` 的 context **没有** `new_faction()`，新领主是 `context:region():owning_faction()`，旧领主是 `context:previous_faction()`（原版 `wh3_dlc27_nor_generic.lua`）。
+
+### 给第三方 UI MOD 打 Lua 补丁的时序与技巧 `[实测/需随版本复查]`
+
+以 `!ancillary_panel.pack`（工坊 3253398688，脚本 `xyz_ancillary_panel.lua`，面板 `ancillary_panel`）的补丁 `zzz_czx_ancillary_sell` 为例：
+
+- **脚本加载顺序 = 文件名字母序，不是 playset 顺序**：`script/campaign/mod/*.lua` 全部合并后按文件名字典序加载（script_log 里 `czx_*.lua` 6.6s 先于 `xyz_ancillary_panel.lua` 8.7s）。`cm:add_first_tick_callback` 按注册顺序执行 → **补丁脚本文件名必须排序在被补丁脚本之后**（`zzz_` > `xyz_`），否则 first tick 时目标面板还没建。仍要套 retry 兜底：
+
+  ```lua
+  cm:add_first_tick_callback(function()
+      local attempts = 0
+      local function try_attach()
+          attempts = attempts + 1
+          local panel = find_uicomponent(core:get_ui_root(), "ancillary_panel")
+          if panel and attach(panel) then return end
+          if attempts < 240 then cm:callback(try_attach, 0.5) end
+      end
+      try_attach()
+  end)
+  ```
+
+- **`xx_sets` 白名单过滤 hack**：xyz 面板列表绑定 `RecordList.Filter(... StringContains(xx_sets, Key + ", ") || xx_sets == "all" ...)`——`xx_sets` 本质是"key, " 连接的白名单串（原版用于套装搜索）。`common.set_context_value("xx_sets", owned_str)` 即可原生过滤出"只看已拥有"，与类别/稀有度/搜索条件按 AND 叠加、列表无间隙、计数自动正确。需注意：面板自身重置按钮会写 `xx_sets="all"`（重写回我们的串即可共存）；`search_set` 会写真套装串（检测外部写入后主动放开开关让位）。
+- **枚举派系已拥有装备 key**：`cco("CcoCampaignFaction", faction_name):Call("AncillaryList.JoinString(AncillaryRecordContext.Key, ', ')")` 一句出串（JoinString/Filter 等列表方法可直接进 `Call` 表达式；原版 `wh3_campaign_magic_items.lua` 用 `Call("RecordList.Filter(...)")` 返回 Lua table 逐条取 `Call("Key")` 亦可兜底）。逐件校验用 `faction:ancillary_exists(key)`、`cm:model():world():characters_owning_ancillary(key):num_items()`（装备中）、`cco("CcoAncillaryRecord", key):Call("UniquenessScore")`。
+- **出售/购买等模型改动**走 `CampaignUI.TriggerCampaignScriptEvent(cqi, "key:...")` + `UITrigger` 服务端监听，MP 安全；服务器端重新校验 `ancillary_exists`/装备中/UniquenessScore 再 `cm:force_remove_ancillary_from_faction` + `cm:treasury_mod`。
+- 往 `button_list`（List LayoutEngine 网格）里 `CreateComponent` 一个 `square_medium_button_toggle` 即可加筛选开关；被补丁方的"重置全部按钮"循环会把我们的开关也 `SetState("active")`——开关逻辑每 tick 从 `CurrentState()` 读，不存独立 flag，自动保持一致。
+- **`SetDockingPoint` + `SetDockOffset` 方向**：dock 点 1-9 = 3x3 九宫格（9=父组件右下角，角对角对齐）；**dock_offset 是屏幕方向**——右缘 dock 点（3/6/9）+X 会推出父组件外（不可见），要进父组件内部须用负 X；上缘 +Y 向内、下缘 +Y 向外（xyz 的 `xx_button_close` 就是 `docking=8 + offset(0,56)` 挂在面板下缘外 56px）。对照 twui 里 `ancillary_detail docking="Top Right" dock_offset="-30,65"`（负 X 收进面板）可验证。新增按钮贴着面板已有按钮排时，沿它的 dock 点用负 X 往内排，不要正 X 外推。
+- **行内勾选框**：list_box 的行（`CcoAncillaryRecord<key>`）由 ContextList 绑定动态建/销，给行加子组件要用 100-250ms `RealTimeTrigger` 扫描补挂；`context.string` 只带被点组件 id（不冒泡到父），`UIComponent(context.component):Parent()` 取行 → `Id()` 得 key。双击检测无 wall-clock API——用 tick 计数做 600ms 窗口。
+- 同类已知样例：`mod_files/zzz_czx_ancillary_sell/script/campaign/mod/zzz_czx_ancillary_sell.lua`。
+
 ## 常见错误对照
 
 | 错误 | 后果 | 修正 |
@@ -432,3 +550,18 @@ WH3 的 twui 控件常通过 `<callbacks_with_context>` 绑定 Cco（component c
 - **`planner:remove_sunits(x)`**：从 planner 移除单位并放回玩家控制（收回=移除+记名）；`planner:release()` 全军释放。
 - **单位状态查询**（exe 字符串实锤存在）：`unit:unary_hitpoints()`（血量分数）、`unit:is_in_melee()`、`unit:is_moving()`/`is_moving_fast()`、`unit:number_of_men_alive()`/`initial_number_of_men()`、`unit:ordered_position()`。
 - **AI General 交接模型**（社区验证的 UX）：热键"toggle 选区托管" + "临时 override"（单位闲置 N 秒后自动归还 AI）——玩家微操单位不用想着还回来，闲置即自动回托管。
+
+### AI General III 扩展接口（aigeneral_iii_pancake 源码确认，2026-09-19）
+
+工坊 2799316652，纯脚本 pack。要"在 AIG3 基础上做战斗 AI"不要另起炉灶——它暴露了完整 submod API，且 `script/battle/mod/` 按文件名字母序加载（`zzz_` 前缀保证排在 `aigeneral_iii_main.lua`/`jg77_*` 之后读到全局）：
+
+- **`pan_aigeneral` 全局对象**：`ai_list`（script_unit[] 托管集）、`player_ai`（script_ai_planner 句柄）、`current_phase`（对照 `pan_util.NO_PHASE/PREBATTLE/DEPLOYMENT/DEPLOYED/MOCK_VICTORY_COUNTDOWN=5.5/VICTORY_COUNTDOWN/COMPLETE`）、`set_ai_enabled(ui_ids, bool)`、`add_to_ai`/`remove_from_ai`、`add_exclusion(_by_id)`/`clear_exclusion_by_id`、`get_config()`。
+- **`modder_API_uc_manager`**（UC 仲裁层，多 mod 共存标准做法）：`register_mod(mod_key, release_cb)` → `claim_units(mod_key, ui_ids)`（抢占时自动回调旧持有方让位——AIG3 注册回调是 `set_ai_enabled(ids,false)`+`add_exclusion`，即被抢=退出托管且不再自动收回）→ `is_unit_claimed(uid)` 返回持有方 mod_key；`release_claims_without_callbacks`、`release_all_claims_without_callbacks_for_mod`。jg77_babysitter 就靠 `is_unit_claimed` 跳过 pancake 单位实现共存。
+- **`requests_aigeneral_pancake`**：`register_additional_transformation(ability_key, orig_type, new_type[, cyclical_key, summon_key])` 注册自定义变身；`add_transformation_callback(key, fn(old_unit, new_unit))`。
+- **lazy config 通道**：`common.filesystem_lookup("/script/pancake_lazy_config/aigeneral/", "*.lua")` 扫所有 pack——submod 放 `script/pancake_lazy_config/aigeneral/<名>.lua` 即可注入默认配置（优先级：默认值 < lazy config < MCT/file，MCT `option_which_config` 决定后两层谁生效）。
+- **`bm:aigeneral_add_listener_for_selections(key, fn(unit, is_selected))`**：选区变化钩子（bm_ext 包裹 `battle_manager_unit_selection_handler` 实现）。
+- **阶段界线**：`VictoryCountdown`（≥5.5）起 AIG3 `switch_from_ai_planner_to_unit_controllers()` 释放 planner、全军 UC 接管跑 chasing 脚本（`chasing_channel` 配置 `beta`=pancake 自制 2000 行追剿 / `current|original`=CA 原版）——submod 的 planner 级指令必须在此时停手，否则与 chasing 抢 UC。
+- **AIG3 只 add_sunits 不挂常驻 planner 指令**——无指令 planner 的漏单位问题（见上节）在 AIG3 下同样存在；submod 补 `player_ai:attack_unit`/`defend_position` 常驻指令是有效增强（`zzz_czx_aig3_plus` 即此思路）。
+- **claim 交接语义（源码确认）**：AIG3 每次 `setup_or_update_ai` 都对全部 `ai_list` 单位 `claim_units(this_mod_key, ...)`——`this_mod_key` 硬编码 `"aigeneral_pancake"`，所以**托管单位的 `is_unit_claimed(uid)` 返回 `"aigeneral_pancake"` 而非 nil**；submod 对 AIG3 单位调 `claim_units(自己的key, {uid})` 会同步触发 AIG3 注册的 release 回调 → `set_ai_enabled(ids,false)`+`add_exclusion_by_id`，单位当场移出 `ai_list`/planner 并被排除（不会再被自动收回）——这是干净的"摘出做专属微操"通道，摘出后 UC 逐单位指令不再与 planner 抢权。归还：`release_claims_without_callbacks({uid}, 自己key)` + `pan_aigeneral:set_ai_enabled({uid}, true, false)`（`add_to_ai` 内部自清 exclusion，无需手动 `clear_exclusion_by_id`；随后 `setup_or_update_ai` 自动重新 claim 回 `"aigeneral_pancake"`）。
+- **摘出前必查**：`pan_aigeneral.units_overridden[uid]`（玩家 override 进行中勿抢）、`is_excluded_id(uid)`（玩家/其他 mod 主动排除的勿抢）、`is_unit_claimed(uid)` 非 nil 且非 `"aigeneral_pancake"` = 别家 mod 持有勿抢。routing 单位应归还（`is_routing()`）让 pending 流程在集结后自动重接。
+- **摘出单位下单签名**（`lib_battle_script_unit.lua`/`lib_battle_patrol_manager.lua` 实证）：`su.uc:attack_unit(target_unit, bool, true)`、`su.uc:goto_location_angle_width(v(x,z), bearing度, ordered_width, run)`、术毕 `su.uc:release_control()`；引擎原生风筝行为 `su:change_behaviour_active("skirmish", true, true)`（先 `unit:can_use_behaviour("skirmish")` 探测）——拉扯微操能用引擎 behaviour 就别自写状态机。

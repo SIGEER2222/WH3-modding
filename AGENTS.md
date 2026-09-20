@@ -56,8 +56,11 @@
 - DB TSV 默认使用“列名行 -> 元数据行 -> 数据行”结构。
 - 本地化 Loc key 必须按原版同表同字段示例确认，不套单一模板。
 - 不确定的 API、scope、表版本、Loc key 或 UI 路径必须标注 `[需验证]`。
-- 需要打包 MOD 时，默认由 Codex 自动完成全流程，不再询问：`tools/build_pack.py <mod名>` 生成 `mod_output/<mod名>.pack` → 复制到游戏 `data\` → 备份 `state.db` 后将 `local:data:<路径sha256[:18]>` 插入当前 playset（并同步 `enabled_order:<game>`）。本地纯本地化补丁用同名 loc 整文件遮蔽时须排在被汉化包**之前**（靠前胜出）。仅当用户明确说要自己用 RPFM 打包时，才停在源文件并给操作清单。
+- 需要打包 MOD 时，默认由 Codex 自动完成全流程，不再询问：`tools/build_pack.py <mod名> --deploy` 一步完成 生成 `mod_output/<mod名>.pack` → 复制到游戏 `data\` → 备份 `state.db` → upsert `user_mod_data`（alias+notes）→ 将 `local:data:<路径sha256[:18]>` 插入当前 playset（并同步 `enabled_order:<game>`）。**须用 Windows Python313 运行**（`C:\Users\22448\AppData\Local\Programs\Python\Python313\python.exe`）——脚本硬编码 `E:\` 路径，WSL python3 会在 deploy 阶段 FileNotFoundError。改名重打用 `--deploy-name <新名>.pack --replace <旧mod_id>`。本地纯本地化补丁用同名 loc 整文件遮蔽时须排在被汉化包**之前**（靠前胜出）。仅当用户明确说要自己用 RPFM 打包时，才停在源文件并给操作清单。
 - 需要准备 Workshop 文案时，使用 Steam 支持的 BBCode 格式，不使用 Markdown 作为最终发布格式。
+- 每个 MOD（含本地自用 MOD）必须带介绍与预览图：`mod_files/<MOD名>/notes/pack_notes.txt` 一句话功能说明（build_pack 打进 pack 内 `notes.rpfm_reserved`，**缺失/为空直接拒绝打包**），`mod_files/<MOD名>/notes/alias.txt` Mod Manager 显示名（`--deploy` 时缺失直接失败，可用 `--alias` 覆盖），`mod_files/<MOD名>/preview.png` 预览图（部署时以 `<部署包名>.png` 放 `data\` 供 Mod Manager 显示）。缺失时随打包流程补齐。
+- 补丁型 MOD（修复/汉化/覆盖其他 MOD 的 pack）必须在 `mod_files/<MOD名>/notes/dependencies.txt` 声明依赖的 pack 文件名（每行一个，写**实际部署/工坊包名**，`#` 开头为注释）。build_pack 会把它写进 PFH5 头依赖块和 `dependencies_manager_v2.rpfm_reserved`，Mod Manager 据此提示缺失依赖并可一键依赖排序（依赖方/补丁排前，靠前胜出）。未声明依赖的补丁在目标包缺失或顺序错误时会静默失效，难以排查。
+- 本地包的 `description` 只来自工坊缓存，`user_mod_data` 的 `alias`+`notes` 是 Mod Manager 显示名称/说明的唯一来源——`build_pack.py --deploy` 已自动写入，禁止绕开脚本手工部署后漏写。mod_id = `local:data:<sha256(规范化包路径)[:18]>`，改名换路径会导致旧记录失效需重写。
 
 ## 反馈驱动指南更新规则
 

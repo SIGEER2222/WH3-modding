@@ -135,6 +135,14 @@ db/<table_name>/!!custom_<feature>
 5. 导入 RPFM 并运行 diagnostics。
 6. 游戏内验证数值、UI 或日志效果。
 
+## Schema 版本降级编码 `[实测/需随版本复查]`
+
+`tools/build_pack.py` 的 `encode_db` 按 TSV 元数据声明的版本查 schema；**schema 缺失时警告并回退到低一版编码**（例：`[warn] schema for battle_entities_tables v39 not found, using v38`）。如果相邻版本列数不同，回退编码会产生**字段错位/截断的坏行**，游戏直接判定整表非法（`bad_mods_report.txt` → `first_invalid_database_table`）。
+
+- 实测案例（2026-09-20）：`battle_entities_tables` v39 比 v38 多一列 `stop_before_turn`，用 v38 schema 编码 v39 声明的表 → WH3 启动即 `BadMods` 拒载整个 pack；把 TSV 版本号改回 v38（多余列按顺序被忽略或丢弃）后正常编码。
+- 规则：**TSV 声明的版本必须 == 打包 schema 版本**。构建日志出现 `schema for <表> v<N> not found, using v<M>` 警告时视为构建失败处理，不要带病出包。
+- 判断相邻版本列差异的方法：对比 schema_wh3.ron 中两版字段列表；若新版只是尾部加列，降级声明通常安全；若中间插列/改类型，必须拿到正确 schema 或手工对齐列。
+
 ## 克隆原版数据行 `[实测/需随版本复查]`
 
 克隆原版行（技能链、属性组等）进 MOD TSV 时，**必须按列名对齐取值**，不能按列位置从其他来源（导出版本不同的 TSV、手工粘贴串）拷贝：

@@ -104,6 +104,14 @@ mod_output/
 └── <mod_name>.png
 ```
 
+每个 MOD 的介绍与预览图来源（build_pack.py 自动消费）：
+
+```text
+mod_files/<MOD名>/
+├── notes/pack_notes.txt   # 一句话功能说明 -> 打进 pack 内 notes.rpfm_reserved
+└── preview.png            # 预览图 -> 复制为 mod_output/<MOD名>.png，部署为 data\<部署包名>.png
+```
+
 Workshop 发布材料默认放：
 
 ```text

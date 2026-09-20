@@ -10,7 +10,7 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 - 处理本项目任务时，先读 `.codex/project_context.md`；本工作区的可维护源副本以 `warhammer-mod-development_generic/` 为准。
 - `gamedata/`、`bilingual/` 与 RPFM 工具目录只读使用；不修改、不格式化、不清理、不移动。
 - 具体 MOD 源文件默认维护在 `mod_files/<MOD名>/`；图片素材在 `assets/image/`，由用户维护；`.pack` 输出在 `mod_output/`；Workshop 发布文件在 `workshop_release/`。
-- 需要打包时默认由 Codex 用  自动完成打包、部署 data 目录、写入 playset（备份 state.db），不询问；仅当用户明确说要自己用 RPFM 打包时才停在源文件。
+- 需要打包时默认由 Codex 用 `tools/build_pack.py <mod名> --deploy` 自动完成打包、部署 data 目录、写入 `user_mod_data`（alias+notes）与 playset（备份 state.db），不询问；仅当用户明确说要自己用 RPFM 打包时才停在源文件。
 - Workshop 文本描述使用 Steam BBCode 作为最终发布格式；发布包应写清依赖、加载顺序、改动内容和兼容性，缩略图优先复用 MOD 源目录中已确认的 `thumbnail.png` 或用户提供图片。
 
 ## Reference 路由
@@ -44,7 +44,8 @@ description: "全面战争：战锤3（Total War: WARHAMMER III）MOD 开发辅�
 7. 进游戏验证 UI、数值、动画、模型、射界、porthole、日志。
 8. 游戏或 RPFM 更新后，先复查 RPFM schema、WH3 dependencies/cache 与原版表结构，再判断 MOD 是否需要兼容性更新。
 9. 生成 Workshop 发布材料时，在 `workshop_release/` 准备 `.pack`、同名 `.png`、`description.bbcode.txt`、必要的发布说明和上传清单；生成物默认不纳入 git。
-10. 用户反馈可复用错误、diagnostics、发布流程或实测结果时，同步更新本指南和 `CHANGELOG.md`。
+10. **每个 MOD（含本地自用 MOD）都必须带介绍与预览图**：`mod_files/<MOD名>/notes/pack_notes.txt` 一句话功能说明（打进 pack `notes.rpfm_reserved`，**缺失或为空时 build_pack 直接拒绝打包**）；`notes/alias.txt` Mod Manager 显示名（`--deploy` 必需，缺失直接失败）；`preview.png` 预览图（build 复制为 `mod_output/<MOD名>.png`，部署时以 `<部署包名>.png` 放 `data\`）。本地包在 Mod Manager 的名称/说明只来自 `state.db.user_mod_data`（`description` 仅取工坊缓存），`build_pack.py --deploy` 自动写入——**禁止绕过脚本手工部署后漏写**。注意 `mod_id = local:data:<sha256(规范化包路径)[:18]>`，改名换路径旧记录即失效，需用 `--deploy-name/--replace` 重写。
+11. 用户反馈可复用错误、diagnostics、发布流程或实测结果时，同步更新本指南和 `CHANGELOG.md`。
 
 ## 高风险禁区
 

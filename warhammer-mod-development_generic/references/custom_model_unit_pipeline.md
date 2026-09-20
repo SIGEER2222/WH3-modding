@@ -18,6 +18,8 @@
 | `blender_pose_render.py` / `blender_render_rmv2.py` | 无头渲染：绑定姿态 / 摆动画姿势截图 |
 | `blender_pose_anim.py` + `make_unit_anim_gifs.py` | 无头动画逐帧渲染 + GIF 组装（评审用动图） |
 | `export_gamedata.py` | 读游戏 pack 条目（支持压缩条目解压） |
+| `unity_bundle_extract.py` | Unity AssetBundle → 原始资产（Texture2D→PNG、Mesh→OBJ、AnimationClip→JSON） |
+| `unity_smr_to_glb.py` | Unity AssetBundle → **带骨架蒙皮 GLB**（按根层级逐 prefab 导出，嵌贴图；产出即本文档管线入口 GLB） |
 
 ## 端到端流程
 
@@ -39,6 +41,7 @@
 
 ## 1. GLB 入库前检查
 
+- **Unity 系游戏 MOD 是现成模型源**：创意工坊 MOD 用 `steamcmd +login anonymous +workshop_download_item <appid> <itemid> +quit` 匿名拉取（例：部落与弯刀「数码宝贝1.0」= appid 1094520 / item 2011281573，已存 `E:\Tools\steamcmd\steamapps\workshop\content\1094520\2011281573`，解包产物在 `scratch/salzaar_digimon/glb/`——104 只数码兽、491 个带骨蒙皮 GLB）。Unity 打包后原始 FBX/DAE 已序列化为引擎对象，**不是源文件**——必须走 `unity_smr_to_glb.py` 重建：蒙皮权重在顶点流 channel 12/13（BlendWeight/BlendIndices，非 m_Skin），骨架按 SMR.m_Bones→Transform 层级重建，容器 path 只指向主对象（fbx 主对象是 Avatar 不是根 GameObject），用根 GO 名回查资源目录 `[实测]`。
 - 先拷到 `scratch/` 用 **ASCII 文件名**——bash/Python 管道传中文路径给 Blender 会乱码。
 - `blender_render_rmv2.py`（或同套 GLB 渲染脚本）先出绑定姿态图，确认模型形态、朝向、比例，再决定骨架。
 - 用户模型不精致没关系——先保管线通，美术问题后期再调。
@@ -125,7 +128,7 @@ blender -b -P tools/blender_grid_views.py -- <glb> <out_prefix>   # 0.25m 网格
 # 手写 scratch/landmarks_<u>.json: {骨名: [x,y,z]}，只标关键骨（落足点/头/爪/躯干链）
 python tools/fit_skeleton.py tools/_skel/<template>.json scratch/landmarks_<u>.json scratch/skel_czx_<u>.json
 blender -b -P tools/blender_rig2.py -- scratch/skel_czx_<u>.json <skinned输入.glb> <bound.glb> nofit <exclude_re> <save.blend>
-python tools/retarget_clip.py <原版clip.anim> scratch/skel_czx_<u>.json <out.anim> --pose <pose.json>
+python tools/retarget_clip.py <原版clip.anim> scratch/skel_czx_<u>.json <out.anim> --pose <pose.json> --delta tools/_skel/<template>.json --ref frame0
 blender -b -P tools/blender_pose_anim.py -- <bound.glb> <pose.json> <skel.json> <outdir> <step>
 blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+骨骼叠加验收图
 ```
@@ -139,6 +142,10 @@ blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+
 - **浑身是刺的球状模型**（莽兽）：密集骨+尖刺面必攒球。方案=rig2 排除装饰链后跑 `rigidify_core.py <bound.glb> <skel.json> <躯干骨列表> --ymin <壳底高>`——上半身整壳刚性绑脊柱/壳骨，只腿参与混合，模型按整体移动 `[实测]`。
 - **动画集=fragment JSON**：`animations/database/battle/fragments/<key>.txt` 是解压后的 JSON（`Properties.SkeletonName` + `SlotData.<SLOT>.Entries.#01.animation` 路径）。MOD 可新写 fragment 文件定义整套动画槽——这是自定义骨架进游戏的接入点 `[实测/需随版本复查]`。
 - **`man_animation` 键→fragment 文件名**直查：`hu6_gor_dual_axe`→`hu6_gor_dual_axe.txt`；注意有例外（`hu11b_dlc17_ghorgon`→`hu11b_ghorgon_base.txt`），映射在 `animation_tables.animpack` 里 `[需验证]`。
+- **必须 `--delta` 走世界增量重定向**：裸 `retarget()` 把供体 clip 的绝对局部旋转照抄——只要我方绑定姿态≠供体绑定姿态（异形几乎必然），肢体就绕错误的轴折进身体里，"idle 全程前倾弓背"（暴龙兽实测）。`--delta <供体_skel.json> --ref frame0` 把"供体每帧世界旋转增量"叠到我方绑定世界朝向上，我方剪影不变、只借运动 `[实测]`。
+- **fit_skeleton 已加朝向重瞄**：移动关节后每根骨的世界四元数按"指向延续子骨"做最短弧 swing 旋转（链末端骨随父 swing 刚性跟随），写入 `world_quat_frame0` 并重算 local。旧版"quats 沿用模板"会让骨局部轴指向供体的肢体方向——是 delta 重定向生效的前提，也是绑定图里骨柱方向的依据 `[实测]`。
+- **模型可能本身不对称/偏轴**：AI 生成模型常见左右爪大小不同、中轴偏离 x=0。落点界标前先实测网格（侧向极值、近地顶点聚类、中轴 x 偏移），**每侧按实测足位独立放界标、中轴骨放到实测中线**——对称界标放在歪模型上叠加图必歪（暴龙兽实测：右爪 x+1.47 vs 左爪 -1.09，中轴 x+0.2）`[实测]`。
+- **叠加图自验必查项**：足/头/尾落点 vs 网格实测极值数值比对 + 逐视图目检渲染图（含 top）；链末端骨的 Blender 默认 tail 画法会画出"飞出身体的假骨柱"——blender_skel_overlay.py 已改为 head→首子骨画法 `[实测]`。
 
 #### 3c-i. 完整自洽自定义骨架接入 `[实测 2026-09-13 坦克单位]`
 
@@ -147,11 +154,24 @@ blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+
 1. `fit_skeleton.py` 按 landmarks 重摆骨位 → `write_skeleton()` 从模板 `.anim` 生成新骨架 `animations/skeletons/<新名>.anim` + `write_invmats()` 生成 `<新名>.bone_inv_trans_mats`；`.anm.meta` 直接复制原版改名即可（内部不含骨架名）。
 2. `retarget_clip.py` 把所需 clips 重定向：clip 内 `skeleton_name` 改新名、static/动态轨道写新 bind local。**注意 retarget 读 `skel['custom_name']`**——fitted JSON 里加 `"custom_name": "<新名>"`。
 3. 动画集接入：`man_animation`/`gun_animation_table` 键 → `battle_animations_table`（key→skeleton 两列）→ `animations/database/battle/bin/<key>.bin`。bin 内嵌 clip 路径全集（非引用 fragment）——fragment .txt 不必提供。
-4. **bin 克隆技巧**：bin 全是 u16 长度前缀字符串+定长二进制字段，**选等长新名即可原位打补丁**：骨架名 `steamtank01`(11)→`czx_stank01`(11)，集名 `wm_steam_tank01`(15)→`czx_steamtank01`(15)，clip 目录 `engine/steamtank01/`→`engine/czx_stank01/`（文件名不变）。audio/persistent meta 路径保留指原版。
+   **⚠ 实测修正（2026-09-19，数码兽白模 T-pose 根因）**：loose `.bin` 放在 `database/battle/bin/` **不会被战斗系统加载**——扫遍本机全部创意工坊包（SFO/银影/arbiter 等 20+ mod）与 vanilla 数据，战斗套件**无一例外**用 `.animpack` 容器（内部嵌 `<key>.bin` 定义+骨架名+clip 路径表）；loose `.bin` 仅用于战役 agent。症状：单位进场但渲染为白色半透明占位人形、全程绑定姿势（骨架从未注册）。配套表：自定义骨架必须有 `battle_skeletons` 行（骨节点语义映射）+ `culture_to_battle_animation` 行（套件挂到文化包，**每个会用到的文化包一行**，vanilla 同套件本就映射 5+ 文化）`[实测/需随版本复查]`。`.animpack` 由 AssetEditor 生成；没有工具链时优先移植已验证 mod 的整套 animpack+骨架资产（数码兽原包 chr050/chr151 即此结构：J_* 原生骨架 + animpack + rmv2 直连 VMD）。
+4. **bin 克隆技巧**：bin 全是 u16 长度前缀字符串+定长二进制字段，**选等长新名即可原位打补丁**：骨架名 `steamtank01`(11)→`czx_stank01`(11)，集名 `wm_steam_tank01`(15)→`czx_steamtank01`(15)，clip 目录 `engine/steamtank01/`→`engine/czx_stank01/`（文件名不变）。
+   **致命细节（实测崩溃）**：`crab01`→`czx_ms` 这种裸词全局替换会把 `.anm.meta`/`.meta`/`animations/audio/...snd.meta` 也改名 → 引擎找不到文件崩溃。只能改两处：`animations/battle/<skel>/**/*.anim`（我们提供的 clip）和 `animations/skeletons/<skel>.anim` + 裸骨架名字段；`.anm.meta`/`.meta`/`.snd.meta`/persistent/locomotion_graphs 引用必须保留原版路径。改写时逐字节流复制——找到旧名后只写新名、**continuation 字节必须原样写回**（跳过一次文件名就把 bin 截短 2KB，结构性损坏）。
 5. RMV2 头骨架名写新名（`convert_new_units.py` 支持 `rmv2_skel_name` 字段覆盖 donor 骨架名）。
 6. land_units.man_animation 与 battlefield_engines.gun_animation_table 都改成新集名。
 
 实例：被感染的坦克 = `czx_stank01` 骨架（exhaust 4 骨链重摆成颈链、barrel 簇当头炮、wheel/axel 对履带轮）+ `czx_steamtank01` 动画集（克隆 wm_steam_tank01.bin）。产物见 `scratch/_build_tank_skel.py`/`_retarget_tank.py`/`_patch_tank_bin.py`、`scratch/landmarks_inf_tank.json`。
+
+实例（数码宝贝/人形贴合 2026-09-13）：战斗暴龙兽 = `czx_wgm001` 骨架（hu1 模板 + Unity J_* 骨点界标——源模型自带骨架位即最佳界标，映射 `J_arm/J_elbow/J_weapon→upperarm/lowerarm/hand` 等 22 点）+ `czx_dgm_wargreymon_emp_sws1` 动画集（克隆 `hu1_empire_sword_and_shield.bin`，27→27 等长；`animations/battle/humanoid01/`→`czx_wgm001/` 仅改 .anim 条目，`.anm.meta`/`.snd.meta`/`reference_poses` 保留原版）。**注意替换时只盖骨名 10 字节、不含末尾 `/`**——多吞 1 字节会截短 bin。bin 里 ~380 条 clip 路径允许缺文件（实测 marine 只发 23 条也正常），可只重定向近战核心集（stand/combat_idles/locomotion/movement/attacks/defends/reactions/deaths/knockback/knockdown/celebrate/shield_up/porthole/jumps_falls）。产物：`scratch/salzaar_digimon/skel_czx_wgm001.json`、`landmarks_wargreymon.json`、`wargreymon_wgm001_bound.glb`、验收图 `wgm001_overlay_*.png`、`pose_wgm_*/`。`convert_new_units.py` 已支持 `--mod <mod名>` 选择输出目录。
+
+批量实例（数码宝贝名册 104 只全量 2026-09-13）：`tools/digimon_batch.py` 全链路（scan→fit→bind→skelres→anim→rmv2→db→ui→verify→pack）。关键教训：
+
+- **源 GLB 质量参差，必须逐候选 Blender 渲染挑选**：同一数码兽常有多个变体文件（`_chr<N>` / `_2` / `with animations` / 武器拆分件）。实测坑型：① rest≠bind 时 raw POSITION 可能是爆炸态（杰斯兽x chr468）；② 整文件 0.01 退化缩放（v仔兽 chr114、奥米加兽x chr357、慈悲 chr448）——Blender 渲染正常因相机自适应，但蒙皮空间全错；③ `_2` 变体是空壳/纯武器件（闪光暴龙兽 chr776_2_3 只是一把剑）；④ 部分文件 rest 姿势是躺平的。判据：候选文件逐个 `_rest_probe` 渲染 + 比对关节高度 h 与网格尺度一致（h<0.25 或 j/mesh 尺度不匹配即弃）。
+- **多 skin 文件要取并集**：`glb_scene` 只读 `skins[0]` 会漏掉手臂等关节（杰斯兽x 分 backpack/body/scarf 三个 skin）——joints 应 union 全部 skins。
+- 退化缩放文件可以整体预放大（POSITION/IBM平移/节点translation ×S 重写 glb，见 `scratch/` 缩放脚本思路）。
+- `eff_*`/`fx_*` 材质片是技能特效板，绑定前必须剔除，否则成大旗布乱飘。
+- jmap 安全兜底=空间最近骨，配件链（bkpk_arm/scarf/武器）→trunk/cape 系；`toe` slot 目标骨名是 `toe_left_0`/`toe_right_0`。
+- QA 高度比阈值对鸟/蛇误报（展翅/昂首攻击高度翻倍属正常），需人工看图复核。
 
 - 输出 RMV2 **v8** 格式，头部 offset 8 写骨架名——游戏靠这个字段挂动画。
 - **单 LOD** 可把 6MB 压到 ~1.5MB/模型；贴图 base 2048、normal/mr 1024 再省体积。
@@ -240,3 +260,16 @@ unit_variants.variant ──→ 乘员 VMD（原版是 wh_emp_state_troops：乘
 - `unit_creation_workflow.md`：纯 DB 派生单位、招募链、RoR、兵牌/porthole。
 - `asseteditor_animation_workflow.md`：AssetEditor 操作细节、Skin Wrap、动画 clip 解码格式。
 - `tsv_format.md`：列名对齐克隆、数值对标法、junction 插行去重。
+
+## 重定向的三种模式（retarget_clip.py）
+
+- `retarget()`（原版）：逐字拷贝供体局部旋转——只适合绑定姿态与供体一致的模型（坦克：骨架摆放本来就接近蒸汽坦克形态）。
+- `retarget_delta(ref='bind')`：世界空间旋转差 = 供体动画世界旋转 × 供体绑定世界旋转⁻¹，叠到我们绑定姿态上。适用于绑定≈供体绑定姿态的模型。
+- `retarget_delta(ref='frame0')`：**异形模型首选**——差值对每条 clip 自己的第 0 帧取，我们的生物保持自身剪影，只借供体的"运动"。枪兵（佝偻怪物 vs 直立人）只有这个模式不塌。
+- 静态槽位统一填我们的绑定局部 TRS；root/animroot 平移按根高比缩放。
+- `damp={regex: factor}`（仅 delta 模式）：把匹配骨的旋转差向恒等混合。**径向多足模型（蟹/蛛）必用**——我们的腿长比供体短很多时，同一旋转差会让腿尖扫过中线把模型折成球（莽兽实测：腿 damp=0.65 后攻击帧才不散架）。同时把 guess 的、模型上其实不存在的附肢骨（arm/claw/pincer）从权重 allow 里剔除——它们悬空在体外，会抓走附近顶点在攻击时甩飞背刺。
+
+## 姿势渲染验证的坑
+
+- `blender_pose_render.py` 的世界差公式需要 skel.json 作为第 5 参数，且要求 Blender 骨骼 rest 方向 ≈ json 绑定方向——rig2 从 head/tail 建骨，rest 方向与 json 绑定姿态可差 70-280°，但公式里 ML 项会约掉，实测正确。
+- 验证姿势数据是否健康：直接比较 pose json 里关节世界坐标 vs 绑定坐标；region spread 不变 = 蒙皮没被撕裂（数值验证脚本 scratch/_skin_check2.py）。

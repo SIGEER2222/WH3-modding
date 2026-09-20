@@ -162,6 +162,14 @@
 
 ## Loc 与描述
 
+**单位说明完整性是硬性要求**：每个新增单位在部队浏览器/兵牌里必须呈现完整说明，缺一不可（`build_pack.py` 已内置校验，缺失直接报错拒绝打包）：
+
+- `units_onscreen_name_<unit>` 与 `land_units_onscreen_name_<unit>`：单位名，非空。
+- `unit_description_short_texts_text_<unit>`：一行概括短描述；**不得等于单位名**（那是占位符）。
+- `unit_description_historical_texts_text_<unit>`：背景/风味长描述，**至少 40 字**。对照原版单位信息面板——原版此处是一整段文字（外观、习性、战场角色），一行存根在浏览器里明显残缺。
+- 每个新增 `unit_abilities` key：`unit_abilities_onscreen_name_*` + `unit_abilities_tooltip_text_*` 均非空。
+- 同时确认 `unit_description_short_texts_tables` / `unit_description_historical_texts_tables` 有对应 DB 行，否则 loc 无处可挂。
+
 Loc key 不要套单一模板：
 
 - `land_units_onscreen_name_<land_unit>` 是单位名称常见 key，但仍应查同类原版。
@@ -187,7 +195,7 @@ Loc key 不要套单一模板：
 - [ ] 新 key 有稳定前缀，无无命名空间主键。
 - [ ] 没有默认使用 `data__`。
 - [ ] donor 共用 weapon/projectile/mount/entity/spacing 未被直接修改。
-- [ ] 新单位 `main_units`、`land_units`、variant、attribute、ability、recruitment、unit set、Loc 链路完整。
+- [ ] 新单位 `main_units`、`land_units`、variant、attribute、ability、recruitment、unit set、Loc 链路完整；说明性 loc（名称/短描述/长背景/技能名+tooltip）齐全非占位——`build_pack.py` 会硬性校验。
 - [ ] RPFM diagnostics 无 banned table、invalid reference、missing loc。
 - [ ] 游戏内验证招募、单位卡、porthole、模型、骑手位置、动画、射界、移动射击、减员、阵型、武器数值。
 
