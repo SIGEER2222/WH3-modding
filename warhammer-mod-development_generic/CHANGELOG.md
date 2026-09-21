@@ -6,7 +6,7 @@
 4. §10.14 同类复发实例：`.singleplayer.battle_preferences` 缓存军表又含已删除的 `czx_kerrigan` 与不在 playset 的 `pkm_025_pikachu`——已备份至 `scratch/prefs_backup_20260921/` 并删除（连同 `army_setups` 残留），游戏 06:29 重建的 prefs 只剩 vanilla key。**自造单位改名/删除时必须同步清 AppData 军表缓存**这条再次验证。
 5. DLC 补丁核对：`E:\Download\战锤III 8.0 dlc未加密补丁` 三件套与游戏目录完全一致（`steam_api64.dll`=980ea8cc cream 版、`steam_api64_o.dll`=40d0ae44 原版备份、`cream_api.ini` 相同），8.0 重装后补丁实际已就位，无需覆盖。
 6. 新工具 `scratch/mdmp_exc.py`：解析 .mdmp ExceptionStream 拿内层异常码/地址并按 ModuleList 基址换算 exe 偏移——比 stack.txt（只有模块名）信息量大，崩溃归因第一步。
-7. 遗留：`+0x1a0be3b` 在重装后、清 prefs、降画质后仍出现（zz_pkm 四分片 dbonly/animonly/nobin 同签名全崩，noanim 存活但同时段有 dump，基线对照待补）——若空 modlist 基线仍同签名崩，收敛到环境层（QQPinyin TSF/cream_api 对 8.0 兼容性）继续查。
+7. 遗留定界（同日 A/B）：`+0x1a0be3b` 在重装后 vanilla 基线**间歇复现**——`battle_basegame --mods none` 07:0x/08:16 通过、09:51/09:55 崩；且在 cream_api 全卸载（ini 移除 + steam_api64.dll 换回原版备份）状态下仍连崩（+0x1a0be3b、+0x2cfe551）——**cream_api 补丁排除、OOM 排除（06:49 后无 Event 2004）、mod 内容排除（vanilla spawn 也崩 +0x2cfe551）**，收敛到引擎竞态/系统注入层（QQPinyin TSF 在每个 dump 模块表但仅 1/33 出现在崩点栈顶，证据弱）。zz_pkm 四分片同签名全崩大概率是基线污染而非包内容问题。协调笔记 `scratch/crash_20260921/NOTE_cross_session.md`。
 
 
 
