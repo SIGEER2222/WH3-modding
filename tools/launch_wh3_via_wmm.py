@@ -21,6 +21,8 @@ from backend.api import API  # noqa: E402
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--save", default="", help="存档文件名（默认最新）")
+    parser.add_argument("--menu", action="store_true",
+                        help="不加载存档，只启动到主菜单")
     args = parser.parse_args()
 
     api = API()
@@ -41,8 +43,11 @@ def main() -> int:
         return 1
     print(f"scanned assets={len(api._assets)}")
 
-    save_name = args.save or api.save_games.latest()["name"]
-    print(f"save={save_name}")
+    if args.menu:
+        save_name = ""
+    else:
+        save_name = args.save or api.save_games.latest()["name"]
+    print(f"save={save_name or '(main menu)'}")
 
     result = api.call("launch_game", [mod_ids, token, save_name])
     print(result)

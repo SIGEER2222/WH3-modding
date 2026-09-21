@@ -51,7 +51,7 @@ WH3-modding/
 | `gamedata/` | 提取的游戏原版脚本、UI、DB 等数据；只读参考 | 忽略 |
 | `bilingual/` | 游戏内中英对照和本地化参考文件；只读参考 | 忽略 |
 | `references/` | 本地 MOD/英雄/美术参考样例，仅引用 | 纳入 |
-| `tools/` | 工作区级脚本（如 `export_gamedata.py` 导出 gamedata/bilingual） | 纳入 |
+| `tools/` | 工作区级脚本（如 `export_gamedata.py` 导出 gamedata/bilingual、`wh3diag.py` 运行时排查 CLI；索引见 `tools/README.md`） | 纳入 |
 | `rpfm-v5.0.6-x86_64-pc-windows-msvc/` | RPFM 工具本体 | 忽略 |
 | `wyccc-warhammer-mod-manager/` | 本地 junction 到 `wyccc-warhammer-mod-manager` 工具仓库；MOD 管理器参考/开发入口 | 忽略 |
 | `scratch/` | 临时/实验性文件；一次性脚本、调试输出、中间导出、截图等 | 忽略 |

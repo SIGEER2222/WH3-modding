@@ -1,3 +1,10 @@
+## 2026-09-21 固化 tools/wh3diag.py：游戏侧排查只读 CLI（替代 scratch 一次性解析脚本）
+
+1. 新增 `tools/wh3diag.py`——固化崩溃排查会话中反复手写的取证路径：`crashes`（mdmp 异常码/params/故障地址→模块偏移/上下文寄存器/stack.txt 符号链）、`scriptlog`（各 script_log 加载枚举数/最后枚举文件/marker 命中，自动标注 148B stub=崩在枚举前、枚举截断=崩在加载中段）、`which`（跨包反查内部路径，data\+工坊 1142710+mod_output 全扫）、`ls`/`meta`/`cat`（PFH5 索引/头/依赖块/rpfm_reserved/单文件提取）、`db`（按 schema_wh3.ron 解码表行）、`usedmods`（清单序号/grep/两清单 diff）、`paths`。pack 参数支持裸文件名自动解析；Windows Python313 与 WSL python3 双跑（`X:\` ↔ `/mnt/x` 自动映射，`WH3_GAME_ROOT`/`WH3_APPDATA`/`RPFM_SCHEMA_WH3` 可覆盖）。
+2. `tools/export_gamedata.py` 新增索引级原语 `read_pack_header`/`iter_pack_index`/`read_pack_payload`/`PackIndexEntry`（不读 payload 的全包扫描）；`iter_pack_entries` 改为复用，行为不变。
+3. 路由登记：`AGENTS.md` 新增「排查入口（问题形态→工具）」表；新建 `tools/README.md` 用法索引；`.codex/project_context.md` 与 `docs/PROJECT_STRUCTURE.md` 登记；`references/crash_and_load_order_diagnostics.md` §三/§六/§10.13 挂工具指针。
+4. 修正 references §六 PFH5 头字段标号：offset 8 = dep_count（原误标"保留"）、offset 12 = dep_size 依赖区字节数（原误标 dep_count）。
+
 ## 2026-09-21 跨表悬空引用审计器 + 静态修复一批 + playset/AppData 卫生
 
 1. 新增 `tools/audit_dangling_refs.py`：对 `mod_files/` 全量做跨表悬空引用审计——自动从 vanilla gamedata 推断外键（源列值集 ⊆ 目标唯一列），另有 variantmesh 文件存在性、loc key 精确匹配（表名前缀按原版约定）、`show_advice`→advice_threads、battle_skeletons 声明、TSV 列数一致性等检查；报告落 `scratch/audit_dangling_refs_report.tsv`。最终 0 ERROR / 126 WARN（WARN 多为上游工坊包提供的 key 或归档测试包）。

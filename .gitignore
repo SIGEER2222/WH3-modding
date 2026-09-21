@@ -14,6 +14,10 @@ tools/AssetEditor/
 # (no trailing slash: it is a junction/symlink, not a real directory).
 wyccc-warhammer-mod-manager
 
+# WorkBuddy local session state + project memory (contains hardlinks that
+# alias .codex/project_context.md and AGENTS.md; keep out of version control).
+.workbuddy/
+
 # Generated packaging and release outputs.
 mod_output/
 workshop_release/

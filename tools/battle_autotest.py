@@ -20,8 +20,10 @@ Usage:
   is still alive and whether a new crash_report dump appeared.
 """
 import argparse
+import csv
 import json
 import os
+import re
 import sqlite3
 import subprocess
 import sys
@@ -39,7 +41,7 @@ CRASH = Path.home() / ("AppData/Roaming/The Creative Assembly/"
 MODLIST = GAME / "zz_autotest_mods.txt"
 
 
-def build_modlist() -> Path:
+def build_modlist(exclude: str = "") -> Path:
     db = sqlite3.connect(DB)
     playset = db.execute(
         "SELECT value FROM app_state "
@@ -47,6 +49,12 @@ def build_modlist() -> Path:
     rows = db.execute(
         "SELECT position, mod_id FROM playset_items WHERE playset_id=? "
         "ORDER BY position", (playset,)).fetchall()
+    if exclude:
+        rx = re.compile(exclude)
+        kept = [(pos, mid) for pos, mid in rows if not rx.search(mid)]
+        print(f"  exclude /{exclude}/ -> dropped {len(rows)-len(kept)}"
+              f"/{len(rows)} items")
+        rows = kept
 
     lines = []
     if WS.is_dir():
@@ -80,6 +88,25 @@ def build_modlist() -> Path:
     return MODLIST
 
 
+def wh3_pids() -> set:
+    """当前所有 Warhammer3.exe 的 pid。
+
+    直接 Popen 拿到的 pid 不可靠：Steam 会接管并重拉起真正的游戏进程，
+    那个中间进程几秒内就退出（rc=-1），只看它会误判成"立刻崩溃"。
+    """
+    out = subprocess.run(
+        ["tasklist", "/FI", "IMAGENAME eq Warhammer3.exe", "/FO", "CSV", "/NH"],
+        capture_output=True, text=True, errors="ignore")
+    pids = set()
+    for row in csv.reader(out.stdout.splitlines()):
+        if len(row) >= 2 and row[0].strip().lower() == "warhammer3.exe":
+            try:
+                pids.add(int(row[1].strip()))
+            except ValueError:
+                pass
+    return pids
+
+
 def _local_id(name: str) -> str:
     import hashlib
     c = str((DATA / name).resolve()).replace("\\", "/").casefold()
@@ -91,6 +118,8 @@ def main() -> int:
     ap.add_argument("xml")
     ap.add_argument("--mods", default="full")
     ap.add_argument("--wait", type=int, default=90)
+    ap.add_argument("--exclude", default="",
+                    help="regex on mod_id to drop from --mods full")
     args = ap.parse_args()
 
     exe = GAME / "Warhammer3.exe"
@@ -126,9 +155,10 @@ def main() -> int:
         print(f"modlist -> {MODLIST} ({len(lines)} packs)")
         modlist_arg = f"{MODLIST.name};"
     else:
-        modlist_arg = f"{build_modlist().name};"
+        modlist_arg = f"{build_modlist(args.exclude).name};"
 
     before = {p.name for p in CRASH.glob("*.mdmp")} if CRASH.is_dir() else set()
+    prev_pids = wh3_pids()
     env = os.environ.copy()
     env["SteamAppId"] = env["SteamGameId"] = "1142710"
     flags = getattr(subprocess, "DETACHED_PROCESS", 0) | \
@@ -141,18 +171,23 @@ def main() -> int:
 
     deadline = time.time() + args.wait
     alive = True
+    spawned = set()
     while time.time() < deadline:
-        rc = p.poll()
-        if rc is not None:
+        spawned = wh3_pids() - prev_pids
+        if not spawned and time.time() - (deadline - args.wait) > 20:
             alive = False
-            print(f"game exited rc={rc} after {args.wait - (deadline - time.time()):.0f}s")
+            print("game gone (no Warhammer3.exe newer than launch)")
             break
         time.sleep(5)
+    for pid in spawned:
+        subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True)
+        time.sleep(2)
     new_dumps = sorted(
         (d for d in (CRASH.glob("*.mdmp") if CRASH.is_dir() else [])
          if d.name not in before),
         key=lambda d: d.stat().st_mtime)
-    print(f"alive_after_{args.wait}s={alive} new_dumps={len(new_dumps)}")
+    print(f"alive_after_{args.wait}s={alive} pids={sorted(spawned)} "
+          f"new_dumps={len(new_dumps)}")
     for d in new_dumps:
         print("  dump:", d.name)
     return 0 if alive and not new_dumps else 1

@@ -26,7 +26,7 @@ E:\Code\WH3-modding\
 ├── gamedata/        # 由 tools/export_gamedata.py 从游戏 pack 导出（2026-09-06 重建）
 ├── bilingual/       # 同上；localisation__.loc_CN.tsv 为合并中文速查表
 ├── references/      # 本地 MOD/英雄/美术参考样例，仅引用
-├── tools/           # export_gamedata.py 等工作区脚本（tools/_*/ 为已忽略的中间产物目录）
+├── tools/           # export_gamedata.py、wh3diag.py 等工作区脚本（tools/_*/ 为已忽略的中间产物目录；用法索引见 tools/README.md）
 ├── rpfm-v5.0.6-x86_64-pc-windows-msvc/
 └── warhammer-mod-development_generic/
 ```
@@ -58,11 +58,14 @@ E:\Code\WH3-modding\
 
 启动游戏可通过 `E:\Code\wyccc-warhammer-mod-manager` 后端 `API._launch_game(mod_ids, order_token)`；清单写游戏根目录 `used_mods.txt`，运行时另生成 `wyccc_launch_mods.txt` 与 `!!!!wyccc_runtime_options.pack`。加载清单被两个后端实例并发修改会触发 token 校验报错，自动化启动前先确认只有一个后端/UI 实例。data 目录 pack 需以 `local:data:*` id 进入 playset 才会写入 `mod` 行加载；直接放 `data\` 而无 mod 行只会记 `unknown file`。
 
+游戏侧排查（crash dump 签名、script_log 枚举截断、pack 索引/依赖/同路径遮蔽反查、包内 DB 行解码、used_mods 清单对比）一律先跑 `tools/wh3diag.py`（只读，WSL/Windows Python 均可；子命令见 `tools/README.md`），不要再写一次性解析脚本——历史 scratch 里已有 6+ 份重复 mdmp/pack 解析器。
+
 ## 本机硬件与 AI 推理环境（2026-09-13）
 
 - **GPU 优先（用户明确要求）**：本机有 NVIDIA GeForce RTX 2070（8GB），后续所有 AI/TTS/模型推理任务一律优先走 GPU，不要默认 CPU。装库时直接选 CUDA 版，例如 `pip install "torch==2.11.0+cu128" --index-url https://download.pytorch.org/whl/cu128`（PyPI 的 Windows wheel 是 CPU 版）。
 - **TTS/语音实验环境**：venv `C:\Users\22448\venvs\wh3tts`（torch 2.11.0+cu128）；HF 缓存约定放 E: `scratch\tts_lab\hf_cache`（C: 盘长期紧张，大模型下载前先查 E: 空间并设 `HF_HOME`）。注意：**2026-09-13 磁盘清理已删除整个 `scratch\tts_lab`（23.5G，含 hf_cache 与 indextts2_ckpt）**，模型需重下；venv 仍在。实测与坑见 `references/audio_and_vo.md` "本机已实测可用的管线"。
 - **磁盘卫生**：模型/数据集/音频中间产物一律放 `scratch/`；下载大文件后对比 `x-linked-size` 校验完整性；失败的 partial 缓存及时删。
+- **分页文件策略（2026-09-21 用户立约）**：`C:\pagefile.sys` 保持**系统托管**（`AutomaticManagedPagefile=True`，无自定义 `Win32_PageFileSetting`），**禁止任何 AI 会话改大或改配置**。9-19 的 40/48GB 手动值是当时为 WH3 mod commit OOM（单进程提交 40–55GB）故意设的；因 C: 仅 ~20GB 空余改回托管，OOM 改靠 `tools/set_memory_safe_prefs.py` 压画质兜底。注意托管下 commit 上限仅 ~20–24GB，若再出 System Event 2004 须先问用户，不得自行改 pagefile。
 
 ## Workshop 订阅/下载能力（本机已具备，勿再回答"做不到"）
 
@@ -118,4 +121,6 @@ E:\Code\WH3-modding\
 - RPFM、日志、网页核验：`references/rpfm_and_verification_workflow.md`
 
 当用户反馈“这样不对”“RPFM 报错”“游戏日志报错”“以后按这个规则来”时，判断是否需要更新 development 指南。更新流程见 `docs/DEVELOPMENT_GUIDE_UPDATE_RULES.md`。
+- **2026-09-21 晨间闪退复发（与上一条不同根因）**：01:03–06:39 又产生约 80 个 dump，`script_log` 全是 148B stub，外层恒为 `Application Error 1000 / 0xc0000409 @ Warhammer3.exe+0x10da8f1`，但**无内层 `0xc0000005`**，异常参数 `[0]=0x7` = `FAST_FAIL_FATAL_APP_EXIT`（进程主动 fail-fast，非空指针）。每次崩溃同一秒都命中 **System `Event 2004` 内存资源耗尽**：`Warhammer3.exe` 提交 **40.5/40.6/40.9/43.3/43.8/46.0/46.2/46.5 GB**；本机 RAM 15.8GB、pagefile `C:\pagefile.sys` 40/48GB、提交上限约 63.8GB，同时 Devin/steamwebhelper 再吃掉数 GB。根因 = AppData `scripts\preferences.script.txt` 在重装后被写成 `minimise_memory_usage false` + `gfx_texture_quality 3` + `gfx_unit_size 3`，而通过全验证矩阵的同目录备份 `preferences.script.txt.bak_reinstall_test` 是 `true` + texture 2。已把 `minimise_memory_usage` 改回 `true`（备份 `preferences.script.txt.bak_20260921_065145`）。**判据固化**：同签名 dump 先查 `Get-WinEvent -FilterHashtable @{LogName='System'; Id=2004}`，命中即 OOM，**不要二分 pack**；无 2004 才回退到 §10.14（AppData 悬空单位 key）/ §10.18（pack 缺 `battle_skeletons_tables`）路线。当前 C: 剩 20.1GB、E: 剩 16.5GB，已无余量再扩 pagefile，只能压 WH3 自身提交（若仍崩再降 `gfx_texture_quality`/`gfx_unit_size` 到 2）。
+- **2026-09-21 二次 OOM 定案（06:50）**：重装验证矩阵通过后仍崩，用户报"并未修复"。重新取证：每次 dump 同秒都有 System **Event 2004**（`Warhammer3.exe` 提交 40.6–47.1GB，上限 63.8GB，物理内存仅 16GB）→ 是 OOM，不是 §10.14 悬空 key（该签名 `0x1a0be3b` 已不再出现，说明 9-20 的修复有效）。**注意 `minimise_memory_usage` 当时已是 true 仍崩**——ultra 贴图档（自造单位 dds：swarm 170MB + digimon 69MB）单独吃光余量。已把 `gfx_texture_quality`/`gfx_unit_size`/`gfx_unit_quality`/effects/terrain/shadow/tree/grass/water/sky 全部降到 2，备份 `preferences.script.txt.bak_20260921_oom`；新增幂等工具 `tools/set_memory_safe_prefs.py [--level 2|1] [--dry]`。判据固化在 references §10.19：**先看 System 2004，命中即 OOM，不要二分 pack**。坑：游戏运行中改 preferences 会被干净退出写回覆盖，须关闭后改并复查。**2026-09-21 傍晚实锤复发**：晨间降档后，15:42 一次干净退出把 prefs 写回 `minimise_memory_usage false`+全 ultra，11:22–18:26 连续 OOM（WH3 commit 40.8–51.4GB，18:26 为 AppHang）。18:46 重跑 `set_memory_safe_prefs.py --level 2` 修复并复查通过；用户选择不设只读、先用 level 2，复发再降 level 1。当日嫌疑包：swarm 重建涨至 221.7MB、digimon 105.5MB、新增 pokemon/animset。**复发排查固定动作：先 `Select-String preferences.script.txt -Pattern 'minimise_memory_usage'` 确认是否又被写回。**
 - **2026-09-21 重装完成与最终归因**：游戏重装（83GB）+ 工坊 105 项回下 + Steam 校验修复 `steam_api64.dll`。**marine 崩溃根因实锤**：`zzz_czx_swarm_units3.pack` 的 `battle_animations_table` 引用骨架 `czx_marine`，但 pack 缺整张 `battle_skeletons_tables`（同缺 `unit_sets`/`ui_unit_groupings`）→ battle init 空指针。源 TSV 版本戳不可信（写 v56/5/3，游戏实际读 v17/2/1）。修复=旧包补三表+清 stale 单位（cishe/gou/leishou）+补 loc 缺口；`tools/sync_pack_to_source.py` 已把部署包反同步回 `mod_files/zzz_czx_swarm_units`（含凯瑞甘 agent 全套，此前源码缺失）。state.db 曾被截成 2 项，已从 `state.db.bak_deploy_ia_all_factions` 恢复 114 项 playset_items + enabled_order。验证矩阵全过：swarm/digimon+swarm/全 playset 自定义战斗 + 全 playset IE 战役初始化到回合处理。仍缺 `!!!wyccc_cn_localization_patch*.pack`×2（无源，纯文本，不崩）。

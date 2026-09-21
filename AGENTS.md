@@ -33,6 +33,7 @@
 2. `warhammer-mod-development_generic/SKILL.md`
 3. 任务相关的 `warhammer-mod-development_generic/references/*.md`
 4. 必要时读取 `docs/PROJECT_STRUCTURE.md` 和 `docs/RPFM_USAGE.md`
+5. `.workbuddy/memory/codex_project_context.md`（与 `.codex/project_context.md` 是同一份文件的硬链接，WorkBuddy/CodeBuddy 会话直接读这条路径即可拿到同一份记忆）
 
 如果当前会话已经加载了 `warhammer-mod-development` skill，仍以本项目内 `warhammer-mod-development_generic/` 作为可维护源副本。
 
@@ -61,6 +62,24 @@
 - 每个 MOD（含本地自用 MOD）必须带介绍与预览图：`mod_files/<MOD名>/notes/pack_notes.txt` 一句话功能说明（build_pack 打进 pack 内 `notes.rpfm_reserved`，**缺失/为空直接拒绝打包**），`mod_files/<MOD名>/notes/alias.txt` Mod Manager 显示名（`--deploy` 时缺失直接失败，可用 `--alias` 覆盖），`mod_files/<MOD名>/preview.png` 预览图（部署时以 `<部署包名>.png` 放 `data\` 供 Mod Manager 显示）。缺失时随打包流程补齐。
 - 补丁型 MOD（修复/汉化/覆盖其他 MOD 的 pack）必须在 `mod_files/<MOD名>/notes/dependencies.txt` 声明依赖的 pack 文件名（每行一个，写**实际部署/工坊包名**，`#` 开头为注释）。build_pack 会把它写进 PFH5 头依赖块和 `dependencies_manager_v2.rpfm_reserved`，Mod Manager 据此提示缺失依赖并可一键依赖排序（依赖方/补丁排前，靠前胜出）。未声明依赖的补丁在目标包缺失或顺序错误时会静默失效，难以排查。
 - 本地包的 `description` 只来自工坊缓存，`user_mod_data` 的 `alias`+`notes` 是 Mod Manager 显示名称/说明的唯一来源——`build_pack.py --deploy` 已自动写入，禁止绕开脚本手工部署后漏写。mod_id = `local:data:<sha256(规范化包路径)[:18]>`，改名换路径会导致旧记录失效需重写。
+
+## 排查入口（问题形态 → 工具）
+
+游戏侧排查**先跑 `tools/wh3diag.py`**（只读；Windows Python313 与 WSL python3 均可；pack 写裸文件名自动解析 data\/工坊/mod_output），不要手写一次性 pack/mdmp 解析脚本：
+
+| 问题形态 | 命令 |
+|---|---|
+| 崩溃归因：dump 签名/异常码/故障模块偏移 | `wh3diag.py crashes [--last N] [--stack] [--regs]` |
+| 崩在哪个阶段（148B stub=枚举前；截断=加载中段；谁最后加载） | `wh3diag.py scriptlog [--marker <标识>] [--tail N]` |
+| "某文件/表到底被哪个 pack 提供"、同路径遮蔽 | `wh3diag.py which <子串> [--exact]` |
+| pack 里有什么/索引原始字节/头与依赖/rpfm_reserved | `wh3diag.py ls\|meta <pack>` |
+| 包内 DB 行是否解码正常（对照 schema） | `wh3diag.py db <pack> [--match <子串>]` |
+| 提取包内单文件内容（比对两版本某行） | `wh3diag.py cat <pack> <内部路径> [--lines A-B]` |
+| used_mods/bisect 清单顺序与集合对比 | `wh3diag.py usedmods [--grep] [--diff]` |
+| 启动二分排错 | `tools/bisect_pack.py`（纪律见 references §七） |
+| OOM 判据与降档 | references §10.19；`tools/set_memory_safe_prefs.py` |
+
+详细用法：`tools/README.md`。
 
 ## 反馈驱动指南更新规则
 

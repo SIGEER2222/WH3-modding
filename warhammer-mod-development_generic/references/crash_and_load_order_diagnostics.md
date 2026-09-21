@@ -37,6 +37,7 @@ BadMods
 
 ## 三、读原生崩溃 dump
 
+- **首选 `tools/wh3diag.py crashes [--last N] [--stack] [--regs]`**：自动列出 dump 异常码、故障地址→`Warhammer3.exe+0x偏移` 签名、params、上下文寄存器与 `.stack.txt` 符号链，不必手写 mdmp 解析。
 - `crash_report\D<date>_T<time>.mdmp` 内含异常流：`0xc0000005` = 访问违例；参数通常为 `[读写标志, 出错地址]`；`0x0` 读空指针最常见。
 - 崩溃地址 `0x14xxxxxxx` 位于 `Warhammer3.exe` 代码段；同一根因多次崩溃地址通常一致或相近。
 - 若多次原生崩溃地址相同、而换 MOD 组合后地址变化，说明不是同一根因，不要合并归因 `[实测/需随版本复查]`。
@@ -75,13 +76,15 @@ WH3 对 `db\<表>\<内部名>` 这一**完整虚拟路径**做文件级去重：
 
 ## 六、Pack / DB 片段二进制速查（脚本诊断用）
 
+**首选 `tools/wh3diag.py`**：`ls`/`meta`/`cat`/`db`/`which` 已封装下列格式解析（`export_gamedata.py` 提供 `read_pack_header`/`iter_pack_index`/`read_pack_payload`/`decode_db_table` 原语）。下表仅在其不满足需求时作手写参考。
+
 PFH5 pack 头（实测，WH3 当前版本）`[实测/需随版本复查]`：
 
 ```text
 offset 0   'PFH5'                    4B magic
 offset 4   u32  pack type            mod pack = 3
-offset 8   u32  0                    保留
-offset 12  u32  dep_count            pack 依赖区字节数
+offset 8   u32  dep_count            依赖项个数（非保留字段）
+offset 12  u32  dep_size             依赖区字节数（NUL 分隔 UTF-8 串）
 offset 16  u32  file_count
 offset 20  u32  index_size           文件索引区字节数
 offset 24  u32  pack 标识/时间戳     任意值即可
@@ -296,7 +299,7 @@ pack 文件数在偏移 +16；索引从 +28 开始，每条 = `size(u32)` + `fla
 ### 10.13 `0xc0000409 @ 0x10da8f1` 是通用 fail-fast 落点，不是 OOM 专属（2026-09-20 修正）
 
 - **关键修正**：`minimise_memory_usage`+贴图降档生效后，WH3 私有提交稳定在 **15.3GB**（上限 63.3GB，系统当时总用 ~40GB），游戏**照崩**，WER 外签名仍是 `0xc0000409 @ 0x10da8f1`——该固定偏移是引擎统一的 fail-fast 兜底，不是 OOM 专属信号。归因前必须读 mdmp 内层异常流：本次 `0xc0000005`，**param[0]=0x8 = 执行（DEP）**，param[1]=目标地址 `0x973d8a00`/`0x31f0b51c0`（堆段垃圾地址）——引擎经坏函数指针/虚表槽间接调用，典型 use-after-free / 接口对象已死仍被回调。
-- **判据速查**：mdmp exception stream 解析——header offset 12 取 StreamDirectoryRva（不是 8！），目录项 12B×N，`type==6` 为异常流；ExceptionRecord 在 off+8（code u32/flags u32/record u64/address u64/nparams u32），参数从 off+40 起各 8B。`0xc0000005` 的 param0：0=read、1=write、**8=execute**。
+- **判据速查**：`tools/wh3diag.py crashes --regs` 直接打印异常码/params/寄存器；手工解析时——header offset 12 取 StreamDirectoryRva（不是 8！），目录项 12B×N，`type==6` 为异常流；ExceptionRecord 在 off+8（code u32/flags u32/record u64/address u64/nparams u32），参数从 off+40 起各 8B。`0xc0000005` 的 param0：0=read、1=write、**8=execute**。
 - **崩溃窗口画像（两次一致）**：过回合事件级联中段——单会话 8500+ `UnitCreated`（`src=province_recruitment`→`no_commander`，AI 征兵集中交付）+ `CharacterCreated`→trait 监听器 + psw 每派系监听器错误风暴 + LL_BUILD 每事件×全定居点扫描。**间歇性**：同存档同一回合有时能过——竞态特征，疑似级联中某对象先死后被另一监听器原生调用。
 - **psw 错误风暴根因**（`!!Prayer_of_star_witch.pack`，sm0_log 每秒几十条）：`psw_英雄.lua`/`psw_天赋效果.lua` 等几十个 `FactionTurnStart` 监听器条件函数**先**解引用 `psw_main_data.player_data[faction_name]` / `faction:pooled_resource_manager():resource(x):value()`，**后**才判 `is_human()`——这些监听器语义上只对玩家派系有意义，却为 ~100 个 AI 派系（含 `rebels`）每回合全部执行一遍。
 - **v9 熔断模式（已落地 `!psw_crash_guard.lua`）**：文件顶层包 `core.add_listener`——`debug.getinfo(cond,"S").source` 命中原版 psw 文件名且事件为 FactionTurnStart/FactionTurnEnd 时，给条件函数套"取不到派系或非玩家→早退 false"前置检查。要点：① 守卫文件须先于目标文件加载（pack 顺序靠前）；② 只在**文件顶层**包，不能放 first_tick（注册早已发生）；③ `core.add_listener` 是 `core_object` 方法，转发须带 `self`；④ 匹配用完整文件名（`psw_英雄.lua`），防止误伤同前缀自家文件（`psw_天赋.lua` vs `psw_天赋效果.lua`）。
@@ -349,3 +352,29 @@ pack 文件数在偏移 +16；索引从 +28 开始，每条 = `size(u32)` + `fla
 - **验证矩阵（全部 `game_startup_mode battle/campaign` autotest，90–120s 无 dump）**：swarm 单包自定义战斗 ✓、digimon+swarm 自定义 ✓、114 项 playset + 原版兵种战斗 ✓、114 项 playset + 自定义兵种战斗 ✓、114 项 playset + IE 战役初始化并跑过回合处理 ✓。
 - **遗留**：`!!!wyccc_cn_localization_patch.pack` / `_batch2.pack` 两个本地汉化包全盘无源（`data_loose_quarantine` 只剩 png 和描述元数据），playset 中保持未解析占位；不影响战斗，只是 wyccc 系部分文本回退英文。
 - 工坊 `2789850037 @z_all_agent_actions`：重装后单独带它打原版战斗不再崩——此前的二分"罪魁"很可能也是文件损坏而非内容问题，全量 playset 下同样通过。
+
+### 10.19 `0xc0000409 @ 0x10da8f1` 的另一条归因路径：AppData preferences 被重置回高画质 → 提交内存耗尽（2026-09-21 定案）
+
+- **现象**：重装后"验证矩阵全过"仅维持到当天凌晨；09-21 01:03–06:39 又产生约 80 个 dump，`script_log` 每次都是 148B stub（`battle_scripted.lua loaded` 一行即死），外层签名恒为 `Application Error 1000 / 0xc0000409 @ Warhammer3.exe+0x10da8f1`。**这次没有内层 `0xc0000005`**：异常流只有一条记录，`ExceptionParameters[0]=0x7` = `FAST_FAIL_FATAL_APP_EXIT`，即进程自己调用 fail-fast 终止，不是野指针。
+- **定案证据**：每次崩溃同一秒都有 System **`Event 2004`（Windows 内存资源耗尽）**——`Warhammer3.exe` 提交内存 **40.5 / 40.6 / 40.9 / 43.3 / 43.8 / 46.0 / 46.2 / 46.5 GB**；本机物理内存仅 **15.8GB**，pagefile `C:\pagefile.sys` 初始 40GB/最大 48GB，**总提交上限约 63.8GB**，同时还有 Devin.exe/steamwebhelper 等吃掉数 GB。OOM 与 §10.10 同源。
+- **触发开关**：`%APPDATA%\The Creative Assembly\Warhammer3\scripts\preferences.script.txt` 在重装/画质重调后被写成 `minimise_memory_usage false` + `gfx_texture_quality 3`(ultra) + `gfx_unit_size 3`(ultra)；而通过全验证矩阵的同目录备份 `preferences.script.txt.bak_reinstall_test` 是 `minimise_memory_usage true` + `gfx_texture_quality 2`。**同一套 playset，只差这三个键就决定崩不崩**（§10.10 实测：开 `minimise_memory_usage` 后私有提交从 ~28GB 降到 15.3GB）。
+- **修复**：把 `minimise_memory_usage` 改回 `true`（无画质代价，只增加加载时间），改前备份 `preferences.script.txt.bak_<时间戳>`。若仍崩，再降 `gfx_texture_quality`/`gfx_unit_size` 到 2。
+- **判据速查（务必先看事件日志）**：`Get-WinEvent -FilterHashtable @{LogName='System'; Id=2004}` 命中且时间点与 dump 对齐 → 是 OOM，不是 Mod/DB/悬空 key，**不要去二分 pack**。反之没有 2004 才回退到 §10.14（悬空单位 key）/§10.18（缺 battle_skeletons）那条路。
+- **教训**：重装/还原/画质调整都会重写 AppData preferences；每次装机后必须复查 `minimise_memory_usage` 与贴图/单位规模档位。16GB 物理内存 + 百余项单位类 Mod 的机器没有余量跑 ultra + `minimise_memory_usage false`。
+
+#### 10.19 修正：只开 `minimise_memory_usage` 不够，必须同时降贴图/单位档位（2026-09-21 06:50 实测）
+
+- **反例**：09-21 06:29–06:49 的崩溃批次里 `minimise_memory_usage` **已经是 true**，但 `gfx_texture_quality 3`、`gfx_unit_size 3`、`gfx_unit_quality 3` 仍是 ultra，`Warhammer3.exe` 照样提交到 **43.3 / 43.8 / 47.1 GB** 并被 Event 2004 判死。即 ultra 贴图档（自造单位 pack 里 swarm 170MB + digimon 69MB 的 dds）单独就能把降内存后的余量吃光——`minimise_memory_usage` 只降缓存，不降资产分辨率。
+- **键名别搞错**：减负要动的是 `gfx_texture_quality`、`gfx_unit_size`（单位规模，不是 `gfx_unit_quality`）、`gfx_unit_quality`、`gfx_effects_quality` 等；`gfx_unit_size` 与 `gfx_unit_quality` 是两个独立键，都要降。
+- **OOM 的内层签名不唯一**：本批 dump 同时出现 `0xe06d7363`（C++ 未捕获异常，param[0]=`0x19930520`，典型 `bad_alloc`）与 `0xc0000005 @ 0x14182fb2b`；两者都是同一 OOM 的不同落点。**归因以 Event 2004 是否同秒为准，不要按异常码分派到不同根因**（纠正 §10.11 表里把这两行分开列的印象）。
+- **可复用脚本**：`tools/set_memory_safe_prefs.py [--level 2|1] [--dry]`，幂等地把上述键设为安全值并备份带时间戳的 `.bak_*`；Windows Python 运行。装机/画质被重置后跑一次即可，不必手改。
+- **写入时机坑**：游戏实例正在运行时改 `preferences.script.txt`，其**干净退出会把内存里的旧值写回文件**，改动被静默覆盖（本次实测：01:32 落盘的 `minimise_memory_usage false` 在 06:48 的实例退出后变成 true）。改档位应在游戏关闭后做，改完复查一次；崩溃退出则不会写盘，改动保留。
+
+### 10.20 测试通过判据：进主菜单不算过，必须进自定义战斗（2026-09-21 用户规则）
+
+- **"进程活着到主菜单"不是通过**。无参数启动到主菜单只证明引擎初始化没崩，不代表战斗初始化路径正常。
+- **通过 = `game_startup_mode battle <xml>` 成功进入战斗**：游戏进程存活超过战斗初始化期（实测 >30s 即过了最脆弱窗口），且无新 crash_report mdmp。
+- **间歇性**：同一 vanilla XML + 空 modlist，同一机器同一分钟内可崩可过（+0x1a0be3b null+0x20）——引擎竞态，非内容问题。**单次通过不能下"已修好"结论；连续 3 次通过才算基线绿。**
+- **空 modlist 语义陷阱**：`Warhammer3.exe game_startup_mode battle <xml> ; ;`（两个分号之间为空）可能不等价于"不加载 mod"——游戏可能回退到扫描 data\ 全部 pack。用 `--mods packs:<file>` 写一个至少含一个 mod 行的 modlist 文件来控制变量。
+- **OOM 与竞态叠加**：`--mods full`（114 项 playset）→ bad_alloc（45.5GB commit + Event 2004）；`--mods none` → 间歇 +0x1a0be3b。两个根因并存时，先修 OOM（prefs/baseline），再看剩余崩溃是否为竞态。
+- **判据速查**：`alive_after_Ns=True && new_dumps=0` = 过；`new_dumps=1` 且 `+0x1a0be3b` = 竞态重试；`new_dumps=1` 且 `0xe06d7363`/`0xc0000409` + Event 2004 = OOM 未修好。
