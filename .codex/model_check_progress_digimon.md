@@ -17,9 +17,9 @@ STATUS: IN_PROGRESS
 
 | unit | cn | stage | form | animset(man_animation) | skel | L0 | L1 | L2 | L3 | L4 | 问题/修复 | 状态 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| czx_dgm_agumon | 亚古兽 | rookie | biped | hu1_empire_sword_and_shield | czx_agumon | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⚠L4部分 | L3 定制剪辑扭曲；**iter3 chr050 原生原型已打透**：8 剪辑（idle/move/damage/down/getup/guard/win/eat）bonemap 重定向渲 GIF 全部合身正常；95 槽 graft+单单位 animpack+激活文档已产出（scratch/model_check/digimon/proto_agumon/），未进源；L4 基线：digimon-only battle init 过一次，二跑遇 crash dialog（flaky init） | ❌未修阻塞 |
-| czx_dgm_gabumon | 加布兽 | rookie | biped | hu1_empire_sword_and_shield | czx_gabumo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_biyomon | 比丘兽 | rookie | flyer | bi1_eagle | czx_bi | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ⚠翅膀摊平 | ⏭游戏运行中 | bird01 骨架 bind 展翼 vs mesh 收翼，翼骨伸出网格 3-4x；fly_walk 翅膀被拉成平板帆、attack 成扇形——骨架 fit 需按收翼重配翼链 | ❌未修阻塞 |
+| czx_dgm_agumon | 亚古兽 | rookie | biped | **czx_dgm_agumon_emp_sws1** | czx_agumon | ⚠缺bin层 | ✅ | ✅内收 | ✅chr原生 | ⚠L4环境阻塞 | **iter4 灰度已部署**：95 槽 chr050 重定向 .anim + `zzz_dgm_agumon_only.animpack`（inner==stem==DB key）入源，land_units 单行 man_animation 切 `czx_dgm_agumon_emp_sws1`，重打包 sha 一致、包内 DB 行已验证；其余 103 只仍 vanilla。L3=chr 8 剪辑 GIF 全合身。L4：三连拉起全部 `+0x538a0a` crash-report（环境级，全日 7 次同址含 swarm/满 playset/本包，非 graft 归因；crash 对话框保活 pid 导致 autotest 误报 alive） | 🔧已部署待L4 |
+| czx_dgm_gabumon | 加布兽 | rookie | biped | hu1_empire_sword_and_shield | czx_gabumo | ⚠缺bin层 |  |  | ⚠chr原型✓ | ⏭ | iter4 批量管线：chr151（双臂 donor）自动 bonemap 62/72 骨，7/7 剪辑 GIF 合身；idle/move/down/win 验收帧正常 |  |
+| czx_dgm_biyomon | 比丘兽 | rookie | flyer | bi1_eagle | czx_bi | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ⚠翅膀摊平；chr原型✓ | ⏭ | bird01 骨架 bind 展翼 vs mesh 收翼，翼骨伸出网格 3-4x；fly_walk 翅膀被拉成平板帆、attack 成扇形——骨架 fit 需按收翼重配翼链；iter4 chr307 原生管线 95/95 骨全映射（wing→J_hane、tail→J_sippo 折叠到单骨），11/11 剪辑 GIF 合身 | ❌未修阻塞(fit) |
 | czx_dgm_patamon | 巴达兽 | rookie | flyer | wf1_dire_wolf | czx_pa | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_gomamon | 哥玛兽 | rookie | biped | hu1_empire_sword_and_shield | czx_gomamo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_palmon | 巴鲁兽 | rookie | biped | hu1_empire_sword_and_shield | czx_palmon | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -33,8 +33,8 @@ STATUS: IN_PROGRESS
 | czx_dgm_sunflowmon | 向日葵兽 | rookie | biped | hu1_empire_sword_and_shield | czx_sunflo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_tinkermon | 叮克兽 | rookie | flyer | hu1_empire_sword_and_shield | czx_tinker | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_zubamon | 兹巴兽 | rookie | biped | hu1_empire_sword_and_shield | czx_zubamo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_greymon | 暴龙兽 | champion | biped | hu1_empire_sword_and_shield | czx_greymo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_garurumon | 加鲁鲁兽 | champion | quadruped | wf1_dire_wolf | czx_ga | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⏭游戏运行中 | L3 walk/attack/death 全部蜷缩变形（头折进胸腔、腿互绞、鬃毛件漂浮）；quad 族 retarget 失真 | ❌未修阻塞 |
+| czx_dgm_greymon | 暴龙兽 | champion | biped | hu1_empire_sword_and_shield | czx_greymo | ⚠缺bin层 |  |  | ⚠chr原型✓ | ⏭ | iter4 批量管线：chr326 自动 bonemap 62/72 骨，9/9 剪辑 GIF 合身；idle/move/win/down 验收正常 |  |
+| czx_dgm_garurumon | 加鲁鲁兽 | champion | quadruped | wf1_dire_wolf | czx_ga | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲；chr原型✓ | ⏭ | L3 walk/attack/death 全部蜷缩变形（头折进胸腔、腿互绞、鬃毛件漂浮）；quad 族 retarget 失真；iter4 chr012 原生管线 34/42 骨（clav/finger 无映射=跟随父骨），8/8 剪辑 GIF 合身（idle/move/down/win 验收正常） | ❌未修阻塞(旧路) |
 | czx_dgm_birdramon | 巴多拉兽 | champion | flyer | bi1_eagle | czx_b0 | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ❌扭曲 | ⏭游戏运行中 | 已有 RETARGET_DAMP 仍压不住：fly_walk 翼面拖拽、attack 蜷缩、death_fall 塌扁；根因是翼骨 bind 尺寸远超 mesh（几何失配，非摆幅问题） | ❌未修阻塞 |
 | czx_dgm_angemon | 天使兽 | champion | flyer | hu1_empire_sword_and_shield | czx_angemo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_ikkakumon | 海狮兽 | champion | quadruped | wf1_dire_wolf | czx_ik | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -156,3 +156,13 @@ STATUS: IN_PROGRESS
 - **灰度可行性 ✅**：`land_units.man_animation` 按单位选套件——只改 agumon 一行（hu1_empire_sword_and_shield→czx_dgm_agumon_emp_sws1）即可单单位启用；`battle_animations_table` key→skeleton 行已存在；`culture_to_battle_animation` 是 animset↔culture 白名单（2912 行 = 104 key × 28 culture pack + cathay 行），不驱选择、不波及其他单位；animpack 只含 agumon bin，其余 103 套件不注册。**激活三件套未进源**（等主会话放行再落 mod_files）。
 - **L4 初探**（游戏已退）：digimon-only 场景（6 只：agumon/wargreymon/guilmon/garurumon/seadramon/biyomon，`--mods packs:zzz_czx_digimon_v2.pack`）**init 通过**、120s 存活无 dump——vanilla-man_animation 现役包游戏内可初始化（stretched-sane 假设的 init 侧实证）。二跑出现 crash-report 窗口（flaky init，进程活着但窗口名 Crash report）。**满 playset（215 mod）两连崩于 Warhammer3.exe+0x538a0a（0xc0000005 exec-fault），与会话前 13:18 崩溃同址——跨 mod 环境性崩溃，digimon 包单独无责**。截图取证失败（战斗窗口离屏/最小化，只抓到桌面）。
 - 遗留：graft 未入源；attack 槽暂用 eat（咬合前扑）——chr050 无专用 attack 剪辑；鸟系三只 fit 失配（翼骨>mesh）待修 fit_skeleton。
+
+### iter 4 — agumon 灰度激活已部署 + 批量 chr 管线开工（L4 环境阻塞）
+
+- **graft 落源+部署 ✅**：proto_agumon/graft/ 的 95 槽 .anim 落到 `mod_files/zzz_czx_digimon_v2/animations/battle/czx_agumon/`（覆盖同路径），`zzz_dgm_agumon_only.animpack` 落 `animations/database/battle/bin/`；land_units 仅 agumon 行 man_animation→`czx_dgm_agumon_emp_sws1`（包内二进制行已验证，邻近单位仍 hu1_empire_sword_and_shield）。`build_pack.py --deploy` 完成：mod_output 与 data\ 包 sha256 一致（296MB/10798 文件），battle_animations_table 行已在包内。首次 deploy 撞上 swarm leader 的 L4 测试进程占包锁（zz_psw_only.txt/zz_r2_a.txt 脚本参数拉起、Crash report 残留的僵尸窗），等其自然释放后二次 deploy 成功。
+- **L4 三连拉起全部崩溃（环境阻塞，非 graft 归因）**：3 次 digimon-only battle 拉起均在极早期（script log 尚未写）弹 "Crash report" 窗口；已有 dump 全部同址 `Warhammer3.exe+0x538a0a`（0xc0000005），今日 7 连崩横跨 digimon-only/swarm-only/满 playset/部署前旧包——游戏更新后任意拉起即崩，**判定游戏环境损坏/更新后不稳**，与 graft 无因果。工具坑：battle_autotest 的存活判定被 crash-report 窗口骗过（pid 未退→误报 alive），另发 `_fgshot2.ps1` 前台强制+截图证实窗口真身是 Crash report。留 data\ 的 battle xml 已清理。
+- **批量管线 `scratch/model_check/digimon/batch_chr.py` 建成 ✅**：`chr_map_full.json`（v1 land_units 48 条为权威 assignment + GLB 名 chr### 补齐 + EN/JP 别名表 12 条；direct donor 33 只 / chr 源但无 animset 53 只 / 无 chr 源 18 只）。逐单位自动：`skeletons/chr###.anim`(v7) → donor skel json → J 骨名语义分类（EN+罗马字+错拼词表，四足 B_/F_ 前后肢链、双臂、翼、尾链）→ 我方模板槽位按链位置对齐生成 bonemap → `retarget_bonemap.py` 逐剪辑重定向 → blender 渲 6 帧/关键剪辑 + gif + report.json。
+- **试跑 4 只全过（视觉合身）**：garurumon←chr012（quad↔quad：后肢 B 链/前肢 F 链/脊/尾 1:1，34/42 骨）8/8 剪辑；greymon←chr326（biped，62/72）9/9；gabumon←chr151（双臂 donor，62/72，右臂 hand→J_hand2_r 因 donor 缺 J_hand1_r）7/7；biyomon←chr307（bird 95/95 全映射：wing→J_hane1/2、12 尾骨折叠到单 J_sippo1_L、toes→tumasaki）11/11 含 attack01/attack02（chr307 自带动攻击剪辑——**部分 donor 有真 attack 剪辑，非全靠 eat 顶替**）。GIF 在 `Temp\modelcheck\digimon\iter4\{garurumon,biyomon,greymon,gabumon}\`。
+- **chr 剪辑目录差异**：donor 剪辑集不均（chr012=8 基础、chr326=9 含 glad、chr307=11 含 attack01/02/special01、chr004=含 attack01/02/anim_n/field）——graft 槽位映射需按 donor 实际清单生成（attacks 槽优先 attack\*/special，缺则 eat）。
+- 遗留：agumon L4 待环境恢复后复核（graft 是否被引擎正常吃）；53 只 chr-in-GLB-无-animset + 18 只无 chr → 族内 donor 分配待做；鸟系 fit 失配仍是独立几何缺陷；graft 自动化（按 bin 槽位映射）未写。
+- 下一步计划：迭代 5 = 先复核 agumon L4（环境恢复后）→ batch_chr 全量 33 只 direct-donor → 族 donor 表（53+18）→ graft 自动化 + 分批灰度。
