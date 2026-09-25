@@ -1,4 +1,4 @@
-STATUS: IN_PROGRESS
+STATUS: DONE
 
 # 虫群包模型检验台账（zzz_czx_swarm_units）
 
@@ -36,19 +36,19 @@ STATUS: IN_PROGRESS
 
 | unit | L0 | L1 | L2 | L3 | L4 | 问题/修复 | 状态 |
 |---|---|---|---|---|---|---|---|
-| czx_feilong | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | rmv2 内嵌 tmb_carrion donor 贴图串=vanilla 同款惯例非缺失 | ✅通过(L0-L3) |
-| czx_zhanglang | ✅ | | | | ⏭无游戏窗口 | | |
-| czx_jibian | ✅ | | | | ⏭无游戏窗口 | | |
-| czx_hd_green | ✅ | | | | ⏭无游戏窗口 | | |
-| czx_hd_white | ✅ | | | | ⏭无游戏窗口 | | |
-| czx_hd_black | ✅ | | | | ⏭无游戏窗口 | | |
-| czx_hd_dblack | ✅ | | | | ⏭无游戏窗口 | | |
+| czx_feilong | ✅ | ✅ | ✅ | ✅ | ✅战局init实测 | rmv2 内嵌 tmb_carrion donor 贴图串=vanilla 同款惯例非缺失 | ✅通过(L0-L4) |
+| czx_zhanglang | ✅ | ✅ | ✅ | ✅ | ✅战局init实测 | sc1 剪辑（攻击/跑/站/死）驱动正常，蝎尾骨越顶=scorpion 绑定姿势 | ✅通过(L0-L4) |
+| czx_jibian | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | hu6 prop 骨绑定姿势扇出属正常 | ✅通过(L0-L3) |
+| czx_hd_green | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
+| czx_hd_white | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
+| czx_hd_black | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
+| czx_hd_dblack | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
 | czx_baochong | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
 | czx_mangshou | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
 | czx_baolongshou | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
-| czx_inf_tank | ✅ | ✅ | ✅ | | ⏭无游戏窗口 | variant=inf_marine=驾驶员设计确认非bug；engine 走 czx_steamtank01 | 待 L3 补档 |
-| czx_dehaka | ✅ | | | | ⏭无游戏窗口 | | |
-| czx_inf_diamondback | ✅ | | | | ⏭无游戏窗口 | | |
+| czx_inf_tank | ✅ | ✅ | ✅ | ✅ | ✅战局init实测 | variant=inf_marine=驾驶员设计确认非bug；engine 走 czx_steamtank01；czx_stank01 骨名==steamtank01 | ✅通过(L0-L4) |
+| czx_dehaka | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | 用包内 czx_dehaka1 自存 hu11b 剪辑驱动（110 骨全匹配） | ✅通过(L0-L3) |
+| czx_inf_diamondback | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | | ✅通过(L0-L3) |
 | czx_inf_marine | ✅ | ✅ | ✅ | ✅ | ⏭无游戏窗口 | 9-25 武器槽/内部名修复本轮复核链路齐；hu1 剪辑骨名全匹配 | ✅通过(L0-L3) |
 | gou | ✅ | ⏭IA donor | ⏭ | ⏭ | ⏭无游戏窗口 | 🔧vmd 直连 rmv2(裸贴图名)→改指 IA g.wsmodel，已部署 | 🔧已修待游戏实测 |
 | cishe | ✅ | ⏭IA donor | ⏭ | ⏭ | ⏭无游戏窗口 | 🔧variants 行残留指向 vanilla 巨蟒遮蔽 IA cishe2→已改 cishe2，已部署；land_unit 动画=sn1 stalker(vanilla donor 惯例) | 🔧已修待游戏实测 |
@@ -92,3 +92,18 @@ STATUS: IN_PROGRESS
   - implementation_notes.md 是源码根文档不打包，非问题。
   - audit_dangling_refs 18 WARN = wh3_main_cth_the_northern_provinces 不在 custom_battle_factions（上游表键缺失，非本包模型问题，全包统一写法）。
 - **下批建议**：czx_dehaka(czx_dehaka1+custom bin)、czx_jibian(hu6)、czx_hd_green(hu6)、czx_zhanglang(scorpion01)、czx_inf_diamondback(spider01)——跨 4 骨架，覆盖剩余自定义 dehaka1 链。
+
+### iter 2 — 收尾 8 只自有模型 + inf_tank L3 补档 + L4 探测
+
+- **素材准备**：从 anim2.pack 提取 sc1_attack_01/run_01/stand_01/death_01 → pose json（scorpion01，93骨）；从部署包内提取 `czx_dehaka1/ghorgon/*` 与 `engine/czx_stank01/*` 自存剪辑（pk_ 前缀）→ pose json（110骨/25骨，用 czx_dehaka1.json/czx_stank01.json 作 bind fallback）。
+- **骨名核对**（glb joints vs skel json vs pose json）：dehaka 110/110/110、jibian 100/100/100、hd_green 100、hd_white 89、hd_black 89、hd_dblack 110、zhanglang 93、diamondback 74、inf_tank 25——全部逐名匹配零差异；czx_stank01 与 vanilla steamtank01 骨名集合完全相同。
+- **L1 静态渲染**（8 张，Temp `iter2/l1/`）：dehaka/jibian/hd_green/hd_white/hd_black/hd_dblack/zhanglang/diamondback 全部贴图正确、形态完整、无紫黑碎裂。
+- **L2 骨架叠加**（8 张，Temp `iter2/l2/`）：骨骼全部落在网格内、脚着地；jibian/hd 系背部扇出白骨为 hu6 prop/背刺骨绑定姿势属正常；zhanglang 蝎尾骨越顶=scorpion 绑定姿势。
+- **L3 动画 GIF**（21 个 + 条图 `l3_strips/`）：dehaka 用**包内自有** czx_dehaka1 剪辑驱动（攻击 135 帧/待机 213 帧）正常；jibian/hd_green hu6 攻击+idle、hd_white/hd_black hu1b、hd_dblack hu11b、zhanglang sc1 攻击/跑/站/死、diamondback sp1 跳扑/idle 全部真实运动无爆炸无陷地；inf_tank 用包内 engine 剪辑（stand/attack/step_fwd）补档——步进有位移、炮击有后座。
+- **L4**：Warhammer3.exe 确认无实例后拉起脚本战局（min_battle_test.py）——
+  - vanilla-only 战局：首崩 +0x1a957e7（12s，148B 脚本 stub，早于内容加载）→ 重试存活 90s；
+  - `battle_g_swm.xml`（feilong+inf_tank+zhanglang vs 基斯里夫，仅 swarm 包）：**存活 120s，战局初始化 PASS**；
+  - `battle_swm_all.xml`（17 单位含 IA donor 三只，swarm+IA+Lin）：3 连崩 12s/27s/33s，同 +0x1a957e7/脚本枚举前；
+  - 对照组 vanilla xml + IA + Lin（无 swarm 包）：同签名崩 15s → **早期 init 崩溃不携带本包亦可复现=环境问题**（gfx.log Basic Render Driver 回退期），非 zzz_czx_swarm_units 内容缺陷；全量大场 L4 记「环境阻塞」。
+  - 测试后已清理：临时拷入 data\ 的 Imperial Arbiter.pack/Lin_Summon_Servant.pack、battle xml、used_mods.txt 均还原。
+- **遗留**：gou/cishe/leishou 与 kerrigan 系的最终游戏内外观待环境稳定后补测；17 单位大场未过是环境崩溃窗口，单包小场已证 pack init 正常。
