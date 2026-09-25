@@ -8,7 +8,6 @@ wh2_main_lzd_lizardmen	false	pkm_001_bulbasaur	true	true				false
 wh2_main_skv_skaven	false	pkm_001_bulbasaur	true	true				false		
 wh3_dlc23_chd_legion_of_azgorh	false	pkm_001_bulbasaur	true	true				false		
 wh3_main_cth_cathay_mp	false	pkm_001_bulbasaur	true	true				false		
-wh3_main_cth_the_western_provinces	false	pkm_001_bulbasaur	true	true				false		
 wh3_main_dae_daemon_prince	false	pkm_001_bulbasaur	true	true				false		
 wh3_main_kho_khorne	false	pkm_001_bulbasaur	true	true				false		
 wh3_main_ksl_kislev	false	pkm_001_bulbasaur	true	true				false		
@@ -33,7 +32,6 @@ wh2_main_lzd_lizardmen	false	pkm_003_venusaur	true	true				false
 wh2_main_skv_skaven	false	pkm_003_venusaur	true	true				false		
 wh3_dlc23_chd_legion_of_azgorh	false	pkm_003_venusaur	true	true				false		
 wh3_main_cth_cathay_mp	false	pkm_003_venusaur	true	true				false		
-wh3_main_cth_the_western_provinces	false	pkm_003_venusaur	true	true				false		
 wh3_main_dae_daemon_prince	false	pkm_003_venusaur	true	true				false		
 wh3_main_kho_khorne	false	pkm_003_venusaur	true	true				false		
 wh3_main_ksl_kislev	false	pkm_003_venusaur	true	true				false		
@@ -58,7 +56,6 @@ wh2_main_lzd_lizardmen	false	pkm_004_charmander	true	true				false
 wh2_main_skv_skaven	false	pkm_004_charmander	true	true				false		
 wh3_dlc23_chd_legion_of_azgorh	false	pkm_004_charmander	true	true				false		
 wh3_main_cth_cathay_mp	false	pkm_004_charmander	true	true				false		
-wh3_main_cth_the_western_provinces	false	pkm_004_charmander	true	true				false		
 wh3_main_dae_daemon_prince	false	pkm_004_charmander	true	true				false		
 wh3_main_kho_khorne	false	pkm_004_charmander	true	true				false		
 wh3_main_ksl_kislev	false	pkm_004_charmander	true	true				false		
@@ -83,7 +80,6 @@ wh2_main_lzd_lizardmen	false	pkm_006_charizard	true	true				false
 wh2_main_skv_skaven	false	pkm_006_charizard	true	true				false		
 wh3_dlc23_chd_legion_of_azgorh	false	pkm_006_charizard	true	true				false		
 wh3_main_cth_cathay_mp	false	pkm_006_charizard	true	true				false		
-wh3_main_cth_the_western_provinces	false	pkm_006_charizard	true	true				false		
 wh3_main_dae_daemon_prince	false	pkm_006_charizard	true	true				false		
 wh3_main_kho_khorne	false	pkm_006_charizard	true	true				false		
 wh3_main_ksl_kislev	false	pkm_006_charizard	true	true				false		
@@ -108,7 +104,6 @@ wh2_main_lzd_lizardmen	false	pkm_007_squirtle	true	true				false
 wh2_main_skv_skaven	false	pkm_007_squirtle	true	true				false		
 wh3_dlc23_chd_legion_of_azgorh	false	pkm_007_squirtle	true	true				false		
 wh3_main_cth_cathay_mp	false	pkm_007_squirtle	true	true				false		
-wh3_main_cth_the_western_provinces	false	pkm_007_squirtle	true	true				false		
 wh3_main_dae_daemon_prince	false	pkm_007_squirtle	true	true				false		
 wh3_main_kho_khorne	false	pkm_007_squirtle	true	true				false		
 wh3_main_ksl_kislev	false	pkm_007_squirtle	true	true				false		
@@ -133,7 +128,6 @@ wh2_main_lzd_lizardmen	false	pkm_009_blastoise	true	true				false
 wh2_main_skv_skaven	false	pkm_009_blastoise	true	true				false		
 wh3_dlc23_chd_legion_of_azgorh	false	pkm_009_blastoise	true	true				false		
 wh3_main_cth_cathay_mp	false	pkm_009_blastoise	true	true				false		
-wh3_main_cth_the_western_provinces	false	pkm_009_blastoise	true	true				false		
 wh3_main_dae_daemon_prince	false	pkm_009_blastoise	true	true				false		
 wh3_main_kho_khorne	false	pkm_009_blastoise	true	true				false		
 wh3_main_ksl_kislev	false	pkm_009_blastoise	true	true				false		
@@ -158,7 +152,6 @@ wh2_main_lzd_lizardmen	false	pkm_025_pikachu	true	true				false
 wh2_main_skv_skaven	false	pkm_025_pikachu	true	true				false		
 wh3_dlc23_chd_legion_of_azgorh	false	pkm_025_pikachu	true	true				false		
 wh3_main_cth_cathay_mp	false	pkm_025_pikachu	true	true				false		
-wh3_main_cth_the_western_provinces	false	pkm_025_pikachu	true	true				false		
 wh3_main_dae_daemon_prince	false	pkm_025_pikachu	true	true				false		
 wh3_main_kho_khorne	false	pkm_025_pikachu	true	true				false		
 wh3_main_ksl_kislev	false	pkm_025_pikachu	true	true				false		
@@ -175,3 +168,10 @@ wh_main_dwf_dwarfs	false	pkm_025_pikachu	true	true				false
 wh_main_emp_empire	false	pkm_025_pikachu	true	true				false		
 wh_main_grn_greenskins	false	pkm_025_pikachu	true	true				false		
 wh_main_vmp_vampire_counts	false	pkm_025_pikachu	true	true				false		
+wh3_main_cth_the_northern_provinces	false	pkm_001_bulbasaur	true	true				false		false
+wh3_main_cth_the_northern_provinces	false	pkm_003_venusaur	true	true				false		false
+wh3_main_cth_the_northern_provinces	false	pkm_004_charmander	true	true				false		false
+wh3_main_cth_the_northern_provinces	false	pkm_006_charizard	true	true				false		false
+wh3_main_cth_the_northern_provinces	false	pkm_007_squirtle	true	true				false		false
+wh3_main_cth_the_northern_provinces	false	pkm_009_blastoise	true	true				false		false
+wh3_main_cth_the_northern_provinces	false	pkm_025_pikachu	true	true				false		false

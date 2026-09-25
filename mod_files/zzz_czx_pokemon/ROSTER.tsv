@@ -1,0 +1,8 @@
+key	cn	stage	form	num_men	hp	ma	md	charge	morale	armour	cost	tier	attr	abilities	desc
+pkm_001_bulbasaur	妙蛙种子	rookie	quadruped	16	350	32	28	20	45	40	800	1	beast	藤鞭|寄生种子	草系初始宝可梦，背上种子储存养分。
+pkm_003_venusaur	妙蛙花	champion	quadruped	1	8500	42	36	35	60	110	1600	3	beast	日光束|藤鞭乱打	妙蛙种子最终形态，背负巨大花朵。
+pkm_004_charmander	小火龙	rookie	biped	16	350	32	28	20	45	40	800	1	beast	火花|龙爪	火系初始宝可梦，尾部火焰代表生命力。
+pkm_006_charizard	喷火龙	ultimate	quadruped	1	8500	42	36	35	60	110	1600	3	fly	喷射火焰|龙爪	小火龙最终形态，喷吐烈焰的飞龙。
+pkm_007_squirtle	杰尼龟	rookie	biped	16	350	32	28	20	45	40	800	1	beast	水枪|缩壳	水系初始宝可梦，甲壳坚硬。
+pkm_009_blastoise	水箭龟	champion	biped	1	8500	42	36	35	60	110	1600	3	beast	水炮|火箭头锤	杰尼龟最终形态，背负水炮的巨龟。
+pkm_025_pikachu	皮卡丘	rookie	biped	16	260	32	28	20	45	40	750	1	beast	十万伏特|电光一闪	电系宝可梦，脸颊储存电力。

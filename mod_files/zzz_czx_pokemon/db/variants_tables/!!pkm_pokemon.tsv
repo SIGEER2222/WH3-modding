@@ -1,9 +1,9 @@
 ﻿variant_name	tech_folder	variant_filename	low_poly_filename	mount_scale	scale	scale_variation	super_low_poly_filename
 #variants_tables;6;db/variants_tables/!!pkm_pokemon
-pm001		pm001		1.0	1.0	0.0	
-pm003		pm003		1.0	1.0	0.0	
-pm004		pm004		1.0	1.0	0.0	
-pm006		pm006		1.0	1.0	0.0	
-pm007		pm007		1.0	1.0	0.0	
-pm009		pm009		1.0	1.0	0.0	
-pm025		pm025		1.0	1.0	0.0	
+pmv001		pkm_001_bulbasaur		1.0	0.84	0.0	
+pmv003		pkm_003_venusaur		1.0	1.183	0.0	
+pmv004		pkm_004_charmander		1.0	2.09	0.0	
+pmv006		pkm_006_charizard		1.0	1.669	0.0	
+pmv007		pkm_007_squirtle		1.0	2.847	0.0	
+pmv009		pkm_009_blastoise		1.0	1.523	0.0	
+pmv025		pkm_025_pikachu		1.0	2.437	0.0	

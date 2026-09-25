@@ -1,4 +1,4 @@
-﻿key	text	tooltip
+key	text	tooltip
 #Loc;1;text/db/pkm.loc		
 units_onscreen_name_pkm_001_bulbasaur	妙蛙种子	true
 land_units_onscreen_name_pkm_001_bulbasaur	妙蛙种子	true
@@ -28,3 +28,25 @@ units_onscreen_name_pkm_025_pikachu	皮卡丘	true
 land_units_onscreen_name_pkm_025_pikachu	皮卡丘	true
 unit_description_short_texts_text_pkm_025_pikachu	皮卡丘，两颊蓄电的电属性宝可梦	true
 unit_description_historical_texts_text_pkm_025_pikachu	皮卡丘，电属性宝可梦。脸颊上的电气袋储存着强大电力，受威胁时会放电攻击，是最广为人知的宝可梦。	true
+unit_abilities_onscreen_name_pkm_004_ember	火花	
+unit_abilities_tooltip_text_pkm_004_ember	向前方目标喷射一团火焰。	
+unit_abilities_onscreen_name_pkm_006_flamethrower	喷射火焰	
+unit_abilities_tooltip_text_pkm_006_flamethrower	喷出大范围的烈焰吐息，焚烧前方敌军。	
+unit_abilities_onscreen_name_pkm_007_water_gun	水枪	
+unit_abilities_tooltip_text_pkm_007_water_gun	向前方目标喷射高压水流。	
+unit_abilities_onscreen_name_pkm_009_hydro_pump	水炮	
+unit_abilities_tooltip_text_pkm_009_hydro_pump	发射威力巨大的水炮，轰击目标区域。	
+unit_abilities_onscreen_name_pkm_025_thunderbolt	十万伏特	
+unit_abilities_tooltip_text_pkm_025_thunderbolt	召唤一道强力的闪电劈向敌军。	
+unit_abilities_onscreen_name_pkm_003_solar_beam	日光束	
+unit_abilities_tooltip_text_pkm_003_solar_beam	汇聚日光之力后在自身周围爆发，重创周围敌军。	
+unit_abilities_onscreen_name_pkm_leech_seed	寄生种子	
+unit_abilities_tooltip_text_pkm_leech_seed	种子扎根持续恢复生命值。	
+unit_abilities_onscreen_name_pkm_blaze	猛火	
+unit_abilities_tooltip_text_pkm_blaze	战斗越激烈，攻击越凶猛。冲锋加成与近战攻击提升。	
+unit_abilities_onscreen_name_pkm_shell_armor	硬壳	
+unit_abilities_tooltip_text_pkm_shell_armor	坚硬的甲壳提供额外防护。	
+unit_abilities_onscreen_name_pkm_swift	轻快	
+unit_abilities_tooltip_text_pkm_swift	身法敏捷，移动速度提升。	
+unit_abilities_onscreen_name_pkm_shell	缩壳	true
+unit_abilities_tooltip_text_pkm_shell	缩入壳中提升防御。护甲与近战防御提升。	true

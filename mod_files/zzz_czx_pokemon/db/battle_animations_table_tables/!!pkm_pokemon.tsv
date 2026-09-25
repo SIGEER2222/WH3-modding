@@ -1,9 +1,9 @@
 ﻿key	skeleton
 #battle_animations_table_tables;0;db/battle_animations_table_tables/!!pkm_pokemon
-pm001	pm001
-pm003	pm003
-pm004	pm004
-pm006	pm006
-pm007	pm007
-pm009	pm009
-pm025	pm025
+pkm_001_bulbasaur_wf1_wolf	czx_bu
+pkm_003_venusaur_wf1_wolf	czx_ve
+pkm_004_charmander_emp_sws1	czx_charma
+pkm_006_charizard_dr1b_drg	czx_chari
+pkm_007_squirtle_emp_sws1	czx_squirt
+pkm_009_blastoise_emp_sws1	czx_blasto
+pkm_025_pikachu_emp_sws1	czx_pikach
