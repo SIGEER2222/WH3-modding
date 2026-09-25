@@ -22,16 +22,16 @@ STATUS: IN_PROGRESS
 | czx_dgm_biyomon | 比丘兽 | rookie | flyer | **czx_dgm_biyomon_bi1_eagl** | czx_bi | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ✅chr原生GIF | ⏭环境阻塞 |bird01 骨架 bind 展翼 vs mesh 收翼，翼骨伸出网格 3-4x；fly_walk 翅膀被拉成平板帆、attack 成扇形——骨架 fit 需按收翼重配翼链；iter4 chr307 原生管线 95/95 骨全映射（wing→J_hane、tail→J_sippo 折叠到单骨），11/11 剪辑 GIF 合身；iter5批1已部署：chr307 bonemap 95/95骨 11剪辑全OK→graft 槽位满填，GIF合身 | ❌未修阻塞(fit) |
 | czx_dgm_patamon | 巴达兽 | rookie | flyer | wf1_dire_wolf | czx_pa | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_gomamon | 哥玛兽 | rookie | biped | **czx_dgm_gomamon_emp_sws1** | czx_gomamo | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | | iter5批1已部署：chr343 bonemap 45/72骨 12剪辑全OK→graft 槽位满填，GIF合身 |  |
-| czx_dgm_palmon | 巴鲁兽 | rookie | biped | hu1_empire_sword_and_shield | czx_palmon | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_palmon | 巴鲁兽 | rookie | biped | hu1_empire_sword_and_shield | czx_palmon | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr050 bonemap 62/72骨 8剪辑GIF合身→批4名单 |  |
 | czx_dgm_tentomon | 甲虫兽 | rookie | insect | sp1_giant_spider | czx_tent | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_guilmon | 基尔兽 | rookie | biped | hu1_empire_sword_and_shield | czx_guilmo | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⏭游戏运行中 | L3 walk 前俯驼背、attack 双臂拉成红条、death 整体拉伸；同 agumon 的 hu1 retarget 失真 | ❌未修阻塞 |
-| czx_dgm_renamon | 妖狐兽 | rookie | biped | hu1_empire_sword_and_shield | czx_renamo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_renamon | 妖狐兽 | rookie | biped | hu1_empire_sword_and_shield | czx_renamo | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr151 bonemap 62/72骨 7剪辑GIF合身→批4名单 |  |
 | czx_dgm_dorumon | 多路兽 | rookie | quadruped | **czx_dgm_dorumon_emp_sws1** | czx_dorumo | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | | iter5批1已部署：chr112 bonemap 47/72骨 5剪辑全OK→graft 槽位满填，GIF合身 |  |
 | czx_dgm_plotmon | 小狗兽 | rookie | quadruped | **czx_dgm_plotmon_wf1_wolf** | czx_pl | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | | iter5批1已部署：chr361 bonemap 37/42骨 5剪辑全OK→graft 槽位满填，GIF合身 |  |
-| czx_dgm_veemon | v仔兽 | rookie | biped | hu1_empire_sword_and_shield | czx_veemon | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_veemon | v仔兽 | rookie | biped | hu1_empire_sword_and_shield | czx_veemon | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr050 bonemap 62/72骨 8剪辑GIF合身→批4名单 |  |
 | czx_dgm_lalamon | 拉拉兽 | rookie | biped | hu1_empire_sword_and_shield | czx_lalamo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_sunflowmon | 向日葵兽 | rookie | biped | hu1_empire_sword_and_shield | czx_sunflo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_tinkermon | 叮克兽 | rookie | flyer | hu1_empire_sword_and_shield | czx_tinker | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：g133(Bip001) bonemap 49/72骨 4剪辑GIF合身→批3名单 |  |
+| czx_dgm_tinkermon | 叮克兽 | rookie | flyer | **czx_dgm_tinkermon_emp_sws1** | czx_tinker | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：g133(Bip001) bonemap 49/72骨 4剪辑GIF合身；iter7批3已部署（38-bin animpack） |  |
 | czx_dgm_zubamon | 兹巴兽 | rookie | biped | hu1_empire_sword_and_shield | czx_zubamo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_greymon | 暴龙兽 | champion | biped | **czx_dgm_greymon_emp_sws1** | czx_greymo | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 |iter4 批量管线：chr326 自动 bonemap 62/72 骨，9/9 剪辑 GIF 合身；idle/move/win/down 验收正常；iter5批1已部署：chr326 bonemap 62/72骨 9剪辑全OK→graft 槽位满填，GIF合身 |  |
 | czx_dgm_garurumon | 加鲁鲁兽 | champion | quadruped | **czx_dgm_garurumon_wf1_wolf** | czx_ga | ⚠缺bin层 | ✅ | ✅内收 | ✅chr原生GIF | ⏭环境阻塞 |L3 walk/attack/death 全部蜷缩变形（头折进胸腔、腿互绞、鬃毛件漂浮）；quad 族 retarget 失真；iter4 chr012 原生管线 34/42 骨（clav/finger 无映射=跟随父骨），8/8 剪辑 GIF 合身（idle/move/down/win 验收正常）；iter5批1已部署：chr012 bonemap 34/42骨 8剪辑全OK→graft 槽位满填，GIF合身 | ❌未修阻塞(旧路) |
@@ -40,16 +40,16 @@ STATUS: IN_PROGRESS
 | czx_dgm_ikkakumon | 海狮兽 | champion | quadruped | **czx_dgm_ikkakumon_wf1_wolf** | czx_ik | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr344 bonemap 35/42骨 11剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_togemon | 仙人掌兽 | champion | biped | **czx_dgm_togemon_emp_sws1** | czx_togemo | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr349 bonemap 47/72骨 10剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_kabuterimon | 比多兽 | champion | insect | sp1_giant_spider | czx_kabu | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⏭游戏运行中 | L3 walk/attack 蜷缩成球、death 位移出画面变小；spider 族 retarget 失真（或需 pos_damp） | ❌未修阻塞 |
-| czx_dgm_gatomon | 迪路兽 | champion | biped | hu1_empire_sword_and_shield | czx_gatomo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_growlmon | 古拉兽 | champion | biped | hu1_empire_sword_and_shield | czx_growlm | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_gatomon | 迪路兽 | champion | biped | hu1_empire_sword_and_shield | czx_gatomo | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr050 bonemap 62/72骨 8剪辑GIF合身→批4名单 |  |
+| czx_dgm_growlmon | 古拉兽 | champion | biped | hu1_empire_sword_and_shield | czx_growlm | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr326 bonemap 62/72骨 9剪辑GIF合身→批4名单 |  |
 | czx_dgm_dorugamon | 多路加兽 | champion | quadruped | **czx_dgm_dorugamon_emp_sws1** | czx_doruga | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr396 bonemap 42/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
-| czx_dgm_geogreymon | 大地暴龙兽 | champion | biped | hu1_empire_sword_and_shield | czx_geogre | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_kyubimon | 九尾狐兽 | champion | quadruped | wf1_dire_wolf | czx_ky | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：chr012(族quad) bonemap 34/42骨 8剪辑GIF合身→批3名单 |  |
-| czx_dgm_tyranomon | 巨龙兽 | champion | biped | hu1_empire_sword_and_shield | czx_tyrano | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_geogreymon | 大地暴龙兽 | champion | biped | hu1_empire_sword_and_shield | czx_geogre | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr326 bonemap 62/72骨 9剪辑GIF合身→批4名单 |  |
+| czx_dgm_kyubimon | 九尾狐兽 | champion | quadruped | **czx_dgm_kyubimon_wf1_wolf** | czx_ky | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：chr012(族quad) bonemap 34/42骨 8剪辑GIF合身；iter7批3已部署（38-bin animpack） |  |
+| czx_dgm_tyranomon | 巨龙兽 | champion | biped | hu1_empire_sword_and_shield | czx_tyrano | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr364(同种metaltyranomon) bonemap 53/72骨 5剪辑GIF合身→批4名单 |  |
 | czx_dgm_seadramon | 海龙兽 | champion | serpent | sn1_sepulchral_stalker_halberd | czx_sea | ⚠缺bin层 | ✅ | ⚠供体骨出网格 | ✅连贯 | ⏭游戏运行中 | L2 供体腿/翼骨落于网格外但 L3 三剪辑（walk/attack_03/death）运动连贯无异常——疑似未蒙皮无害 | ✅通过 |
 | czx_dgm_veedramon | v龙兽 | champion | biped | **czx_dgm_veedramon_emp_sws1** | czx_veedra | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr397 bonemap 42/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_zubaeagermon | 兹巴伊戈兽 | champion | flyer | wf1_dire_wolf | czx_zu | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_veemonex | v仔兽ex | champion | biped | hu1_empire_sword_and_shield | czx_veemo1 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_veemonex | v仔兽ex | champion | biped | hu1_empire_sword_and_shield | czx_veemo1 | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr397(同种veedramon) bonemap 42/72骨 5剪辑GIF合身→批4名单 |  |
 | czx_dgm_fairymon | 仙女兽 | champion | flyer | hu1_empire_sword_and_shield | czx_fairym | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_vritramon | 火神兽 | champion | biped | hu1_empire_sword_and_shield | czx_vritra | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_duramon | 杜兰兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_duramo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -57,15 +57,15 @@ STATUS: IN_PROGRESS
 | czx_dgm_weregarurumon | 兽人加鲁鲁兽 | ultimate | biped | **czx_dgm_weregarurumon_emp_sws1** | czx_werega | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr140 bonemap 62/72骨 8剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_garudamon | 伽偻达兽 | ultimate | flyer | hu1_empire_sword_and_shield | czx_garuda | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_angewomon | 天女兽 | ultimate | flyer | hu1_empire_sword_and_shield | czx_angewo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_zudomon | 祖顿兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_zudomo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_megakabuterimon | 超比多兽 | ultimate | insect | sp1_giant_spider | czx_mega | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：chr359(insectoid) bonemap 46/74骨 11剪辑GIF合身→批3名单 |  |
+| czx_dgm_zudomon | 祖顿兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_zudomo | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr344(同种ikkakumon) bonemap 45/72骨 11剪辑GIF合身→批4名单 |  |
+| czx_dgm_megakabuterimon | 超比多兽 | ultimate | insect | **czx_dgm_megakabuterimon_sp1_spid** | czx_mega | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：chr359(insectoid) bonemap 46/74骨 11剪辑GIF合身；iter7批3已部署（38-bin animpack） |  |
 | czx_dgm_lilimon | 花仙兽 | ultimate | flyer | hu1_empire_sword_and_shield | czx_lilimo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_magnaangemon | 神圣天使兽 | ultimate | flyer | **czx_dgm_magnaangemon_emp_sws1** | czx_magnaa | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr101 bonemap 40/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_wargrowlmon | 大古拉兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_wargro | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_rizegreymon | 跃升暴龙兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_rizegr | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_paildramon | 机甲龙兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_paildr | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_megaseadramon | 超海龙兽 | ultimate | serpent | sn1_sepulchral_stalker_halberd | czx_meg | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_skullgreymon | 丧尸暴龙兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_skullg | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_skullgreymon | 丧尸暴龙兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_skullg | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr326(同种greymon系) bonemap 62/72骨 9剪辑GIF合身→批4名单 |  |
 | czx_dgm_metaltyranomon | 金属巨龙兽 | ultimate | biped | **czx_dgm_metaltyranomon_emp_sws1** | czx_metalt | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr364 bonemap 53/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_lilamon | 丁香兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_lilamo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_taomon | 祭师兽 | ultimate | biped | hu1_empire_sword_and_shield | czx_taomon | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -76,19 +76,19 @@ STATUS: IN_PROGRESS
 | czx_dgm_durandamon | 杜兰达兽 | mega | biped | hu1_empire_sword_and_shield | czx_durand | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_metalseadramon | 钢铁海龙兽 | mega | serpent | sn1_sepulchral_stalker_halberd | czx_met | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_plesiomon | 蛇颈龙兽 | mega | serpent | sn1_sepulchral_stalker_halberd | czx_ple | ⚠缺bin层 | ✅ | ⚠供体骨出网格 | ✅连贯 | ⏭游戏运行中 | damp(tail 0.25/neck-spine 0.4)有效：walk 滑行、attack_03 前扑、death 瘫伏均连贯；L2 供体腿骨落网格外同 seadramon 无害 | ✅通过 |
-| czx_dgm_machinedramon | 机械邪龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_machin | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_machinedramon | 机械邪龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_machin | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr364(同族机龙) bonemap 53/72骨 5剪辑GIF合身→批4名单 |  |
 | czx_dgm_chaosdramon | 混沌龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_chaosd | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_sakuyamon | 沙古牙兽 | mega | biped | hu1_empire_sword_and_shield | czx_sakuya | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_rosemon | 蔷薇兽 | mega | biped | hu1_empire_sword_and_shield | czx_rosemo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_rosemonbm | 蔷薇兽爆裂形态 | mega | biped | hu1_empire_sword_and_shield | czx_rosem0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_vikemon | 维京兽 | mega | biped | hu1_empire_sword_and_shield | czx_vikemo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_heraklekabuterimon | 力神比多兽 | mega | insect | sp1_giant_spider | czx_hera | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_magnadramon | 圣龙兽 | mega | quadruped | wf1_dire_wolf | czx_ma | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：chr548(翼quad) bonemap 34/42骨 12剪辑GIF合身→批3名单 |  |
+| czx_dgm_magnadramon | 圣龙兽 | mega | quadruped | **czx_dgm_magnadramon_wf1_wolf** | czx_ma | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：chr548(翼quad) bonemap 34/42骨 12剪辑GIF合身；iter7批3已部署（38-bin animpack） |  |
 | czx_dgm_hououmon | 凤凰兽 | mega | flyer | bi1_eagle | czx_ho | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ❌扭曲 | ⏭游戏运行中 | 同 birdramon：damp 已加仍 fly 全段翼面塌陷成倒 V/死坠压扁；翼骨 bind 远超 mesh 须 fit 重修 | ❌未修阻塞 |
 | czx_dgm_dorugoramon | 多路龙兽 | mega | quadruped | **czx_dgm_dorugoramon_emp_sws1** | czx_dorug0 | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr019 bonemap 64/72骨 12剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_fujinmon | 风神兽 | mega | biped | hu1_empire_sword_and_shield | czx_fujinm | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_wargreymon | 战斗暴龙兽 | mega | biped | **czx_dgm_wargreymon_emp_sws1** | czx_wgm001 | ⚠缺bin层 | ✅ | ✅内收 | ✅chr原生GIF | ⏭环境阻塞 |L3 attack_05 站姿正常、run/death 前倾可辨——体形接近 humanoid01 失真较轻，边缘通过；iter5批1已部署：chr027 bonemap 45/72骨 8剪辑全OK→graft 槽位满填，GIF合身 | ✅通过 |
-| czx_dgm_wargreymonx | 战斗暴龙兽X | mega | biped | hu1_empire_sword_and_shield | czx_wargre | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_wargreymonx | 战斗暴龙兽X | mega | biped | hu1_empire_sword_and_shield | czx_wargre | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr027(同种wargreymon) bonemap 45/72骨 8剪辑GIF合身→批4名单 |  |
 | czx_dgm_metalgarurumon | 钢铁加鲁鲁 | mega | quadruped | **czx_dgm_metalgarurumon_wf1_wolf** | czx_me | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | | iter5批1已部署：chr135 bonemap 37/42骨 8剪辑全OK→graft 槽位满填，GIF合身 |  |
 | czx_dgm_metalgarurumonx | 钢铁加鲁鲁X | mega | quadruped | wf1_dire_wolf | czx_m0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_shinegreymon | 闪光暴龙兽 | mega | biped | **czx_dgm_shinegreymon_emp_sws1** | czx_shineg | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr094 bonemap 62/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
@@ -101,13 +101,13 @@ STATUS: IN_PROGRESS
 | czx_dgm_omegamonm | 奥米加兽慈悲形态 | mega | biped | **czx_dgm_omegamonm_emp_sws1** | czx_omega4 | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr448 bonemap 49/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_gallantmon | 红莲骑士兽 | mega | biped | **czx_dgm_gallantmon_emp_sws1** | czx_gallan | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr013 bonemap 62/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
 | czx_dgm_gallantmoncm | 红莲骑士兽真红莲形态 | mega | biped | **czx_dgm_gallantmoncm_emp_sws1** | czx_galla0 | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr105 bonemap 62/72骨 11剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
-| czx_dgm_gallantmonx | 红莲骑士兽X | mega | biped | hu1_empire_sword_and_shield | czx_galla1 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_gallantmonx | 红莲骑士兽X | mega | biped | hu1_empire_sword_and_shield | czx_galla1 | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr013(同种gallantmon) bonemap 62/72骨 5剪辑GIF合身→批4名单 |  |
 | czx_dgm_alphamon | 阿尔法兽 | mega | biped | **czx_dgm_alphamon_emp_sws1** | czx_alpham | ⚠缺bin层 | ✅ | ✅内收 | ✅chr原生GIF | ⏭环境阻塞 | hu1 walk 整体前倾 ~45°、attack 拧转披风乱飞、death 倾覆——大体积 biped 仍失真（无 damp）；iter5批量管线完毕：chr416 bonemap 21/72骨 4剪辑GIF合身；iter6批2已部署（33-bin animpack） | ❌未修阻塞 |
 | czx_dgm_jesmon | 杰斯兽 | mega | biped | **czx_dgm_jesmon_emp_sws1** | czx_jesmon | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr749 bonemap 64/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
-| czx_dgm_jesmonx | 杰斯兽X | mega | biped | hu1_empire_sword_and_shield | czx_jesmo0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_jesmonx | 杰斯兽X | mega | biped | hu1_empire_sword_and_shield | czx_jesmo0 | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr749(同种jesmon) bonemap 64/72骨 5剪辑GIF合身→批4名单 |  |
 | czx_dgm_magnamon | 金甲龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_magnam | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_magnamonx | 金甲龙兽X | mega | biped | hu1_empire_sword_and_shield | czx_magna0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_imperialdm | 帝皇龙甲兽龙形态 | mega | flyer | hu1_empire_sword_and_shield | czx_imper1 | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：u133(Bip001) bonemap 37/72骨 8剪辑GIF合身→批3名单 |  |
+| czx_dgm_magnamonx | 金甲龙兽X | mega | biped | hu1_empire_sword_and_shield | czx_magna0 | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter7 biped试跑：chr416(alphamon骑士) bonemap 21/72骨 4剪辑GIF合身→批4名单 |  |
+| czx_dgm_imperialdm | 帝皇龙甲兽龙形态 | mega | flyer | **czx_dgm_imperialdm_emp_sws1** | czx_imper1 | ⚠缺bin层 |  |  | ✅chr原生GIF(族donor) | ⏭环境阻塞 | ；iter6 族donor试跑：u133(Bip001) bonemap 37/72骨 8剪辑GIF合身；iter7批3已部署（38-bin animpack） |  |
 | czx_dgm_imperialfm | 帝皇龙甲兽战士形态 | mega | biped | hu1_empire_sword_and_shield | czx_imperi | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_imperialpm | 帝皇龙甲兽圣骑士形态 | mega | biped | hu1_empire_sword_and_shield | czx_imper0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_ulforcev | 究极V龙兽 | mega | biped | **czx_dgm_ulforcev_emp_sws1** | czx_ulforc | ⚠缺bin层 |  |  | ✅chr原生GIF | ⏭环境阻塞 | iter5批量管线完毕：chr397 bonemap 42/72骨 5剪辑GIF合身；iter6批2已部署（33-bin animpack） |  |
@@ -259,3 +259,9 @@ STATUS: IN_PROGRESS
 - **L4 环境阻塞（证据链更新）**：今日另一会话已定位 `+0x538a0a` 真凶=zz_diag_junction.pack（移出 playset）；GPU 侧 `gfx.log` 已恢复 RTX 2070（Basic Render Driver 消失）。但新签名 `+0x4e5b30` 出现：本会话探针 digimon-only（15:39）与**纯 vanilla 空 modlist（15:44）同址复现**，且其他会话的前端 modlist 拉起（zz_e1，含本包）同址——**两条拉起路径都被 +0x4e5b30 打死，vanilla 控制组复现=与本包无关**。判定 L4 继续挂起；`game_startup_mode battle` autotest 在 9.0 上 vanilla 也死（+0x1a957e7），前端二分法（挂载完停在 press-any-key + modified.log/mp_log.txt 判据）为下轮正解，本轮因并发会话残留 crash 进程（zz_e1）+连崩未拉。
 - **骨架名对齐修正**：全量比对 `skel_*.json.skeleton_name` vs `battle_animations_table` 注册骨架发现唯一不一致 = dorugoramon（skel json `czx_dorug` / 注册 `czx_dorug0`）——剪辑内嵌骨架名与注册名不符。已给 skel json 加 `custom_name=czx_dorug0` 重跑 batch+graft，剪辑内嵌名已对齐；最终部署包 sha `1943f896`（含修正，357MB/10831 文件）。
 - **下一步**：iter7 = 批3 落源 5 只族 donor 合格品（tinkermon/kyubimon/magnadramon/megakabuterimon/imperialdm 已备好 bin+剪辑，graft+deploy 即可）→ 前端二分 L4（zz_diag_junction 已除，待 +0x4e5b30 消退或定位）→ 53 只 mesh-chr 按附录A池化分批跑 batch_chr --donor → 视情况给 serpent/insect 补位。
+### iter 7 — 批3（5只族 donor）落源部署 + mesh-chr biped 组试跑 15/15 全过
+
+- **批3 部署 ✅（累计 38 只激活）**：tinkermon←g133(Bip001)/kyubimon←chr012/magnadramon←chr548/megakabuterimon←chr359/imperialdm←u133，graft 全满填（emp_sws1 95/95、wf1_wolf 43/43、sp1_spid 35/35）。骨架名一致性预检通过（skel json == battle_animations_table == 剪辑内嵌名，5/5 OK——iter6 dorugoramon 教训已制度化）。`pack_animsets.py` 重打 38-bin animpack（3.2MB）；land_units 再切 5 行；`build_pack --deploy` 成功：370MB/10836 文件，sha `b13ece55`，mod_output==data 一致。**激活数 38/104，剩余 66 只 vanilla。**
+- **mesh-chr biped 组试跑 15/15 合格（批4 名单）**：veemon/gatomon/palmon←chr050、renamon←chr151、growlmon/geogreymon/skullgreymon←chr326、tyranomon/machinedramon←chr364、veemonex←chr397、zudomon←chr344、wargreymonx←chr027、gallantmonx←chr013、jesmonx←chr749、magnamonx←chr416——优先同种/同族 donor。逐张 montage 验收全合身，无炸顶点/穿地/塌身。映射 21/72（magnamonx←chr416 极简）~64/72（jesmonx）。验收图 `Temp\modelcheck\digimon\iter7\`。**无系统性失真模式，池化方案放量安全。**
+- **L4 继续环境阻塞**：`+0x4e5b30` 全路径连崩未消退（截至 16:06 已 10 连同址，含 vanilla 空 modlist 控制组）。前端二分判据备好（拉起 modlist→press-any-key 存活+modified.log/mp_log.txt 条数），待环境恢复执行。
+- **下一步**：iter8 = 批4 落源 15 只 biped 合格品 → mesh-chr 继续放量：biped 剩余 ~22 只（按池化表 chr050/151/326/349/364/140/027/088/105/416/749/213 分档）→ flyer 组（bird/angel/dragon 三池）→ quad 剩余（kyubimon 外的 quad 已验 chr012 可行）→ insect 补位（chr359 已证）→ serpent 4 只维持 vanilla 收场。无 chr 源 18 只按附录A借用方案同流。
