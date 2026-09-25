@@ -1,4 +1,4 @@
 ﻿key	auto_generate	is_caster	small_icon	associated_unit_override	audio_voiceover_actor_group	show_in_ui	cap	has_female_name	can_gain_xp	loyalty_is_applicable	contributes_to_agent_cap	recruitment_category	magic_lore	names_group	can_be_loaned	recruitable	saving_settings	audio_vo_culture_override	spam_click_vo_enabled	can_equip_ancillaries	cost	recruitment_button_active_icon_path	recruitment_button_background_icon_path
-#agent_subtypes_tables;2;db/agent_subtypes_tables/!!czx_swarm_units																							
+#agent_subtypes_tables;3;db/agent_subtypes_tables/!!czx_swarm_units																							
 czx_kerrigan	true	true	ui/campaign ui/agents/wh2_main_lore_dark_magic.png	czx_kerrigan	lin_vo_actor_Kerrigan_Zerg	true	-1	true	true	true	true			czx_kerrigan	true	true	can_be_saved_loaded		false	true	800		
 czx_kerrigan_lord	false	true		czx_kerrigan_lord	lin_vo_actor_Kerrigan_Zerg	true	-1	false	true	false	true	legendary_lords		czx_kerrigan	false	true	can_be_saved_loaded		false	true	1100		

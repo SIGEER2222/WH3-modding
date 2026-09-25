@@ -1,4 +1,4 @@
 ﻿agent_type	art_set_id	culture	subculture	faction	is_custom	is_male	agent_subtype	campaign_map_scale
-#campaign_character_art_sets_tables;6;db/campaign_character_art_sets_tables/!!czx_swarm_units								
+#campaign_character_art_sets_tables;7;db/campaign_character_art_sets_tables/!!czx_swarm_units								
 wizard	czx_kerrigan				false	false	czx_kerrigan	1.0
 general	czx_kerrigan_lord				false	false	czx_kerrigan_lord	1.0

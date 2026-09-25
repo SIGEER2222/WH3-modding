@@ -1,4 +1,4 @@
-﻿faction	name	unit	variant	unit_card
+faction	name	unit	variant	unit_card
 #unit_variants_tables;5;db/unit_variants_tables/!!czx_swarm_units				
 	czx_feilong	czx_feilong	czx_feilong	czx_feilong
 	czx_zhanglang	czx_zhanglang	czx_zhanglang	czx_zhanglang
@@ -16,3 +16,5 @@
 	czx_dehaka	czx_dehaka	czx_dehaka	czx_dehaka
 	czx_inf_diamondback	czx_inf_diamondback	czx_inf_diamondback	czx_inf_diamondback
 	czx_inf_marine	czx_inf_marine	czx_inf_marine	czx_inf_marine
+	gou	gou	gou	gou
+	cishe	cishe	cishe	cishe

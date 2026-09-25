@@ -1,4 +1,4 @@
-﻿exclude	unit_caste	unit_category	unit_class	unit_record	unit_set
+exclude	unit_caste	unit_category	unit_class	unit_record	unit_set
 #unit_set_to_unit_junctions_tables;1;db/unit_set_to_unit_junctions_tables/!!czx_swarm_units					
 false				czx_feilong	skv_chongzu
 false				czx_zhanglang	skv_chongzu
@@ -16,3 +16,5 @@ false				czx_inf_tank	skv_chongzu
 false				czx_dehaka	skv_chongzu
 false				czx_inf_diamondback	skv_chongzu
 false				czx_inf_marine	skv_chongzu
+false				gou	skv_chongzu
+false				cishe	skv_chongzu

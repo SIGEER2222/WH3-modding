@@ -1,2 +1,4 @@
 # 虫群单位集 skv_chongzu 与派系接线由 Imperial Arbiter 定义
 Imperial Arbiter.pack
+# 凯瑞甘召唤改为召唤 lin_all_kerrigan_zerg（英灵召唤包内的事务官小类/模型/技能树）
+Lin_Summon_Servant.pack

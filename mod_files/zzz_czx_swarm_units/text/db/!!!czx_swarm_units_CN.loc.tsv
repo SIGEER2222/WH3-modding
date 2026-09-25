@@ -1,4 +1,4 @@
-﻿key	text	tooltip
+key	text	tooltip
 #loc;;text/db/!!!czx_swarm_units_CN.loc
 land_units_onscreen_name_czx_feilong	飞龙（异龙）	false
 land_units_onscreen_name_czx_zhanglang	蟑螂（劫掠者）	false
@@ -143,3 +143,10 @@ units_onscreen_name_czx_feilong	飞龙（异龙）	0
 units_onscreen_name_czx_zhanglang	蟑螂（劫掠者）	0
 units_onscreen_name_czx_kerrigan	凯瑞甘	0
 units_onscreen_name_czx_kerrigan_lord	凯瑞甘（领主）	0
+ui_unit_groupings_onscreen_chong_zu	虫群	0
+units_onscreen_name_gou	跳虫	0
+land_units_onscreen_name_gou	跳虫	0
+units_onscreen_name_cishe	刺蛇	0
+land_units_onscreen_name_cishe	刺蛇	0
+units_onscreen_name_leishou	雷兽	0
+land_units_onscreen_name_leishou	雷兽	0

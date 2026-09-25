@@ -1,4 +1,4 @@
-﻿variant_name	tech_folder	variant_filename	low_poly_filename	mount_scale	scale	scale_variation	super_low_poly_filename
+variant_name	tech_folder	variant_filename	low_poly_filename	mount_scale	scale	scale_variation	super_low_poly_filename
 #variants_tables;6;db/variants_tables/!!czx_swarm_units							
 czx_feilong		czx_feilong		1.0	0.5	0.05000000074505806	
 czx_zhanglang		czx_zhanglang		1.0	1.0	0.0	
@@ -16,3 +16,5 @@ czx_inf_tank		czx_inf_tank		1.0	1.0	0.05000000074505806
 czx_dehaka		czx_dehaka		1.0	1.0	0.05000000074505806	
 czx_inf_diamondback		czx_inf_diamondback		1.0	1.0	0.05000000074505806	
 czx_inf_marine		czx_inf_marine		1.0	1.0	0.05000000074505806	
+gou		gou		1.0	1.0	0.05000000074505806	
+cishe		cishe2		1.0	1.100000		
