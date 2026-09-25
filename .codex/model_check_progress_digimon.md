@@ -17,7 +17,7 @@ STATUS: IN_PROGRESS
 
 | unit | cn | stage | form | animset(man_animation) | skel | L0 | L1 | L2 | L3 | L4 | 问题/修复 | 状态 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| czx_dgm_agumon | 亚古兽 | rookie | biped | hu1_empire_sword_and_shield | czx_agumon | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⏭游戏运行中 | L3 定制剪辑扭曲（walk 头折贴地/attack 四肢拉条/death 团状）；idle 尚可；vanilla hu1 回退路径渲染正常偏拉长；retarget 大摆幅失真待专项返工 | ❌未修阻塞 |
+| czx_dgm_agumon | 亚古兽 | rookie | biped | hu1_empire_sword_and_shield | czx_agumon | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⚠L4部分 | L3 定制剪辑扭曲；**iter3 chr050 原生原型已打透**：8 剪辑（idle/move/damage/down/getup/guard/win/eat）bonemap 重定向渲 GIF 全部合身正常；95 槽 graft+单单位 animpack+激活文档已产出（scratch/model_check/digimon/proto_agumon/），未进源；L4 基线：digimon-only battle init 过一次，二跑遇 crash dialog（flaky init） | ❌未修阻塞 |
 | czx_dgm_gabumon | 加布兽 | rookie | biped | hu1_empire_sword_and_shield | czx_gabumo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_biyomon | 比丘兽 | rookie | flyer | bi1_eagle | czx_bi | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ⚠翅膀摊平 | ⏭游戏运行中 | bird01 骨架 bind 展翼 vs mesh 收翼，翼骨伸出网格 3-4x；fly_walk 翅膀被拉成平板帆、attack 成扇形——骨架 fit 需按收翼重配翼链 | ❌未修阻塞 |
 | czx_dgm_patamon | 巴达兽 | rookie | flyer | wf1_dire_wolf | czx_pa | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -147,3 +147,12 @@ STATUS: IN_PROGRESS
 - **alphamon**：L1✅ L2✅ 但 L3 hu1 系前倾 ~45°/拧转 ❌——大体型 biped 无 damp 一样失真。
 - **推荐修复路线（综合）**：主线走 **chr 原生剪辑**（50/104 有源，语义正确、原型已验证），每 chr 单位需要 skel_chr###.json（dump_chr_skel.py 已有）+ czx→chr bonemap（chr_clips 有样例可半自动生成）+ 剪辑槽位映射（chr ~8-15 剪 vs WH3 ~40 槽，可复用）；无 chr 源的 54 只回退「修 retarget_delta/补 damp」或继续 vanilla man_animation。骨架 fit 失配（翼骨>mesh）是独立缺陷，无论走哪条路线都要修 3 只鸟的 fit。
 - L4 仍跳过：Warhammer3.exe 运行中。
+
+### iter 3 — agumon chr 端到端原型 + 灰度方案 + L4 初探
+
+- **结构对比**：chr050.bin（947B）极简——8 剪辑 12 槽位引用（idle/move/damage/down/getup/guard/win/eat）；czx_dgm_agumon_emp_sws1.bin（107KB）= hu1 完整套件克隆，95 条 `animations/battle/czx_agumon/**.anim` 槽位路径横跨 14 类（attacks13/deaths15/knockdown14/reactions8/locomotion8/movement6/defends6/jumps_falls7/stand4/knockback4/combat_idles3/celebrate3/shield_up2/porthole2）。
+- **原型产出**（`scratch/model_check/digimon/proto_agumon/`）：chr050 8 剪辑经 `retarget_bonemap.py`+`bonemap_czx2chr050.json`（czx→chr 24 骨映射）→ `anims/chr_*.anim`（skeleton_name=czx_agumon，v8）→ blender 渲 GIF **8/8 全合身正常**（idle 站姿呼吸 / move 自然步态 / damage 受击后仰 / down 倒地 / getup 爬起 / guard 抱臂格挡 / win 跳举庆祝 / eat 前扑咬=attack 语义）。
+- **graft 资产**：`build_graft.py` 生成 95 槽位 .anim 全覆盖映射（attacks→eat、locomotion/movement/shield_up→move、stand/idles/porthole→idle、defends→guard、knockback/reactions→damage、knockdown/deaths/falls→down、getup→getup、celebrate→win）+ `zzz_dgm_agumon_only.animpack`（单 bin，inner==stem==DB key）+ `ACTIVATION.txt`（步骤+回滚）。
+- **灰度可行性 ✅**：`land_units.man_animation` 按单位选套件——只改 agumon 一行（hu1_empire_sword_and_shield→czx_dgm_agumon_emp_sws1）即可单单位启用；`battle_animations_table` key→skeleton 行已存在；`culture_to_battle_animation` 是 animset↔culture 白名单（2912 行 = 104 key × 28 culture pack + cathay 行），不驱选择、不波及其他单位；animpack 只含 agumon bin，其余 103 套件不注册。**激活三件套未进源**（等主会话放行再落 mod_files）。
+- **L4 初探**（游戏已退）：digimon-only 场景（6 只：agumon/wargreymon/guilmon/garurumon/seadramon/biyomon，`--mods packs:zzz_czx_digimon_v2.pack`）**init 通过**、120s 存活无 dump——vanilla-man_animation 现役包游戏内可初始化（stretched-sane 假设的 init 侧实证）。二跑出现 crash-report 窗口（flaky init，进程活着但窗口名 Crash report）。**满 playset（215 mod）两连崩于 Warhammer3.exe+0x538a0a（0xc0000005 exec-fault），与会话前 13:18 崩溃同址——跨 mod 环境性崩溃，digimon 包单独无责**。截图取证失败（战斗窗口离屏/最小化，只抓到桌面）。
+- 遗留：graft 未入源；attack 槽暂用 eat（咬合前扑）——chr050 无专用 attack 剪辑；鸟系三只 fit 失配（翼骨>mesh）待修 fit_skeleton。
