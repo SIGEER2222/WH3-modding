@@ -8,7 +8,8 @@ STATUS: IN_PROGRESS
 
 - **文件链 104/104 齐**：vmd→wsmodel→rmv2→material→dds 全链存在；RMV2 内嵌骨架名 == battle_skeletons.name == 骨架目录名（czx_*）。见 `scratch/model_check/digimon/l0_report.tsv`。
 - **DB 行 104/104 齐**：main/land/unit_variants/variants/battle_animations_table/battle_skeletons/custom_battle_permissions/loc（name+short+hist）全在；audit_dangling_refs 0 ERROR（104 WARN 全部是 `wh3_main_cth_the_northern_provinces` 已知误报）。
-- ⚠ **animset 注册层整体缺失**：源码 `animations/database/battle/bin/` 为空，pack 内无 `animations/database/` 子树（无 bin 无 animpack）。当前 `land_units.man_animation` 全部指向 vanilla 族套件（hu1_empire_sword_and_shield×83 / wf1_dire_wolf×9 / sn1_sepulchral_stalker_halberd×5 / sp1_giant_spider×4 / bi1_eagle×3，2026-09-24 13:07 改动），czx_dgm_*_suffix 动画 key 仅被 battle_animations_table/culture 表引用——自定义套件资产（9021 clips + 104 骨架 + bins）目前是休眠层。唯一 animpack 副本在 `scratch/zzz_czx_digimon_v2_animsets.animpack.broken`（Sep 24 12:55，104 条，内部名=stem=czx 名=**matched-combat 修复前**布局）。**另一会话正在 crash_20260925 排查，animpack 去留由主会话裁决，本轮不重建。**
+- ⚠ **animset 注册层整体缺失**：源码 `animations/database/battle/bin/` 为空，pack 内无 `animations/database/` 子树（无 bin 无 animpack）。当前 `land_units.man_animation` 全部指向 vanilla 族套件（hu1_empire_sword_and_shield×83 / wf1_dire_wolf×9 / sn1_sepulchral_stalker_halberd×5 / sp1_giant_spider×4 / bi1_eagle×3，2026-09-24 13:07 改动），czx_dgm_*_suffix 动画 key 仅被 battle_animations_table/culture 表引用——自定义套件资产（9021 clips + 104 骨架 + bins）目前是休眠层。
+- iter2 animpack 解剖结论（`scratch/model_check/digimon/animpack_audit.py`）：`scratch/zzz_czx_digimon_v2_animsets.animpack.broken` **格式完好**（104 条、无尾字节）、**内部套件名==stem==DB key**（czx_dgm_*_suffix，已是正确命名约定，非 vanilla donor 名）、bin 内引用 `animations/skeletons/czx_*.anim`+`reference_poses/` 正确；且与 `scratch/dgm_plus_pkm_src/animations/database/battle/bin/` 备份 **104/104 逐字节相同**。"broken" 名不符实——格式/命名都对，被弃的真实原因是**剪辑内容畸形**（L3 实测），9-24 拔除+改 vanilla man_animation 属止损。修好剪辑后直接把这 104 bin 回源/重打 animpack 即可，无需改名手术。
 - ⚠ **unit_set_to_unit_junctions 全空**（仅表头）：104 只无 unit_set 归属——自定义战斗选人界面分类页签可能不显示它们（units_custom_battle_permissions 已在，全派系行齐）。待确认影响。
 - Warhammer3.exe 运行中 → L4 全跳过（「待游戏窗口」）。
 
@@ -34,7 +35,7 @@ STATUS: IN_PROGRESS
 | czx_dgm_zubamon | 兹巴兽 | rookie | biped | hu1_empire_sword_and_shield | czx_zubamo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_greymon | 暴龙兽 | champion | biped | hu1_empire_sword_and_shield | czx_greymo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_garurumon | 加鲁鲁兽 | champion | quadruped | wf1_dire_wolf | czx_ga | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⏭游戏运行中 | L3 walk/attack/death 全部蜷缩变形（头折进胸腔、腿互绞、鬃毛件漂浮）；quad 族 retarget 失真 | ❌未修阻塞 |
-| czx_dgm_birdramon | 巴多拉兽 | champion | flyer | bi1_eagle | czx_b0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_birdramon | 巴多拉兽 | champion | flyer | bi1_eagle | czx_b0 | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ❌扭曲 | ⏭游戏运行中 | 已有 RETARGET_DAMP 仍压不住：fly_walk 翼面拖拽、attack 蜷缩、death_fall 塌扁；根因是翼骨 bind 尺寸远超 mesh（几何失配，非摆幅问题） | ❌未修阻塞 |
 | czx_dgm_angemon | 天使兽 | champion | flyer | hu1_empire_sword_and_shield | czx_angemo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_ikkakumon | 海狮兽 | champion | quadruped | wf1_dire_wolf | czx_ik | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_togemon | 仙人掌兽 | champion | biped | hu1_empire_sword_and_shield | czx_togemo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -74,7 +75,7 @@ STATUS: IN_PROGRESS
 | czx_dgm_cresgarurumon | 偃月加鲁鲁兽 | mega | quadruped | hu1_empire_sword_and_shield | czx_cresga | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_durandamon | 杜兰达兽 | mega | biped | hu1_empire_sword_and_shield | czx_durand | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_metalseadramon | 钢铁海龙兽 | mega | serpent | sn1_sepulchral_stalker_halberd | czx_met | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_plesiomon | 蛇颈龙兽 | mega | serpent | sn1_sepulchral_stalker_halberd | czx_ple | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_plesiomon | 蛇颈龙兽 | mega | serpent | sn1_sepulchral_stalker_halberd | czx_ple | ⚠缺bin层 | ✅ | ⚠供体骨出网格 | ✅连贯 | ⏭游戏运行中 | damp(tail 0.25/neck-spine 0.4)有效：walk 滑行、attack_03 前扑、death 瘫伏均连贯；L2 供体腿骨落网格外同 seadramon 无害 | ✅通过 |
 | czx_dgm_machinedramon | 机械邪龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_machin | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_chaosdramon | 混沌龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_chaosd | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_sakuyamon | 沙古牙兽 | mega | biped | hu1_empire_sword_and_shield | czx_sakuya | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -83,7 +84,7 @@ STATUS: IN_PROGRESS
 | czx_dgm_vikemon | 维京兽 | mega | biped | hu1_empire_sword_and_shield | czx_vikemo | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_heraklekabuterimon | 力神比多兽 | mega | insect | sp1_giant_spider | czx_hera | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_magnadramon | 圣龙兽 | mega | quadruped | wf1_dire_wolf | czx_ma | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_hououmon | 凤凰兽 | mega | flyer | bi1_eagle | czx_ho | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_hououmon | 凤凰兽 | mega | flyer | bi1_eagle | czx_ho | ⚠缺bin层 | ✅ | ⚠翼骨出网格 | ❌扭曲 | ⏭游戏运行中 | 同 birdramon：damp 已加仍 fly 全段翼面塌陷成倒 V/死坠压扁；翼骨 bind 远超 mesh 须 fit 重修 | ❌未修阻塞 |
 | czx_dgm_dorugoramon | 多路龙兽 | mega | quadruped | hu1_empire_sword_and_shield | czx_dorug0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_fujinmon | 风神兽 | mega | biped | hu1_empire_sword_and_shield | czx_fujinm | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_wargreymon | 战斗暴龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_wgm001 | ⚠缺bin层 | ✅ | ✅内收 | ⚠可辨 | ⏭游戏运行中 | L3 attack_05 站姿正常、run/death 前倾可辨——体形接近 humanoid01 失真较轻，边缘通过 | ✅通过 |
@@ -101,7 +102,7 @@ STATUS: IN_PROGRESS
 | czx_dgm_gallantmon | 红莲骑士兽 | mega | biped | hu1_empire_sword_and_shield | czx_gallan | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_gallantmoncm | 红莲骑士兽真红莲形态 | mega | biped | hu1_empire_sword_and_shield | czx_galla0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_gallantmonx | 红莲骑士兽X | mega | biped | hu1_empire_sword_and_shield | czx_galla1 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
-| czx_dgm_alphamon | 阿尔法兽 | mega | biped | hu1_empire_sword_and_shield | czx_alpham | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
+| czx_dgm_alphamon | 阿尔法兽 | mega | biped | hu1_empire_sword_and_shield | czx_alpham | ⚠缺bin层 | ✅ | ✅内收 | ❌扭曲 | ⏭游戏运行中 | hu1 walk 整体前倾 ~45°、attack 拧转披风乱飞、death 倾覆——大体积 biped 仍失真（无 damp） | ❌未修阻塞 |
 | czx_dgm_jesmon | 杰斯兽 | mega | biped | hu1_empire_sword_and_shield | czx_jesmon | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_jesmonx | 杰斯兽X | mega | biped | hu1_empire_sword_and_shield | czx_jesmo0 | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
 | czx_dgm_magnamon | 金甲龙兽 | mega | biped | hu1_empire_sword_and_shield | czx_magnam | ⚠缺bin层 |  |  |  | ⏭游戏运行中 |  |  |
@@ -136,3 +137,13 @@ STATUS: IN_PROGRESS
 - **对照实验**：agumon 渲 vanilla hu1_sws_walk/attack（=当前游戏实际路径，man_animation 指向原版套件）姿态正常仅拉长 → 游戏内现状不是团状扭曲；定制剪辑层休眠且失真。
 - **修复决策**：retarget 质量返工（调 RETARGET_DAMP/POS_DAMP 或改用 chr 原生剪辑——chr050→czx_agumon 实测渲染正常）+ animset 注册层去留都属专项，本轮不修，相关 5 只记 ❌未修阻塞。
 - L4 全跳过：Warhammer3.exe 运行中（禁动用户游戏窗口/不写 data\）。
+
+### iter 2 — animpack 解剖 + chr 原型 + damp 三件套复验
+
+- **animpack 解剖**：`scratch/zzz_czx_digimon_v2_animsets.animpack.broken` 格式完好、命名约定正确（inner==stem==DB key）、与 `scratch/dgm_plus_pkm_src/bin/` 备份逐字节相同——弃置原因是剪辑内容畸形而非格式。修复路线=修剪辑数据→bin 回源→重打 animpack→man_animation 指回 czx key。
+- **chr 原生路线原型（agumon）**：v1 `mod_files/zzz_czx_digimon/animations/database/battle/bin/chr###.animpack` 共 **50 只**有 chr 源（chr050=亚古兽等，`digimon_batch.py` CHR_MAP 段有 unit→chr 对应）。`scratch/chr_clips/` 已有完整管线遗产：chr050 clips + `bonemap_czx2chr050.json`（24 骨映射）+ `retarget_bonemap.py` 产物 `agu_*_pose.json`。本轮把 agu_move/idle/damage 直接渲到 czx_dgm_agumon_bound.glb：**姿态完全正常**（自然走姿/直立 idle/受击后仰）——同骨架同渲染器下 chr 源✅ vs vanilla retarget 源❌，定性证据拿到。
+- **对比图**：`Temp\modelcheck\digimon\l3\` 并存 `czx_dgm_agumon_hu1_sws_*`（畸形）/ `czx_dgm_agumon_VANILLA_*`（正常但拉长）/ `czx_dgm_agumon_CHR_*`（正常且合身）。
+- **damp 三件套复验**：plesiomon（tail/neck damp）三剪辑连贯 ✅——damp 对「链过长摆幅过大」有效；birdramon/hououmon 仍 ❌——其根因是**翼骨 bind 尺寸与 mesh 收翼不匹配**（L2 翼骨出网格 3-4x），属 fit_skeleton 几何问题，damp 旋钮压不住。biyomon 同型。
+- **alphamon**：L1✅ L2✅ 但 L3 hu1 系前倾 ~45°/拧转 ❌——大体型 biped 无 damp 一样失真。
+- **推荐修复路线（综合）**：主线走 **chr 原生剪辑**（50/104 有源，语义正确、原型已验证），每 chr 单位需要 skel_chr###.json（dump_chr_skel.py 已有）+ czx→chr bonemap（chr_clips 有样例可半自动生成）+ 剪辑槽位映射（chr ~8-15 剪 vs WH3 ~40 槽，可复用）；无 chr 源的 54 只回退「修 retarget_delta/补 damp」或继续 vanilla man_animation。骨架 fit 失配（翼骨>mesh）是独立缺陷，无论走哪条路线都要修 3 只鸟的 fit。
+- L4 仍跳过：Warhammer3.exe 运行中。
