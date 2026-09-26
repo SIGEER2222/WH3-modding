@@ -204,6 +204,7 @@ blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+
 - **单 LOD** 可把 6MB 压到 ~1.5MB/模型；贴图 base 2048、normal/mr 1024 再省体积。
 - 每个单位产物：`.rigid_model_v2`、`.wsmodel`、`.xml.material`、DDS×5、`.variantmeshdefinition`。
 - VMD 必须指向真实存在的 wsmodel——死链会让单位无声失败（本项目 leishou 曾有此坑）。
+- **graft/retarget 产出的剪辑要补 `be_prop_*` 轨道**：供体 clip 的 prop 挂点轨道在重定向后变恒等（钉 animroot 原点），启用 CA 式 `<SLOT attach_point="be_prop_N">` 武器槽前必须补写：`scratch/fix_beprop_tracks.py`（全动态剪辑）+ `fix_beprop_tracks_dyn.py`（tb/rb 混合压缩剪辑→重建全动态）。逐帧 `L_prop=inv(W_animroot)⊗W_driver`，映射见 vanilla_bone_conventions.md 惯例 2。**⚠ 压缩编码解出的 quat 可能非单位（|q|=1.0011 实测），FK/求逆前逐 quat 归一化，否则 |q|² 缩放在长力臂上放大成 mm~cm 级偏差 `[实测 2026-09-26]`**。
 
 ## 5. DB 生成
 
@@ -266,6 +267,8 @@ unit_variants.variant ──→ 乘员 VMD（原版是 wh_emp_state_troops：乘
    - **预览目录只留最新一轮**：`scratch/_preview/` 每次出新图前删掉上一轮旧图（用户验收只看当前版本），多版本对比图放 `scratch/cmp/` 不进 `_preview`。预览产物一律放 `scratch/` 内，禁止在仓库根目录建 `_preview/`（见 `AGENTS.md` 工作区卫生）。
    - **绑定叠加验收图（强制）**：**每次调整骨骼/绑定/权重后，必须先出一张"网格+骨架"叠加图确认绑定关系**——`blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>`（绑完的内嵌骨架实体骨柱+半透明网格，参考 `scratch/jibian_bound_overlay.png`）；若骨架来自外部 JSON 用 `blender_skel_overlay_json.py`。验收点：**足/头/尾三点必须对位**——足/踝/趾关节落在模型足上并贴地（y≈0），头/颈/颚骨在头腔内，尾/后肢骨在尾部内（非人形单位 rear_*/tail_* 同理）；腿链进腿、脊柱链穿躯干、臂链进臂，装饰骨明确排除；骨架穿出/偏离/尺度不符（大数倍）一律先修再进动画验收。三视图各出一张（`--view front|side|persp`）+ `--bonesub` 只画参与蒙皮的结构骨（装饰骨白噪声会糊住判断）`[实测]`。
    - 审图重点：炸面/脱肢/漂浮碎块/贴地/朝向。
+   - **运行时蒙皮审计（强制，2026-09-26 起）**：文件层 `JOINTS_0` 干净 ≠ 渲染正确——studio 加载时 `rebindStrayWeights`/`graftVestigialFace` 会**改写 skinIndex**。验收必须读 `__studio.modelReport.rebind`（steal/tail/trunk/byBone 计数）+ `lastGraft`：steal 非零且 byBone 落在 hand/wrist/weapon/爪 = 拒收；graft 抓到非头骨主导的躯干/胸口顶点 = 拒收。判别法：`#nojaw` hash 开关禁用 jaw 补蒙做 A/B 对照 `[实测]`。
+   - **中段帧三视图强制**：奔跑、combat_walk、至少两条 attack（含跳跃/移动攻击）各抽 ≥1 个中间帧出正/侧/顶（或等效角）三视图——钉死顶点/抢蒙/内衬外露只在运动中段帧暴露，静态 bind 通过不算过 `[实测]`。
    - **渲染完必须自己先抽帧检查再向用户汇报**：至少看首帧+中段帧；有供体时先渲供体地面真值作基线。汇报要写明"看过哪些帧、看到什么现象"，渲染成功不等于通过 `[实测]`。
 4. **游戏内**：Mod Manager 启动 → 自定义战看模型/动画/技能/自爆表现；战役看招募建筑图标/兵牌/porthole。
 
@@ -339,6 +342,13 @@ python tools/inject_anims_glb.py x.glb --clips a.anim,b.anim --dry       # 只�
 | VMD 指向不存在 wsmodel | 死链 | 改 VMD 或补 wsmodel |
 | 单位血量离谱 | HP 是每模型值，抄了单体巨兽 | 按模型数折算 |
 | 中文路径喂 Blender 乱码 | 编码 | 拷 scratch 改 ASCII 名 |
+| 贴图细节全丢（没眼睛/牙/爪尖）但大体颜色对 | .dae 源 UV 双重翻转：fbx_to_glb 手动翻 + glTF 导出器自动翻抵消 | 移除 fbx_to_glb 的 .dae 手动翻转；既有 GLB 用 `scratch/vflip_uv.py` 就地翻 TEXCOORD_0；头部顶点采样到贴图下半部=病灶信号 |
+| 工作室"自带动画"把模型拉散架 | inject_anims_glb 注的是原版骨架绝对局部 TRS，非重定向 | 预览游戏实际动画用 `scratch/inject_rt.py` 注 mod_files 里已重定向的 czx_* .anim；批量 `scratch/reinject_studio.py` |
+| inject_rt 重定向剪辑进 GLB 仍解体 | .anim 局部 TRS（wh3 骨架局部约定）≠ GLB 节点局部约定（Blender 骨轴系），直接写轨道必错位 | `scratch/fix_injected_anims.py` 原地修：世界空间 delta 重定向 `W_glb=ΔW_skel⊗W_glb_bind` 再按父子链解回节点局部，写 `extras.wsFixed` 幂等标记；缺省扫全部 dgm_pub_batch skel json |
+| 动画中段肢体折叠/腿过头/揉团（静态 bind 正常） | .anim 量化轨按 donor 局部范围裁剪，retarget 目标值越界被钳到 ±127（toe_left_0 超 740×） | retarget_clip 写回后量化轨自动提升无损（tb3→12/rb4→8）；凡写 .anim 必须回读 `resolve_locals`+`world_from_locals` 对比意图 `[实测]` |
+| 待机/张嘴时下颚到胸口垂暗红"领带" | jmap 把下颚源骨（`J_joe/J_ago/J_chin/J_mouth/J_kuti/J_kuci/J_joe_l/r/J_ago2/J_grey_chin/J_garuru_chin`）错配到 head/eyebrow/spine_2/root——头抬起时颚部内衬滞留撕开 | jmap 改指该骨架 `jaw`/`jaw_0`；删 `*_world.glb`+`*_bound.glb` 清 phase_bind/rmv2 重跑（world.glb 存在即跳权重重映射）。验收信号：张嘴帧中线暗红垂带；顶点审计=喉部中线前方顶点主导骨非 jaw |
+| 奔跑/攻击时体侧甩出"门板"长条、爪尖滞留不动 | 工作室 importer 运行时 `rebindStrayWeights` steal 规则把 hand_* 爪尖顶点抢挂休眠 cape_*_0（亚古兽 71 顶点） | `STEAL_SRC_RE` 收窄到 arm/forearm/elbow（不含 hand/wrist）；验收=`modelReport.rebind.steal>0` 且 byBone 落 hand/wrist/weapon 即拒收 |
+| 自检 fail=0 但视觉明显不对 | 几何自检只测"不爆炸"，不测动画源/贴图方向 | 必做中段帧截图 + 对照 vanilla 导出基线（wh3_export_unit_glb） |
 
 ## 10. 相关文档
 

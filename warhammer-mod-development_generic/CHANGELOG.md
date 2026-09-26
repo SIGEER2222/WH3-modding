@@ -1,3 +1,11 @@
+## 2026-09-26 夜：下颚源骨 jmap 全库错配修复 + 运行时抢蒙病灶定案
+
+1. **J_* 下颚源骨 jmap 错配（25 单位，口腔"领带"病灶）**：dgm_pub_batch/digimon_batch 两批 jmap.json 把 `J_joe/J_ago/J_chin/J_mouth/J_kuti/J_kuci/J_jaw/J_joe_l/r/J_ago2/J_grey_chin/J_garuru_chin` 错映到 `head/eyebrow/eye_left/neck_0/spine_0/root`——下颚/口腔内衬顶点绑进躯干或眉骨，头部动画抬起时颚皮滞留、嘴缝撕开垂出暗红"领带"（亚古兽确诊）。全部改指本骨架 `jaw`/`jaw_0`；删 `*_world.glb`+`*_bound.glb` 清 phase_bind/rmv2/ui 标记重跑（world.glb 存在即跳权重重映射——换 jmap 必须删缓存）。25 单位 rmv2 全部重写。
+2. **report.json 文件名编码坑**：`究极V龙兽` 被早期 scan 存成 `究级v龙兽`（U+6781 vs U+7EA7 + 大小写）→ phase_bind 找文件失败；已按 chr### 反查磁盘真名修正 3 条（ulforcev/ulforcevx/shinegreymonbm）。
+3. **工作室 importer steal 抢蒙（runtime 层，游戏包不染）**：`rebindStrayWeights` 的 steal 规则把 hand_* 爪尖顶点抢挂休眠 cape_*_0（亚古兽 71 顶点——手臂动爪尖钉原位拉出"门板"）。`STEAL_SRC_RE` 收窄到 arm/forearm/elbow 不含 hand/wrist；modelReport.rebind.steal 归零。**运行时改绑是文件权重之上的第三层**——文件 JOINTS_0 干净不代表渲染对，验收必须读运行时 rebind 报告。
+4. **验收规范增补**（references/custom_model_unit_pipeline.md §8/§9）：运行时蒙皮审计（rebind/lastGraft 报告、`#nojaw` A/B 对照）+ 奔跑/攻击中段帧三视图强制（钉死顶点/抢蒙/内衬外露只在运动中段暴露）+ jmap 颚骨错配与 steal 抢蒙两条病灶入坑表。
+5. **部署**：v5 pack（816MB）→ `data/zzz_czx_digimon_v5.pack`，playset pos 86 已切换 `local:data:96ee5efb95bb56b42b`（游戏运行中旧包仍锁，v2/v3/v4 残留文件待退出后清理）。matrix.js 全库分批回归 fail=0（110+ GLB × 全 clip）。
+
 ## 2026-09-26 深夜:digimon be_prop 挂点轨道补写 + 非单位四元数坑定案
 
 1. **grafted 剪辑 be_prop_* 轨道从"全静态钉原点"修复为 CA 惯例动态轨道**:`scratch/fix_beprop_tracks.py`(全动态剪辑逐帧重写 prop 局部 TRS) + `fix_beprop_tracks_dyn.py`(tb/rb 混合压缩剪辑经 resolve_locals 重建为全动态)。映射 `be_prop_0/1→hand_right`、`2→hand_left`、`3→spine_2`、`4→root`、`5→hand_left`;`L_prop = inv(W_animroot) ⊗ W_driver`(animroot 带 X180° 常量翻转,不能直接抄世界值)。
