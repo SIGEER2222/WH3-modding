@@ -20,6 +20,8 @@
 | `export_gamedata.py` | 读游戏 pack 条目（支持压缩条目解压） |
 | `unity_bundle_extract.py` | Unity AssetBundle → 原始资产（Texture2D→PNG、Mesh→OBJ、AnimationClip→JSON） |
 | `unity_smr_to_glb.py` | Unity AssetBundle → **带骨架蒙皮 GLB**（按根层级逐 prefab 导出，嵌贴图；产出即本文档管线入口 GLB） |
+| `dgm_pub_convert.py` / `glb_reorient.py` / `normalize_scale.py` | 公开模型源批转：站点归档→GLB、关节位自动定向、对齐旧 mesh_h 缩放 |
+| `wh3_export_unit_glb.py` | **原版单位→GLB 导出**（pack→VMD→RMV2→GLB 含真骨架+权重+clip，进模型工作室当蒙皮质量基线） |
 
 ## 端到端流程
 
@@ -109,6 +111,12 @@ v2 算法（拓扑感知）：
 
 - **必须启用装饰骨黑名单**：`skirt_*/cape_*/belt_*/platform_section_*/feather_*` 等布料/挂载/羽毛骨在动画里独立甩动，抢到权重必撕裂 `[实测]`。
 - 脚本内置通用黑名单（`prop|cape|skirt|platform|finger|be_|feather|hair|weapon|attach|slot|mount` 等）；骨架特有装饰骨用第 5 个可选参数追加排除正则，如 hq1 的 `skulls_*`（鞍座吊骷髅）/`pole_*`/`gut_*`/`belly_*`/`tongue_*`/`eyelid_*`、`hu11b` 的 `eyelid|eyebrow`、`hu1` 的 `eyebrow|eye_|jaw`。绑定前先 dump 骨架 bone 名单对照检查 `[实测]`。
+- **`animroot` 必须永远在黑名单里** `[实测 2026-09-26]`：绑到原点的顶点在身体离地动画（腾空/跳跃/飞扑）时原地不动、和躯干之间拉成细丝。已修两处：内置排除正则含 `animroot`；keep 权重快照里也单独剥掉 animroot 列（双保险——Blender glTF 导入会把全零权重行规整成 joint0=1.0=animroot，只在 weightmap 端清零不够）。症状画像：bound.glb 顶点审计 `animroot` 主导顶点 >0 = 必出问题（数码兽 104 只曾 92 只中招）。
+- **keep 模式（argv[8] `'keep'`）保留源美术权重** `[实测 2026-09-26 修复后真正生效]`：输入 GLB 自带以**目标骨名**命名的顶点组（`glb_bindspace.write_glb(weights=, bone_names=)` 产出的合成 skin，源 JOINTS 先经 jmap.json 映射到目标骨索引）。顶点组被保留的顶点跳过自动绑，用源权重——披风/翼/武器等非人形件靠它避免最近段撕裂。关键实现坑：
+  - bake 循环里 `o.vertex_groups.clear()` 会先于 keep 快照把权重清光——keep 模式必须跳过该行（此 bug 曾致 `weightmap override verts: 0` 全失效，旧管线跑了很久没人发现）。
+  - Blender 4.5 `VertexGroupElement` 字段是 `.group` 不是 `.index`。
+  - jmap 里映射到 helper 骨（animroot/未映射名→lut 兜底 animroot）的顶点会被剥光→自动回退 auto-bind，等于"jmap 只管它能管的，剩下自动补"。
+- **jmap.json（源骨名→目标骨名）是单兵修型的主要旋钮** `[实测]`：放单位工作目录 `<unit>/jmap.json` 即被 batch 拾取。写法定参：主肢体链按解剖对应（J_arm→upperarm 等）；披风/mantle 链映射到骨架的 `cape_*` 链（骨架有的话，比塌到躯干骨好——披风骨在动画里真的会动）；武器 `J_wep*`→`hand_right/left`（刚性跟手，武器不会钉地/跟脚）；helper 节点（chr###/GRP_*/Ef_*/*Target）→`animroot`（反正会被剥掉→auto-bind）。被排除骨也能吃 keep 权重（keep 不看 weightable 名单），所以可以把源权重直接指到 cape/skirt/weapon 骨上。
 - 绑定产物：`<unit>_skinned.glb`（`tools/_out/`）。
 - 第 6 个可选参数 `save.blend`：绑定后把 骨架+网格+权重 存成 `.blend`，供人工 Weight Paint 微调——改完 File→Export→glTF 2.0（GLB，勾 Skinning）→ 重跑 convert+pack。本项目产物在 `manual_edit/`。
 - 第 7 个可选参数 `yaw_deg`：fit 前绕竖直轴旋转网格（网格朝向与骨架不一致时用）。**必须用顶点半径渲染验证**——早先版本用 `transform_apply` 在 `-b` 后台模式静默失效（日志打印 yaw applied 但顶点没变）；已改为直接 `mesh.data.transform` `[实测]`。
@@ -164,7 +172,26 @@ blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+
 
 实例（数码宝贝/人形贴合 2026-09-13）：战斗暴龙兽 = `czx_wgm001` 骨架（hu1 模板 + Unity J_* 骨点界标——源模型自带骨架位即最佳界标，映射 `J_arm/J_elbow/J_weapon→upperarm/lowerarm/hand` 等 22 点）+ `czx_dgm_wargreymon_emp_sws1` 动画集（克隆 `hu1_empire_sword_and_shield.bin`，27→27 等长；`animations/battle/humanoid01/`→`czx_wgm001/` 仅改 .anim 条目，`.anm.meta`/`.snd.meta`/`reference_poses` 保留原版）。**注意替换时只盖骨名 10 字节、不含末尾 `/`**——多吞 1 字节会截短 bin。bin 里 ~380 条 clip 路径允许缺文件（实测 marine 只发 23 条也正常），可只重定向近战核心集（stand/combat_idles/locomotion/movement/attacks/defends/reactions/deaths/knockback/knockdown/celebrate/shield_up/porthole/jumps_falls）。产物：`scratch/salzaar_digimon/skel_czx_wgm001.json`、`landmarks_wargreymon.json`、`wargreymon_wgm001_bound.glb`、验收图 `wgm001_overlay_*.png`、`pose_wgm_*/`。`convert_new_units.py` 已支持 `--mod <mod名>` 选择输出目录。
 
-批量实例（数码宝贝名册 104 只全量 2026-09-13）：`tools/digimon_batch.py` 全链路（scan→fit→bind→skelres→anim→rmv2→db→ui→verify→pack）。关键教训：
+#### 3c-ii. 公开模型源批量管线（数码宝贝 v2，104 只全量 2026-09-25/26）`[实测]`
+
+场景：成批换源（Salzaar 解包模型有缺陷 → The Models Resource/Spriters Resource 公开带骨模型）。链路：
+
+```
+站点 zip（curl 需 UA；CF 直链可在浏览器侧用 tabbit 原生下载事件落盘）
+  → 解压盘点 → dgm_pub_convert.py 转 GLB（优选 DAE>二进制FBX，ASCII FBX 常坏）
+  → glb_reorient.py 按同名关节位自动定旋转（err=0 = 与旧骨架逐点重合）
+  → normalize_scale.py 归一化到旧 mesh_h（源模型尺度差异巨大，必须做）
+  → index.json 登记 digimon→文件映射（CN_ALIAS 补别名）
+  → digimon_batch.py --glb-dir scratch/dgm_pub_src/glb 全链路
+```
+
+单兵覆盖旋钮（`digimon_batch.py` 内表）：`GLB_OVERRIDE`（多形态包挑件/回退旧源）、`TEX_OVERRIDE`（FBX 丢贴图时指外部 PNG→DDS）、`BIND_YAW`（朝向修正）、jmap.json（见 §3b）。**改源/改映射必须删 `world.glb`+`bound.glb` 并清 `report.json` 对应 phase**——world.glb 只在不存在时重建，相位 done 会静默跳过 `[实测]`。
+
+批量 jmap 策略 `[实测]`：biped 族搬旧 jmap（骨架无翼/披风骨，旧映射把附肢塌到躯干，比 auto-bind 散到腿/趾好）；骨架自带对应骨的族（bird 有 wing_*/feather_*、quad 有 tail_*）**不搬**——旧 jmap 会把翼顶点塌到 neck/leg 反而退化。骨架含 `cape_*` 链的 biped 把 `J_mant*` 重指披风骨。
+
+**工作室 QA 闭环**（AI 迭代单兵修型的可行回路）：`bound.glb` 拷进 `model-studio/models/` → 程序化动作库播极端 clip（腾空必杀/俯冲）→ tabbit 截图 → 顶点审计（`glb_bindspace` 读 JOINTS_0/WEIGHTS_0 数主导骨分布：animroot>0、披风顶点落腿/趾 = 病灶）→ 改 jmap/排除规则 → 单兵 `--units` 重绑 → 复截。原版导出模型（`tools/wh3_export_unit_glb.py`，pack→GLB 含真骨架权重）放同目录当**流畅度基线**——CA 官方蒙皮在工作室里丝滑即证明骨架/动作库没问题，差异纯在权重映射 `[实测]`。
+
+关键教训：
 
 - **源 GLB 质量参差，必须逐候选 Blender 渲染挑选**：同一数码兽常有多个变体文件（`_chr<N>` / `_2` / `with animations` / 武器拆分件）。实测坑型：① rest≠bind 时 raw POSITION 可能是爆炸态（杰斯兽x chr468）；② 整文件 0.01 退化缩放（v仔兽 chr114、奥米加兽x chr357、慈悲 chr448）——Blender 渲染正常因相机自适应，但蒙皮空间全错；③ `_2` 变体是空壳/纯武器件（闪光暴龙兽 chr776_2_3 只是一把剑）；④ 部分文件 rest 姿势是躺平的。判据：候选文件逐个 `_rest_probe` 渲染 + 比对关节高度 h 与网格尺度一致（h<0.25 或 j/mesh 尺度不匹配即弃）。
 - **多 skin 文件要取并集**：`glb_scene` 只读 `skins[0]` 会漏掉手臂等关节（杰斯兽x 分 backpack/body/scarf 三个 skin）——joints 应 union 全部 skins。
@@ -242,11 +269,43 @@ unit_variants.variant ──→ 乘员 VMD（原版是 wh_emp_state_troops：乘
    - **渲染完必须自己先抽帧检查再向用户汇报**：至少看首帧+中段帧；有供体时先渲供体地面真值作基线。汇报要写明"看过哪些帧、看到什么现象"，渲染成功不等于通过 `[实测]`。
 4. **游戏内**：Mod Manager 启动 → 自定义战看模型/动画/技能/自爆表现；战役看招募建筑图标/兵牌/porthole。
 
+## 8b. 反向导出：原版单位 → GLB（wh3_export_unit_glb.py）`[实测 2026-09-26]`
+
+用途：把游戏里原版单位连骨架+权重+贴图+动画整条链导成自包含 GLB，丢进 `model-studio/models/` 当**蒙皮质量基线**和骨骼/动画研究样本。
+
+```bash
+# 裸名自动解 VMD 链；多 slot VMD 每槽取第一个 variant（stump_* 断肢槽自动跳过）
+python tools/wh3_export_unit_glb.py emp_greatswords \
+  --clips "animations/battle/humanoid01/2handed_sword/stand/hu1_2hsw_stand_idle_01.anim,..." \
+  --name wh3_emp_greatswords
+# 产出 scratch/wh3_export/out/<name>.glb → 拷 model-studio/models/ 自动出现在样例下拉
+```
+
+链路：`VMD(xml) → 每 SLOT 第一个 VARIANT_MESH → wsmodel(xml) → .rigid_model_v2`；slot 的 model 属性也可直引 `.rigid_model_v2`（断肢件/道具走这条，无 wsmodel 包装）。武器/道具 rmv2 无骨架字段（游戏用 attach_point 挂接），导出器跳过。
+
+**RMV2 顶点格式（关键坑）**：材质块首个 u16 = `vertex_type`（BinaryVertexFormat）。v8 文件里会混两种——
+- `4` Cinematic 36B：`pos4f16 | bi u8x4 | bw u8x4 | nrm u8x4 | uv f16x2 | binorm u8x4 | tan u8x4 | colour u8x4`
+- `3` Weighted 32B（双权重！）：`pos4f16 | bi u8x2@8 | bw u8x2@10 | nrm u8x4@12 | uv f16x2@16 | binorm u8x4@20 | tan u8x4@24 | pad4@28`
+
+把 32B 当 4 权重解码会得到 bi≈254 越界索引，GLTFLoader 直接崩 `matrixWorld`。判据看材质 vertex_type，不要按字节宽猜。
+
+动画：clip 是 `animations/battle/<skel>/<武器类别>/...` 层级，`--anim-dir` 限定子目录（默认 auto 按字母序抓会拿到错的武器类型，如 greatswords 抓到 2handed_hammer）。`*_pose_*.anim` 是 0 帧静态姿势文件会被跳过。`resolve_locals(clip, part, frame, skel_frame)` 直接给每骨局部 TRS；`parse_anim(skeleton .anim)` frame0 = 绑定姿态，IBM = inv(frame0世界矩阵)（与 .anim 尾部 `.bone_inv_trans_mats` 一致，实测可对拍）。
+
+实测结果（进 model-studio）：
+- `hef_sun_dragon`（dragon01, 127骨, 2 mesh, 4 内嵌 clip）→ morph=quad，映射 17/17 + 附加骨 14（尾/翼/爪/jaw），自检 FAIL 集中在辅助骨阈值口径（14m 巨兽飞行 clip），非导出缺陷
+- `emp_greatswords`（humanoid01, 72骨, 6 mesh, 4 clip）→ morph=biped，自检 14P/3W/0F，WARN 全是 run/charge 位移动画真实位移触发
+
 ## 9. 已知坑速查
 
 | 症状 | 根因 | 修法 |
 |---|---|---|
 | 摆姿势碎成放射状 | 装饰骨抢权重 / 几何蒙皮质量不够 | 优先换 transfer_weights.py 供体转移 |
+| 腾空/跳跃时拉成细丝、地面留碎片 | 顶点绑到 animroot（原点钉死） | 排除正则+keep 快照双端剥 animroot；顶点审计主导骨=animroot>0 即病灶 |
+| keep 权重完全不生效（override 0/N） | bake 循环提前 clear 顶点组 / Blender4.5 字段名 | keep 模式跳过 `vertex_groups.clear()`；用 `v.groups` 元素 `.group` 非 `.index` |
+| 披风/裙摆在动作里塌成一团 | mant/cloth 链映射到躯干骨 | jmap 重指骨架 `cape_*` 链；无披风骨骨架才塌到 spine/neck |
+| 武器静止时平躺在脚边、动作中跟脚甩 | J_wep*→animroot 或被 auto-bind 最近到腿脚 | jmap 指 `hand_right/left` 刚性跟手 |
+| 换源/改 jmap 后 bind 输出没变 | world.glb 只在不存在时重建+phase 标记跳跑 | 删 world.glb+bound.glb、清 report.json 相位再跑 |
+| 静态姿态正常、大招/腾空解体 | 普通帧不暴露钉死顶点 | 验收必须覆盖腾空类 clip（ult_skyfall/俯冲），静态图通过不算过 |
 | 球状躯干被剪碎/塌陷 | 球面离腿骨比躯干骨近 | rigidify_core.py --ymin 刚性绑躯干骨 |
 | 连绑定姿态都碎 | rest 帧 roll 不一致，双重坐标转换 | pose 用相对增量公式 |
 | AssetEditor 截图全黑 | WPF/D3D 视口截屏问题 | 看日志+二进制，勿当绑定失败 |
@@ -260,6 +319,7 @@ unit_variants.variant ──→ 乘员 VMD（原版是 wh_emp_state_troops：乘
 - `unit_creation_workflow.md`：纯 DB 派生单位、招募链、RoR、兵牌/porthole。
 - `asseteditor_animation_workflow.md`：AssetEditor 操作细节、Skin Wrap、动画 clip 解码格式。
 - `tsv_format.md`：列名对齐克隆、数值对标法、junction 插行去重。
+- `references/temari_luna_techniques.md`（仓库根参考样例）：第三方整单位替换拆解——同主键 main_units 行只改 `land_unit` + `unit_variants` 重定向、自定义骨骼/animpack（缺动作槽位回填 idle）、技能播歌纯 DB 链路、vanilla 互斥组复用。适合抄「替换而非新增」的整体结构。
 
 ## 重定向的三种模式（retarget_clip.py）
 
