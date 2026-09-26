@@ -270,6 +270,7 @@ unit_variants.variant ──→ 乘员 VMD（原版是 wh_emp_state_troops：乘
    - **运行时蒙皮审计（强制，2026-09-26 起）**：文件层 `JOINTS_0` 干净 ≠ 渲染正确——studio 加载时 `rebindStrayWeights`/`graftVestigialFace` 会**改写 skinIndex**。验收必须读 `__studio.modelReport.rebind`（steal/tail/trunk/byBone 计数）+ `lastGraft`：steal 非零且 byBone 落在 hand/wrist/weapon/爪 = 拒收；graft 抓到非头骨主导的躯干/胸口顶点 = 拒收。判别法：`#nojaw` hash 开关禁用 jaw 补蒙做 A/B 对照 `[实测]`。
    - **中段帧三视图强制**：奔跑、combat_walk、至少两条 attack（含跳跃/移动攻击）各抽 ≥1 个中间帧出正/侧/顶（或等效角）三视图——钉死顶点/抢蒙/内衬外露只在运动中段帧暴露，静态 bind 通过不算过 `[实测]`。
    - **渲染完必须自己先抽帧检查再向用户汇报**：至少看首帧+中段帧；有供体时先渲供体地面真值作基线。汇报要写明"看过哪些帧、看到什么现象"，渲染成功不等于通过 `[实测]`。
+   - **证据图必须留全路径（强制，2026-09-26 起）**：声称"已修复/验收通过"时，汇报必须附验收图的**磁盘绝对路径**（如 `E:\Code\...\scratch\_preview\xxx.png` 或 tabbit 截图落盘路径），不许只说"截图确认正常"。图必须留在磁盘上可复查——口头描述不算证据，矩阵/自检日志同理需给出 JSON/log 文件路径 `[实测]`。
 4. **游戏内**：Mod Manager 启动 → 自定义战看模型/动画/技能/自爆表现；战役看招募建筑图标/兵牌/porthole。
 
 ## 8b. 反向导出：原版单位 → GLB（wh3_export_unit_glb.py）`[实测 2026-09-26]`
