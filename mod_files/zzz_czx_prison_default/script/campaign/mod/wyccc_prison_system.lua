@@ -4697,7 +4697,7 @@ refresh_ui = function()
     )
     if recruit_chance_text then
         recruit_chance_text:SetVisible(selected ~= nil)
-        visual_set_text(recruit_chance_text, selected and localised_format(
+        wp_visual_set_text(recruit_chance_text, selected and localised_format(
             "wyccc_prison_runtime_recruitment_chance", {CHANCE = effective_recruitment_chance}
         ) or "")
     end
@@ -5218,7 +5218,7 @@ log("independent prison state machine initialised; no native prison API is used"
 
 -- Visual shell: keep the independent state machine above, but use the
 -- Athel Tamarha prison artwork and radial layout for the player-facing panel.
-local function visual_set_text(component, text)
+function wp_visual_set_text(component, text)
     if not component or not is_uicomponent(component) then return end
     pcall(function() component:SetStateText(tostring(text or "")) end)
     pcall(function()
@@ -5227,7 +5227,7 @@ local function visual_set_text(component, text)
     end)
 end
 
-local function visual_set_image(component, path)
+function wp_visual_set_image(component, path)
     if not component or not is_uicomponent(component) or not path then return end
     -- Some vanilla-derived image components expose the image path on the
     -- component itself, while others expose a child named "icon".  Updating
@@ -5241,7 +5241,7 @@ local function visual_set_image(component, path)
     end
 end
 
-local function hide_native_scrollbars()
+function wp_hide_native_scrollbars()
     if not panel_uic or not is_uicomponent(panel_uic) then return end
     local paths = {
         {"left_side", "left_tooltip_holder"},
@@ -5259,7 +5259,7 @@ end
 -- The right-side vanilla tooltip nests upgrade_2/upgrade_3 under
 -- upgrade_1/dy_name, while the left-side tooltip keeps them as siblings.
 -- Resolve both shapes so every facility exposes the same three-level tree.
-local function find_upgrade_node(content, level)
+function wp_find_upgrade_node(content, level)
     if not content then return nil end
     local id = "upgrade_" .. tostring(level)
     local node = find_uicomponent(content, id)
@@ -5271,7 +5271,7 @@ local function find_upgrade_node(content, level)
     return node
 end
 
-local function set_portrait_image(component, portrait_path)
+function wp_set_portrait_image(component, portrait_path)
     if not component or not is_uicomponent(component) or portrait_path == "" then return false end
     -- commander_portrait is a multi-image UIC.  SetImagePath(path) alone
     -- changes the backing texture but leaves the state image at the template's
@@ -5370,7 +5370,7 @@ local function set_prisoner_portrait(component, record, visible)
     -- battle result and the campaign UI refresh.  The path captured at the
     -- pending-battle boundary is a stable fallback for that case.
     if portrait_path ~= "" then
-        set_portrait_image(component, portrait_path)
+        wp_set_portrait_image(component, portrait_path)
     end
     pcall(function() component:SetVisible(true) end)
     debug_log("portrait bind; fm_cqi=" .. tostring(family_member_cqi)
@@ -5380,11 +5380,11 @@ local function set_prisoner_portrait(component, record, visible)
         .. ", state=" .. tostring(state_bound))
 end
 
-local function scaled(value)
+function wp_scaled(value)
     return math.floor(value * visual_scale + 0.5)
 end
 
-local function visual_image(id, parent, path, width, height, x, y)
+function wp_visual_image(id, parent, path, width, height, x, y)
     local image = nil
     pcall(function() image = core:get_or_create_component(id, "ui/groovy/image", parent) end)
     if not image or not is_uicomponent(image) then return nil end
@@ -5395,7 +5395,7 @@ local function visual_image(id, parent, path, width, height, x, y)
     return image
 end
 
-local function visual_button(id, parent, width, height, x, y, callback)
+function wp_visual_button(id, parent, width, height, x, y, callback)
     local button = nil
     pcall(function() button = core:get_or_create_component(id, "ui/templates/round_small_button_toggle", parent) end)
     if not button or not is_uicomponent(button) then return nil end
@@ -5412,11 +5412,11 @@ local function visual_button(id, parent, width, height, x, y, callback)
     return button
 end
 
-local function visual_action(id, icon_path, x, y, callback)
-    local button = visual_button(id, panel_uic, scaled(64), scaled(64), x, y, callback)
+function wp_visual_action(id, icon_path, x, y, callback)
+    local button = wp_visual_button(id, panel_uic, wp_scaled(64), wp_scaled(64), x, y, callback)
     if not button then return nil end
     pcall(function() button:SetImagePath(VANILLA_UI_ROOT .. "dungeon_rite_button_active.png") end)
-    visual_image(id .. "_icon", button, icon_path, scaled(42), scaled(42), 0, 0)
+    wp_visual_image(id .. "_icon", button, icon_path, wp_scaled(42), wp_scaled(42), 0, 0)
     return button
 end
 
@@ -5429,11 +5429,11 @@ refresh_ui = function()
         ui_refresh_in_progress = false
         return
     end
-    hide_native_scrollbars()
+    wp_hide_native_scrollbars()
     local faction = cm:get_faction(faction_key)
     local state = get_state(faction_key)
     local capacity = prisoner_capacity(state)
-    visual_set_text(vanilla_title_uic or find_uicomponent(panel_uic, "wyccc_prison_visual_title"),
+    wp_visual_set_text(vanilla_title_uic or find_uicomponent(panel_uic, "wyccc_prison_visual_title"),
         localised_format("wyccc_prison_runtime_prison_title_count", {
             COUNT = prisoner_count(state),
             CAPACITY = capacity
@@ -5452,7 +5452,7 @@ refresh_ui = function()
                 -- the native ContextImageSetter cannot immediately clear it.
                 button:SetState(selected_prisoner_index == i and "selected" or "active")
                 set_prisoner_portrait(slot_portraits[i], record, true)
-                if slot_labels[i] then visual_set_text(slot_labels[i], name) end
+                if slot_labels[i] then wp_visual_set_text(slot_labels[i], name) end
                 if slot_frames[i] then
                     pcall(function() slot_frames[i]:SetImagePath(selected_prisoner_index == i
                         and VANILLA_UI_ROOT .. "athel_tamarha_prison_selected.png"
@@ -5465,7 +5465,7 @@ refresh_ui = function()
             else
                 button:SetState("inactive")
                 set_prisoner_portrait(slot_portraits[i], nil, false)
-                if slot_labels[i] then visual_set_text(slot_labels[i], localised("wyccc_prison_runtime_empty_cell")) end
+                if slot_labels[i] then wp_visual_set_text(slot_labels[i], localised("wyccc_prison_runtime_empty_cell")) end
                 if slot_frames[i] then pcall(function() slot_frames[i]:SetImagePath(VANILLA_UI_ROOT .. "athel_tamarha_prison_empty.png") end) end
                 button:SetTooltipText(localised("wyccc_prison_runtime_no_prisoners"), true)
             end
@@ -5486,7 +5486,7 @@ refresh_ui = function()
     )
     if recruit_chance_text then
         recruit_chance_text:SetVisible(selected ~= nil)
-        visual_set_text(recruit_chance_text, selected and localised_format(
+        wp_visual_set_text(recruit_chance_text, selected and localised_format(
             "wyccc_prison_runtime_recruitment_chance", {CHANCE = effective_recruitment_chance}
         ) or "")
     end
@@ -5570,10 +5570,10 @@ refresh_ui = function()
         local level_text = name and find_uicomponent(name, "dy_level") or nil
         local icon_name = selected_facility_key == "ransom" and "facility_treasury" or "facility_" .. selected_facility_key
         local icon_path = "ui/skins/wyccc_prison/" .. icon_name .. ".png"
-        if side_title then visual_set_text(side_title, facility_name(selected_facility_key)) end
-        if icon then visual_set_image(icon, icon_path) end
-        if name then visual_set_text(name, facility_name(selected_facility_key)) end
-        if level_text then visual_set_text(level_text, localised_format(
+        if side_title then wp_visual_set_text(side_title, facility_name(selected_facility_key)) end
+        if icon then wp_visual_set_image(icon, icon_path) end
+        if name then wp_visual_set_text(name, facility_name(selected_facility_key)) end
+        if level_text then wp_visual_set_text(level_text, localised_format(
             "wyccc_prison_runtime_level", {LEVEL = detail_level, MAX_LEVEL = MAX_FACILITY_LEVEL}
         )) end
 
@@ -5587,10 +5587,10 @@ refresh_ui = function()
             local effect_template = find_uicomponent(effect_list, "listview", "list_clip", "list_box", "effect_template")
             if effect_template then
                 effect_template:SetVisible(true)
-                visual_set_text(effect_template, facility_effect_text(selected_facility_key, detail_level))
+                wp_visual_set_text(effect_template, facility_effect_text(selected_facility_key, detail_level))
                 effect_template:SetTooltipText(facility_effect_text(selected_facility_key, detail_level), true)
                 local effect_icon = find_uicomponent(effect_template, "icon")
-                if effect_icon then visual_set_image(effect_icon, icon_path) end
+                if effect_icon then wp_visual_set_image(effect_icon, icon_path) end
             end
         end
         local unit_effect_template = content and find_uicomponent(content, "unit_effect_template") or nil
@@ -5600,17 +5600,17 @@ refresh_ui = function()
         local side_actions = upgrade_action_buttons[side_key] or {}
         upgrade_action_buttons[side_key] = side_actions
         for level = 1, MAX_FACILITY_LEVEL do
-            local upgrade_node = find_upgrade_node(content, level)
+            local upgrade_node = wp_find_upgrade_node(content, level)
             if upgrade_node then
                 upgrade_node:SetVisible(true)
                 local tooltip = facility_upgrade_tooltip(selected_facility_key, detail_level, level, faction)
                 upgrade_node:SetTooltipText(tooltip, true)
                 local upgrade_icon = find_uicomponent(upgrade_node, "building_icon")
-                if upgrade_icon then visual_set_image(upgrade_icon, icon_path) end
+                if upgrade_icon then wp_visual_set_image(upgrade_icon, icon_path) end
 
                 local upgrade_name = find_uicomponent(upgrade_node, "dy_name")
                 local upgrade_level = upgrade_name and find_uicomponent(upgrade_name, "dy_level") or nil
-                if upgrade_name then visual_set_text(upgrade_name, localised_format(
+                if upgrade_name then wp_visual_set_text(upgrade_name, localised_format(
                     "wyccc_prison_runtime_facility_level", {
                         NAME = facility_name(selected_facility_key),
                         LEVEL = level
@@ -5622,7 +5622,7 @@ refresh_ui = function()
                         or (level == detail_level + 1
                             and localised("wyccc_prison_runtime_facility_status_upgradable")
                             or localised("wyccc_prison_runtime_facility_status_locked"))
-                    visual_set_text(upgrade_level, upgrade_status)
+                    wp_visual_set_text(upgrade_level, upgrade_status)
                 end
 
                 local cost_uic = find_uicomponent(upgrade_node, "dy_pooled_resource_cost")
@@ -5682,8 +5682,8 @@ refresh_ui = function()
                     local action_y = upgrade_name and (side_key == "left" and 0 or 35)
                         or 49
                     if not action_button or not is_uicomponent(action_button) then
-                        action_button = visual_button(action_id, action_parent,
-                            scaled(64), scaled(64), scaled(action_x), scaled(action_y), function()
+                        action_button = wp_visual_button(action_id, action_parent,
+                            wp_scaled(64), wp_scaled(64), wp_scaled(action_x), wp_scaled(action_y), function()
                                 local current = get_state(faction:name()).facilities[selected_facility_key] or 0
                                 if target_level == current + 1 then
                                     upgrade(faction, selected_facility_key)
@@ -5695,17 +5695,17 @@ refresh_ui = function()
                             pcall(function()
                                 action_button:SetImagePath(VANILLA_UI_ROOT .. "dungeon_rite_button_active.png")
                             end)
-                            visual_image(action_id .. "_icon", action_button,
+                            wp_visual_image(action_id .. "_icon", action_button,
                                 VANILLA_UI_ROOT .. "athel_tamarha_upgrade_icon.png",
-                                scaled(33), scaled(33), 0, 0)
+                                wp_scaled(33), wp_scaled(33), 0, 0)
                         end
                     end
                     if action_button then
                         -- Re-apply the anchor after every layout pass because
                         -- the native tooltip can reset child docking when its
                         -- state changes.
-                        place(action_button, scaled(64), scaled(64),
-                            scaled(action_x), scaled(action_y))
+                        place(action_button, wp_scaled(64), wp_scaled(64),
+                            wp_scaled(action_x), wp_scaled(action_y))
                         local is_next = target_level == detail_level + 1
                         local can_upgrade = is_next and faction:treasury() >= FACILITY_COSTS[target_level]
                         action_button:SetVisible(is_next)
@@ -5725,11 +5725,11 @@ refresh_ui = function()
     -- state text preserves the original fonts/anchors while the numbers come
     -- from the independent four-facility state machine.
     if vanilla_upgrade_total_uic then
-        visual_set_text(vanilla_upgrade_total_uic,
+        wp_visual_set_text(vanilla_upgrade_total_uic,
             tostring(detail_level) .. "/" .. tostring(MAX_FACILITY_LEVEL))
     end
     if vanilla_upgrade_label_uic then
-        visual_set_text(vanilla_upgrade_label_uic,
+        wp_visual_set_text(vanilla_upgrade_label_uic,
             detail_level < MAX_FACILITY_LEVEL
                 and localised("wyccc_prison_runtime_upgrade_available")
                 or localised("wyccc_prison_runtime_max_level"))
@@ -5746,7 +5746,7 @@ refresh_ui = function()
             vanilla_upgrade_total_parent_uic:SetTooltipText(upgrade_tooltip, true)
         end
     end
-    hide_native_scrollbars()
+    wp_hide_native_scrollbars()
     ui_refresh_in_progress = false
 end
 
@@ -5783,18 +5783,18 @@ setup_ui = function()
     -- The empty TWUI host has no dimensions until its first layout pass.
     -- Keep every visual coordinate in the known screen coordinate space.
     local w, h = sw, sh
-    visual_image("wyccc_prison_visual_bg", panel_uic, VANILLA_UI_ROOT .. "dungeon_of_athel_tamarha_bg.png", sw, sh, 0, 0)
-    visual_image("wyccc_prison_visual_radial", panel_uic, VANILLA_UI_ROOT .. "dungeon_radial.png", 960, 540, 0, 0)
-    visual_image("wyccc_prison_visual_outer_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_outer_ring.png", 765, 765, 0, 0)
-    visual_image("wyccc_prison_visual_inner_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_inner_ring.png", 708, 708, 0, 0)
-    visual_image("wyccc_prison_visual_shards", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_top_shards.png", 267, 168, 0, -h / 2 + 80)
-    visual_image("wyccc_prison_visual_header_icon", panel_uic, VANILLA_UI_ROOT .. "dungeon_header_icon.png", 63, 87, 0, -h / 2 + 56)
-    visual_image("wyccc_prison_visual_header_line", panel_uic, VANILLA_UI_ROOT .. "dungeon_header_underline.png", 326, 72, 0, -h / 2 + 102)
+    wp_visual_image("wyccc_prison_visual_bg", panel_uic, VANILLA_UI_ROOT .. "dungeon_of_athel_tamarha_bg.png", sw, sh, 0, 0)
+    wp_visual_image("wyccc_prison_visual_radial", panel_uic, VANILLA_UI_ROOT .. "dungeon_radial.png", 960, 540, 0, 0)
+    wp_visual_image("wyccc_prison_visual_outer_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_outer_ring.png", 765, 765, 0, 0)
+    wp_visual_image("wyccc_prison_visual_inner_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_inner_ring.png", 708, 708, 0, 0)
+    wp_visual_image("wyccc_prison_visual_shards", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_top_shards.png", 267, 168, 0, -h / 2 + 80)
+    wp_visual_image("wyccc_prison_visual_header_icon", panel_uic, VANILLA_UI_ROOT .. "dungeon_header_icon.png", 63, 87, 0, -h / 2 + 56)
+    wp_visual_image("wyccc_prison_visual_header_line", panel_uic, VANILLA_UI_ROOT .. "dungeon_header_underline.png", 326, 72, 0, -h / 2 + 102)
     local title = core:get_or_create_component("wyccc_prison_visual_title", "ui/groovy/text/fe_default", panel_uic)
     place(title, 500, 42, 0, -h / 2 + 112)
-    visual_set_text(title, localised("wyccc_prison_ui_title"))
+    wp_visual_set_text(title, localised("wyccc_prison_ui_title"))
     title:SetVisible(true)
-    local close = visual_button("wyccc_prison_close", panel_uic, 40, 40, w / 2 - 55, -h / 2 + 48, hide_panel)
+    local close = wp_visual_button("wyccc_prison_close", panel_uic, 40, 40, w / 2 - 55, -h / 2 + 48, hide_panel)
     if close then pcall(function() close:SetImagePath("ui/skins/default/icon_cross.png") end) end
 
     prisoner_slots = {}
@@ -5804,7 +5804,7 @@ setup_ui = function()
     local slot_positions = {{-125, -145}, {125, -145}, {-125, 95}, {125, 95}}
     for i = 1, 4 do
         local slot_index = i
-        local button = visual_button("wyccc_prisoner_slot_" .. tostring(i), panel_uic, 181, 184,
+        local button = wp_visual_button("wyccc_prisoner_slot_" .. tostring(i), panel_uic, 181, 184,
             slot_positions[i][1], slot_positions[i][2], function()
                 selected_prisoner_index = slot_index
                 refresh_ui()
@@ -5812,11 +5812,11 @@ setup_ui = function()
         prisoner_slots[i] = button
         if button then
             pcall(function() button:SetImagePath(VANILLA_UI_ROOT .. "athel_tamarha_prison_bg.png") end)
-            slot_portraits[i] = visual_image("wyccc_prisoner_portrait_" .. tostring(i), button, VANILLA_UI_ROOT .. "prisoner_silhouette.png", 132, 132, 0, -8)
-            slot_frames[i] = visual_image("wyccc_prisoner_frame_" .. tostring(i), button, VANILLA_UI_ROOT .. "athel_tamarha_prison_empty.png", 181, 184, 0, 0)
+            slot_portraits[i] = wp_visual_image("wyccc_prisoner_portrait_" .. tostring(i), button, VANILLA_UI_ROOT .. "prisoner_silhouette.png", 132, 132, 0, -8)
+            slot_frames[i] = wp_visual_image("wyccc_prisoner_frame_" .. tostring(i), button, VANILLA_UI_ROOT .. "athel_tamarha_prison_empty.png", 181, 184, 0, 0)
             slot_labels[i] = core:get_or_create_component("wyccc_prisoner_label_" .. tostring(i), "ui/groovy/text/fe_default", button)
             place(slot_labels[i], 158, 26, 0, 70)
-            visual_set_text(slot_labels[i], localised("wyccc_prison_runtime_empty_cell"))
+            wp_visual_set_text(slot_labels[i], localised("wyccc_prison_runtime_empty_cell"))
             slot_labels[i]:SetVisible(true)
         end
     end
@@ -5828,7 +5828,7 @@ setup_ui = function()
     for _, facility in ipairs(FACILITIES) do
         local facility_key = facility
         local position = facility_positions[facility_key]
-        local node = visual_button("wyccc_prison_facility_node_" .. facility_key, panel_uic, 120, 120, position[1], position[2], function()
+        local node = wp_visual_button("wyccc_prison_facility_node_" .. facility_key, panel_uic, 120, 120, position[1], position[2], function()
             selected_facility_key = facility_key
             refresh_ui()
         end)
@@ -5836,20 +5836,20 @@ setup_ui = function()
         if node then
             local icon_name = facility_key == "ransom" and "facility_treasury" or "facility_" .. facility_key
             pcall(function() node:SetImagePath("ui/skins/wyccc_prison/" .. icon_name .. ".png") end)
-            facility_frames[facility_key] = visual_image("wyccc_prison_facility_frame_" .. facility_key, node, VANILLA_UI_ROOT .. "athel_tamarha_building_frame_active.png", 120, 120, 0, 0)
+            facility_frames[facility_key] = wp_visual_image("wyccc_prison_facility_frame_" .. facility_key, node, VANILLA_UI_ROOT .. "athel_tamarha_building_frame_active.png", 120, 120, 0, 0)
         end
         facility_buttons[facility_key] = {}
     end
 
-    visual_image("wyccc_prison_facility_detail_bg", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_top_shards.png", 400, 260, w / 2 - 230, 55)
-    facility_detail_icon = visual_image("wyccc_prison_facility_detail_icon", panel_uic, "ui/skins/wyccc_prison/facility_capacity.png", 92, 92, w / 2 - 380, 15)
+    wp_visual_image("wyccc_prison_facility_detail_bg", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_top_shards.png", 400, 260, w / 2 - 230, 55)
+    facility_detail_icon = wp_visual_image("wyccc_prison_facility_detail_icon", panel_uic, "ui/skins/wyccc_prison/facility_capacity.png", 92, 92, w / 2 - 380, 15)
     facility_detail_title = core:get_or_create_component("wyccc_prison_facility_detail_title", "ui/groovy/text/fe_default", panel_uic)
     place(facility_detail_title, 270, 34, w / 2 - 235, -35)
     facility_detail_title:SetVisible(true)
     facility_detail_text = core:get_or_create_component("wyccc_prison_facility_detail_text", "ui/groovy/text/fe_default", panel_uic)
     place(facility_detail_text, 320, 105, w / 2 - 185, 35)
     facility_detail_text:SetVisible(true)
-    facility_upgrade_button = visual_button("wyccc_prison_facility_upgrade", panel_uic, 64, 64, w / 2 - 55, 128, function()
+    facility_upgrade_button = wp_visual_button("wyccc_prison_facility_upgrade", panel_uic, 64, 64, w / 2 - 55, 128, function()
         local f = cm:get_faction(cm:get_local_faction_name(true))
         local current_level = get_state(f:name()).facilities[selected_facility_key] or 0
         if current_level < MAX_FACILITY_LEVEL then upgrade(f, selected_facility_key) end
@@ -5857,22 +5857,22 @@ setup_ui = function()
     end)
     if facility_upgrade_button then
         pcall(function() facility_upgrade_button:SetImagePath(VANILLA_UI_ROOT .. "dungeon_rite_button_active.png") end)
-        visual_image("wyccc_prison_facility_upgrade_icon", facility_upgrade_button, VANILLA_UI_ROOT .. "dungeon_header_icon.png", 34, 46, 0, 0)
+        wp_visual_image("wyccc_prison_facility_upgrade_icon", facility_upgrade_button, VANILLA_UI_ROOT .. "dungeon_header_icon.png", 34, 46, 0, 0)
     end
 
-    recruit_button_uic = visual_action("wyccc_prison_action_recruit", VANILLA_UI_ROOT .. "prisoner_indoctrinate.png", -115, h / 2 - 80, function()
+    recruit_button_uic = wp_visual_action("wyccc_prison_action_recruit", VANILLA_UI_ROOT .. "prisoner_indoctrinate.png", -115, h / 2 - 80, function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record then perform_recruit(faction, state, record); refresh_ui() end
     end)
-    ransom_button_uic = visual_action("wyccc_prison_action_ransom", VANILLA_UI_ROOT .. "prisoner_execute.png", -38, h / 2 - 80, function()
+    ransom_button_uic = wp_visual_action("wyccc_prison_action_ransom", VANILLA_UI_ROOT .. "prisoner_execute.png", -38, h / 2 - 80, function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record and perform_ransom(faction, state, record) then selected_prisoner_index = 0; refresh_ui() end
     end)
-    release_button_uic = visual_action("wyccc_prison_action_release", "ui/skins/default/icon_cross.png", 38, h / 2 - 80, function()
+    release_button_uic = wp_visual_action("wyccc_prison_action_release", "ui/skins/default/icon_cross.png", 38, h / 2 - 80, function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record and perform_release(faction, state, record) then selected_prisoner_index = 0; refresh_ui() end
     end)
-    interrogate_button_uic = visual_action("wyccc_prison_action_interrogate", VANILLA_UI_ROOT .. "prisoner_interrogate.png", 115, h / 2 - 80, function()
+    interrogate_button_uic = wp_visual_action("wyccc_prison_action_interrogate", VANILLA_UI_ROOT .. "prisoner_interrogate.png", 115, h / 2 - 80, function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record then grant_interrogation(faction, state, record); refresh_ui() end
     end)
@@ -5915,43 +5915,43 @@ setup_ui = function()
     place(panel_uic, sw, sh, 0, 0)
     visual_ui_ready = false
 
-    visual_image("wyccc_prison_visual_bg", panel_uic, VANILLA_UI_ROOT .. "dungeon_of_athel_tamarha_bg.png", sw, sh, 0, 0)
-    visual_image("wyccc_prison_visual_outer_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_outer_ring_1.png", scaled(1090), scaled(1090), 0, scaled(-3))
-    visual_image("wyccc_prison_visual_centre_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_outer_ring.png", scaled(624), scaled(624), 0, scaled(3))
-    visual_image("wyccc_prison_visual_inner_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_inner_ring.png", scaled(637), scaled(637), scaled(4), scaled(-9))
-    visual_image("wyccc_prison_visual_prison_bg", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_prison_bg.png", scaled(501), scaled(501), scaled(4), scaled(-9))
-    visual_image("wyccc_prison_visual_header", panel_uic, VANILLA_UI_ROOT .. "dungeon_header_icon.png", scaled(370), scaled(78), 0, scaled(-198))
+    wp_visual_image("wyccc_prison_visual_bg", panel_uic, VANILLA_UI_ROOT .. "dungeon_of_athel_tamarha_bg.png", sw, sh, 0, 0)
+    wp_visual_image("wyccc_prison_visual_outer_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_outer_ring_1.png", wp_scaled(1090), wp_scaled(1090), 0, wp_scaled(-3))
+    wp_visual_image("wyccc_prison_visual_centre_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_outer_ring.png", wp_scaled(624), wp_scaled(624), 0, wp_scaled(3))
+    wp_visual_image("wyccc_prison_visual_inner_ring", panel_uic, VANILLA_UI_ROOT .. "dungeon_inner_ring.png", wp_scaled(637), wp_scaled(637), wp_scaled(4), wp_scaled(-9))
+    wp_visual_image("wyccc_prison_visual_prison_bg", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_prison_bg.png", wp_scaled(501), wp_scaled(501), wp_scaled(4), wp_scaled(-9))
+    wp_visual_image("wyccc_prison_visual_header", panel_uic, VANILLA_UI_ROOT .. "dungeon_header_icon.png", wp_scaled(370), wp_scaled(78), 0, wp_scaled(-198))
 
     local title = core:get_or_create_component("wyccc_prison_visual_title", "ui/groovy/text/fe_default", panel_uic)
-    place(title, scaled(370), scaled(30), 0, scaled(-144))
-    visual_set_text(title, localised("wyccc_prison_ui_title"))
+    place(title, wp_scaled(370), wp_scaled(30), 0, wp_scaled(-144))
+    wp_visual_set_text(title, localised("wyccc_prison_ui_title"))
     title:SetVisible(true)
 
-    local close = visual_button("wyccc_prison_close", panel_uic, scaled(56), scaled(56), 0, scaled(415), hide_panel)
+    local close = wp_visual_button("wyccc_prison_close", panel_uic, wp_scaled(56), wp_scaled(56), 0, wp_scaled(415), hide_panel)
     if close then
         pcall(function() close:SetImagePath(VANILLA_UI_ROOT .. "dungeon_rite_button_active.png") end)
-        visual_image("wyccc_prison_close_icon", close, "ui/skins/default/icon_check.png", scaled(32), scaled(32), 0, 0)
+        wp_visual_image("wyccc_prison_close_icon", close, "ui/skins/default/icon_check.png", wp_scaled(32), wp_scaled(32), 0, 0)
     end
-    local info = visual_button("wyccc_prison_info", panel_uic, scaled(38), scaled(38), scaled(770), scaled(-430), nil)
+    local info = wp_visual_button("wyccc_prison_info", panel_uic, wp_scaled(38), wp_scaled(38), wp_scaled(770), wp_scaled(-430), nil)
     if info then pcall(function() info:SetImagePath("ui/skins/default/icon_help.png") end) end
 
     prisoner_slots, slot_portraits, slot_frames, slot_labels = {}, {}, {}, {}
     local slot_positions = {{-92, -40}, {92, -40}, {-92, 125}, {92, 125}}
     for i = 1, 4 do
         local slot_index = i
-        local button = visual_button("wyccc_prisoner_slot_" .. tostring(i), panel_uic, scaled(181), scaled(184),
-            scaled(slot_positions[i][1]), scaled(slot_positions[i][2]), function()
+        local button = wp_visual_button("wyccc_prisoner_slot_" .. tostring(i), panel_uic, wp_scaled(181), wp_scaled(184),
+            wp_scaled(slot_positions[i][1]), wp_scaled(slot_positions[i][2]), function()
                 selected_prisoner_index = slot_index
                 refresh_ui()
             end)
         prisoner_slots[i] = button
         if button then
             pcall(function() button:SetImagePath(VANILLA_UI_ROOT .. "athel_tamarha_prison_bg.png") end)
-            slot_portraits[i] = visual_image("wyccc_prisoner_portrait_" .. tostring(i), button, VANILLA_UI_ROOT .. "prisoner_silhouette.png", scaled(120), scaled(120), 0, scaled(-8))
-            slot_frames[i] = visual_image("wyccc_prisoner_frame_" .. tostring(i), button, VANILLA_UI_ROOT .. "athel_tamarha_prison_empty.png", scaled(181), scaled(184), 0, 0)
+            slot_portraits[i] = wp_visual_image("wyccc_prisoner_portrait_" .. tostring(i), button, VANILLA_UI_ROOT .. "prisoner_silhouette.png", wp_scaled(120), wp_scaled(120), 0, wp_scaled(-8))
+            slot_frames[i] = wp_visual_image("wyccc_prisoner_frame_" .. tostring(i), button, VANILLA_UI_ROOT .. "athel_tamarha_prison_empty.png", wp_scaled(181), wp_scaled(184), 0, 0)
             slot_labels[i] = core:get_or_create_component("wyccc_prisoner_label_" .. tostring(i), "ui/groovy/text/fe_default", button)
-            place(slot_labels[i], scaled(158), scaled(26), 0, scaled(70))
-            visual_set_text(slot_labels[i], localised("wyccc_prison_runtime_empty_cell"))
+            place(slot_labels[i], wp_scaled(158), wp_scaled(26), 0, wp_scaled(70))
+            wp_visual_set_text(slot_labels[i], localised("wyccc_prison_runtime_empty_cell"))
             slot_labels[i]:SetVisible(true)
         end
     end
@@ -5961,8 +5961,8 @@ setup_ui = function()
     for _, facility in ipairs(FACILITIES) do
         local facility_key = facility
         local position = facility_positions[facility_key]
-        local node = visual_button("wyccc_prison_facility_node_" .. facility_key, panel_uic, scaled(109), scaled(109),
-            scaled(position[1]), scaled(position[2]), function()
+        local node = wp_visual_button("wyccc_prison_facility_node_" .. facility_key, panel_uic, wp_scaled(109), wp_scaled(109),
+            wp_scaled(position[1]), wp_scaled(position[2]), function()
                 selected_facility_key = facility_key
                 refresh_ui()
             end)
@@ -5970,21 +5970,21 @@ setup_ui = function()
         if node then
             local icon_name = facility_key == "ransom" and "facility_treasury" or "facility_" .. facility_key
             pcall(function() node:SetImagePath("ui/skins/wyccc_prison/" .. icon_name .. ".png") end)
-            facility_frames[facility_key] = visual_image("wyccc_prison_facility_frame_" .. facility_key, node, VANILLA_UI_ROOT .. "athel_tamarha_building_frame_active.png", scaled(109), scaled(109), 0, 0)
+            facility_frames[facility_key] = wp_visual_image("wyccc_prison_facility_frame_" .. facility_key, node, VANILLA_UI_ROOT .. "athel_tamarha_building_frame_active.png", wp_scaled(109), wp_scaled(109), 0, 0)
         end
         facility_buttons[facility_key] = {}
     end
 
-    facility_detail_icon = visual_image("wyccc_prison_facility_detail_icon", panel_uic, "ui/skins/wyccc_prison/facility_capacity.png", scaled(80), scaled(80), scaled(-675), scaled(-175))
+    facility_detail_icon = wp_visual_image("wyccc_prison_facility_detail_icon", panel_uic, "ui/skins/wyccc_prison/facility_capacity.png", wp_scaled(80), wp_scaled(80), wp_scaled(-675), wp_scaled(-175))
     facility_detail_title = core:get_or_create_component("wyccc_prison_facility_detail_title", "ui/groovy/text/fe_default", panel_uic)
-    place(facility_detail_title, scaled(300), scaled(34), scaled(-590), scaled(-225))
+    place(facility_detail_title, wp_scaled(300), wp_scaled(34), wp_scaled(-590), wp_scaled(-225))
     facility_detail_title:SetVisible(true)
     facility_detail_text = core:get_or_create_component("wyccc_prison_facility_detail_text", "ui/groovy/text/fe_default", panel_uic)
-    place(facility_detail_text, scaled(320), scaled(155), scaled(-590), scaled(-105))
+    place(facility_detail_text, wp_scaled(320), wp_scaled(155), wp_scaled(-590), wp_scaled(-105))
     facility_detail_text:SetVisible(true)
 
-    visual_image("wyccc_prison_upgrade_shards", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_top_shards.png", scaled(267), scaled(168), 0, scaled(-350))
-    facility_upgrade_button = visual_button("wyccc_prison_facility_upgrade", panel_uic, scaled(131), scaled(131), 0, scaled(-320), function()
+    wp_visual_image("wyccc_prison_upgrade_shards", panel_uic, VANILLA_UI_ROOT .. "athel_tamarha_top_shards.png", wp_scaled(267), wp_scaled(168), 0, wp_scaled(-350))
+    facility_upgrade_button = wp_visual_button("wyccc_prison_facility_upgrade", panel_uic, wp_scaled(131), wp_scaled(131), 0, wp_scaled(-320), function()
         local f = cm:get_faction(cm:get_local_faction_name(true))
         local current_level = get_state(f:name()).facilities[selected_facility_key] or 0
         if current_level < MAX_FACILITY_LEVEL then upgrade(f, selected_facility_key) end
@@ -5992,25 +5992,25 @@ setup_ui = function()
     end)
     if facility_upgrade_button then pcall(function() facility_upgrade_button:SetImagePath(VANILLA_UI_ROOT .. "dungeon_rite_button_active.png") end) end
     facility_upgrade_level_text = core:get_or_create_component("wyccc_prison_upgrade_level", "ui/groovy/text/fe_default", panel_uic)
-    place(facility_upgrade_level_text, scaled(120), scaled(60), 0, scaled(-325))
+    place(facility_upgrade_level_text, wp_scaled(120), wp_scaled(60), 0, wp_scaled(-325))
     facility_upgrade_level_text:SetVisible(true)
     facility_upgrade_cost_text = core:get_or_create_component("wyccc_prison_upgrade_cost", "ui/groovy/text/fe_default", panel_uic)
-    place(facility_upgrade_cost_text, scaled(90), scaled(24), scaled(95), scaled(-315))
+    place(facility_upgrade_cost_text, wp_scaled(90), wp_scaled(24), wp_scaled(95), wp_scaled(-315))
     facility_upgrade_cost_text:SetVisible(false)
 
-    recruit_button_uic = visual_action("wyccc_prison_action_recruit", VANILLA_UI_ROOT .. "prisoner_indoctrinate.png", scaled(-115), scaled(220), function()
+    recruit_button_uic = wp_visual_action("wyccc_prison_action_recruit", VANILLA_UI_ROOT .. "prisoner_indoctrinate.png", wp_scaled(-115), wp_scaled(220), function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record then perform_recruit(faction, state, record); refresh_ui() end
     end)
-    ransom_button_uic = visual_action("wyccc_prison_action_ransom", VANILLA_UI_ROOT .. "prisoner_execute.png", scaled(-38), scaled(220), function()
+    ransom_button_uic = wp_visual_action("wyccc_prison_action_ransom", VANILLA_UI_ROOT .. "prisoner_execute.png", wp_scaled(-38), wp_scaled(220), function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record and perform_ransom(faction, state, record) then selected_prisoner_index = 0; refresh_ui() end
     end)
-    release_button_uic = visual_action("wyccc_prison_action_release", "ui/skins/default/icon_cross.png", scaled(38), scaled(220), function()
+    release_button_uic = wp_visual_action("wyccc_prison_action_release", "ui/skins/default/icon_cross.png", wp_scaled(38), wp_scaled(220), function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record and perform_release(faction, state, record) then selected_prisoner_index = 0; refresh_ui() end
     end)
-    interrogate_button_uic = visual_action("wyccc_prison_action_interrogate", VANILLA_UI_ROOT .. "prisoner_interrogate.png", scaled(115), scaled(220), function()
+    interrogate_button_uic = wp_visual_action("wyccc_prison_action_interrogate", VANILLA_UI_ROOT .. "prisoner_interrogate.png", wp_scaled(115), wp_scaled(220), function()
         local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name()); local record = prisoner_for_index(state, selected_prisoner_index)
         if record then grant_interrogation(faction, state, record); refresh_ui() end
     end)
@@ -6086,11 +6086,11 @@ setup_ui = function()
     vanilla_upgrade_icon_uic = nil
     vanilla_left_side_uic = find_uicomponent(panel_uic, "outer_ring_content_holder", "left_side")
     vanilla_right_side_uic = find_uicomponent(panel_uic, "outer_ring_content_holder", "right_side")
-    hide_native_scrollbars()
+    wp_hide_native_scrollbars()
 
     if vanilla_title_uic then
         vanilla_title_uic:SetVisible(true)
-        visual_set_text(vanilla_title_uic, localised("wyccc_prison_ui_title"))
+        wp_visual_set_text(vanilla_title_uic, localised("wyccc_prison_ui_title"))
     end
     if vanilla_close_uic then
         vanilla_close_uic:SetVisible(true)
@@ -6186,25 +6186,25 @@ setup_ui = function()
     facility_detail_title = nil
     facility_detail_text = nil
 
-    recruit_button_uic = visual_action("wyccc_prison_action_recruit",
+    recruit_button_uic = wp_visual_action("wyccc_prison_action_recruit",
         VANILLA_UI_ROOT .. "prisoner_indoctrinate.png", -96, 365, function()
             local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name())
             local record = prisoner_for_index(state, selected_prisoner_index)
             if record then perform_recruit(faction, state, record); refresh_ui() end
         end)
-    ransom_button_uic = visual_action("wyccc_prison_action_ransom",
+    ransom_button_uic = wp_visual_action("wyccc_prison_action_ransom",
         VANILLA_UI_ROOT .. "prisoner_execute.png", -32, 365, function()
             local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name())
             local record = prisoner_for_index(state, selected_prisoner_index)
             if record and perform_ransom(faction, state, record) then selected_prisoner_index = 0; refresh_ui() end
         end)
-    release_button_uic = visual_action("wyccc_prison_action_release",
+    release_button_uic = wp_visual_action("wyccc_prison_action_release",
         "ui/skins/default/icon_cross.png", 32, 365, function()
             local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name())
             local record = prisoner_for_index(state, selected_prisoner_index)
             if record and perform_release(faction, state, record) then selected_prisoner_index = 0; refresh_ui() end
         end)
-    interrogate_button_uic = visual_action("wyccc_prison_action_interrogate",
+    interrogate_button_uic = wp_visual_action("wyccc_prison_action_interrogate",
         VANILLA_UI_ROOT .. "prisoner_interrogate.png", 96, 365, function()
             local faction = cm:get_faction(cm:get_local_faction_name(true)); local state = get_state(faction:name())
             local record = prisoner_for_index(state, selected_prisoner_index)

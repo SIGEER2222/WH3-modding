@@ -37,6 +37,23 @@
 
 不要机械复制剧情、任务或编成表，例如 `battle_set_piece_*`、`armed_citizenry_*`、`mercenary_unit_groups`，除非用户明确要求。
 
+### 属性组与阶段被动
+
+- `land_units.attribute_group` 指向一个 `unit_attributes_groups`，该组所有 `unit_attributes_to_groups` 条目都会作用于每个使用该组的兵种。不要把 `causes_terror` 这类高影响属性放入同时覆盖低阶多实体单位的宽泛种族组；当被动随进化阶段或编制变化时按 `ROSTER.stage`、`main_units.tier` 与 `num_men` 拆组并复核覆盖。[实测/需随版本复查]
+- 将恐惧与恐惧灵气作为不同强度门槛：低阶不因种族标签自动获得恐惧灵气；优先把它留给定位/编制相符的精锐单体，并检查属性组对整支多实体编队的全体生效范围。
+
+### 招募建筑等级门槛
+
+- `building_units_allowed_tables` 每个 `(building, unit)` 一行：建筑升级不自动继承下级已授权单位——原版惯例是把同一单位在一条链的每一级各写一行（如僵尸在 `wh_main_vmp_settlement_major_1..5`/`minor_1..3` 各有行）。想让单位"链上始终可招"，要为该链所有等级写行，不能只写 1 级 `[实测/需随版本复查]`。
+- "一级就解锁"的两种做法：① 挂主城/定居点链（VMP 僵尸模板：`*_settlement_major_1-5` + `*_settlement_minor_1-3` + `wh_main_special_settlement_<城市>_<1-5>_vmp`），开局即可招；② 挂各族军事链的 1 级建筑（如 `wh_main_emp_barracks_1`、`wh_main_vmp_bindingcircle_1`/`forest_1`）。
+- 批量生成时可用 `gamedata/db/building_levels_tables` 做"链补全"：由已有建筑反查 `chain`，再把该链全部等级建筑补齐——脚本参考 `scratch/tier1_recruit_20260922.py`（一次性）。`zzz_czx_digimon` 系的生成器 `tools/gen_digimon_recruit.py` 按 `ROSTER.tsv` 的 `tier` 列控制最低建筑等级（默认 tier1→≥2级、tier2→≥3级、tier≥3→≥4级）；2026-09-22 起 v2 的 rookie 改为链全级（1 级起）覆盖，重跑生成器会覆盖该改动，需同步生成器逻辑。
+
+## 自定义战斗动画的文化注册
+
+- 自造或重定向的 `land_units.man_animation` 除了要在 `battle_animations_table_tables` 有 key→skeleton 行、在 `battle_skeletons_tables` 有匹配骨架外，还要核对对应 `animations/database/battle/bin/<man_animation>.bin`、骨架文件与 walk/run/move、attack clips。
+- `culture_to_battle_animation_tables_tables` 按 `(battle_animations_table, culture_pack)` 登记动画组的文化可用性；自定义动画只登记在一个 culture 时，其他文化即使有 custom-battle/recruit 权限也可能没有动画。按 `culture_pack_ids_tables.id` 取得支持的文化包，为每个目标文化补齐缺失 pair；借 vanilla 动画集时先查原版 pair，只补缺项避免重复键。[DB 审计已验证映射差异；需游戏内复查动画播放]
+- 以动画文件存在且可解码、RMV2 顶点权重索引在骨架范围内作为静态检查；不能只按文件名判断 locomotion 已齐，需确认 move clip 不是 idle 的字节副本且动态轨道确实有步态变化。最终仍须在游戏中看待机、移动、近战/远程攻击和施法动作。[实测/需随版本复查]
+
 ## 多源拼装单位
 
 当一个新单位同时借用 A 的外观、B 的坐骑、C 的武器、D 的招募建筑时，把来源链分开确认：

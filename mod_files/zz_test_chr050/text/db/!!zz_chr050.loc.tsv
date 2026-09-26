@@ -1,0 +1,6 @@
+key	text	tooltip
+#Loc;1;text/db/!!zz_chr050.loc
+units_onscreen_name_zz_chr050	亚古兽（chr050测试）	
+land_units_onscreen_name_zz_chr050	亚古兽（chr050测试）	
+unit_description_short_texts_text_zz_chr050	小型爬虫数码兽，专用chr050动画集隔离测试单位——验证待机、行走、攻击动作。	
+unit_description_historical_texts_text_zz_chr050	成长期爬虫型数码兽，从旧版dgm_digimon包提取的chr050完整动画资产栈隔离测试。	

@@ -26,9 +26,11 @@ def decode_verts(raw, count, vsize):
     """Return (pos f32[n,3], uv f32[n,2], nrm f32[n,3]) from a vertex blob."""
     a = np.frombuffer(raw, dtype=np.uint8).reshape(count, vsize)
     if vsize == 32:
-        pos = a[:, 0:12].copy().view('<f4').reshape(count, 3)
-        uv = a[:, 24:28].copy().view('<f2').reshape(count, 2).astype(np.float32)
-        nrm_b = a[:, 20:24].astype(np.float32)
+        # v7 weighted: pos f16x3(0:6) pad(6:8) boneidx(8:12) bonew(12:16)
+        #              nrm u8x4(16:20) uv f16x2(20:24) bin/tan(24:32)
+        pos = a[:, 0:6].copy().view('<f2').reshape(count, 3).astype(np.float32)
+        uv = a[:, 20:24].copy().view('<f2').reshape(count, 2).astype(np.float32)
+        nrm_b = a[:, 16:20].astype(np.float32)
     elif vsize == 36:
         pos4 = a[:, 0:8].copy().view('<f2').reshape(count, 4).astype(np.float32)
         pos = pos4[:, :3] * pos4[:, 3:4]

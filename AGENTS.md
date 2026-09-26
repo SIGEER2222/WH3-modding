@@ -13,6 +13,7 @@
 - `mod_output/`：打包后的 `.pack` 等输出产物；不纳入版本管理。
 - `workshop_release/`：Steam Workshop 发布用文件；文本描述默认使用 Steam BBCode。
 - `bilingual/`、`gamedata/` 与 `rpfm-v5.0.6-x86_64-pc-windows-msvc/`：只读参考资料或本地工具，默认不修改。
+- `.devin/skills/`：Devin 项目级 skill（如 `tabbit` 浏览器自动化的本机对接说明）。
 - `references/`：本地 MOD/英雄/美术参考样例（已纳入版本管理），仅引用。
 - `manual_edit/`：用户手工 Blender 修权工作目录（`.blend` 大文件，已被 `.gitignore` 忽略）；默认只引用/追加，不整理、不清理。
 - `scratch/`：临时/实验性文件目录，默认被 `.gitignore` 忽略。一次性脚本、调试输出、截图、中间导出、`_bak`、`db_binary` 等备份/生成产物应放在这里；需要长期保留的再移入 `tools/` 或对应 MOD 源目录。
@@ -29,7 +30,7 @@
 
 处理本项目任务前，先读取：
 
-1. `.codex/project_context.md`
+1. `.codex/project_context.md`（只保留当前状态与持久事实；2026-09-25 前的按日排障/部署叙事归档在 `.codex/project_context_history.md`，按需查阅，不必每次读）
 2. `warhammer-mod-development_generic/SKILL.md`
 3. 任务相关的 `warhammer-mod-development_generic/references/*.md`
 4. 必要时读取 `docs/PROJECT_STRUCTURE.md` 和 `docs/RPFM_USAGE.md`
@@ -76,7 +77,8 @@
 | 包内 DB 行是否解码正常（对照 schema） | `wh3diag.py db <pack> [--match <子串>]` |
 | 提取包内单文件内容（比对两版本某行） | `wh3diag.py cat <pack> <内部路径> [--lines A-B]` |
 | used_mods/bisect 清单顺序与集合对比 | `wh3diag.py usedmods [--grep] [--diff]` |
-| 启动二分排错 | `tools/bisect_pack.py`（纪律见 references §七） |
+| 大版本兼容审计（旧版表/悬空外键/过期 twui）+ 一键生成补丁源 | `wh3diag.py compat <pack> [--dep 依赖] [--emit <补丁名>]`（须 Windows Python313） |
+| 启动二分排错 | `tools/bisect_pack.py`（纪律见 references §七；9.0 起 `game_startup_mode battle` autotest 已废，改前端拉起二分，见 §10.31） |
 | OOM 判据与降档 | references §10.19；`tools/set_memory_safe_prefs.py` |
 
 详细用法：`tools/README.md`。

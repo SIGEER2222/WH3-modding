@@ -35,14 +35,21 @@
 | 飞龙 feilong | 本包 | `bird01b` | `bi1b_` | `bi1b_stand_idle_04` ✅ |
 | 凯瑞甘 kerrigan | 本包 | `humanoid01b` | `hu1b_` | `hu1b_sws_stand_idle_05`（95 帧）✅ |
 | 刺蛇 cishe(es2) | Imperial Arbiter | `snake01` | `sn01_` | `sn01_stand_idle_alt_05`（45 帧）✅ |
-| 雷兽 leishou | Imperial Arbiter | `bigcat01`（目标） | `bc1_` | 修复中 |
-| 跳虫 gou | Imperial Arbiter | `wolf01`（目标） | `wf1_`/`wolf01` 系 | 修复中 |
+| 雷兽 leishou | Imperial Arbiter | `bigcat01` | `bc1_` | 现役使用 IA donor；运行时验证待做 |
+| 跳虫 gou | Imperial Arbiter | `wolf01` | `wf1_`/`wolf01` 系 | 现役使用 IA donor；运行时验证待做 |
 
 原版骨架 donor 与 clip 量：bigcat01=战神獒 73 clips（含擒杀 matched_attack、喷吐、跳跃攻击）；scorpion01=古墓巨蝎 138；bird01b=腐尸秃鹫 119；wolf01=恐狼 338；snake01=幽冥行者 889；humanoid01b=5050。
 
+## 战斗动画文化映射审计
+
+- `[DB 审计/游戏内待验证]` 只确认 `battle_animations_table` 与 `battle_skeletons_tables` 不够：`culture_to_battle_animation_tables_tables` 的 `(battle_animations_table, culture_pack)` 也要覆盖单位实际可用的文化。用 `culture_pack_ids_tables` 作为合法文化包清单；donor 动画 key 先查 vanilla 的已有 pair，再只增加缺项。
+- 本地核对实例：Digimon v2 原有 104 个自定义动画 key 都只登记 `wh3_main_cth_cathay`，而 custom battle 权限覆盖多文化；宝可梦已有 24 个文化映射。扩展登记后仍要在游戏里验证不同文化的移动、攻击和施法动作。
+- 在不改 RMV2 的动画问题上，先确认 `.anim` clip 的 skeleton 名、帧数、动态轨道和 culture pair；不要因为模型静止就先重绑/替换网格。
+- `[已修/游戏内待目视]` 2026-09-23 的 7 个 Pokemon `move.anim` 原与 `idle.anim` 字节一致（无走路循环）。已用 `tools/retarget_bonemap.py` 生成真实 walk cycle：语义骨映射 JSON（our→donor 骨名）+ 世界空间旋转差值重定向。**注意点**：① PM 骨架 L/R 约定与 vanilla 镜像相反（PM `L*` 在 +X，vanilla `*_left` 在 -X），映射必须 our-L→donor-right；② donor 按体型选——四足用 wolf01、宽展四足用 heavyquadruped01(Stegadon)、双足带尾用 raptor01(Steed of Slaanesh)、直立双足用 humanoid01；③ `animroot`/`root` 携带位移（含前进 Z），按骨盆高度比缩放；④ `--damp` 可压制步幅过大的肢体（妙蛙花宽展腿需 damp 0.4 + 不映射 foot/toe 避免穿地）。生成的 clip 用全骨骼动态轨道（f32），ftc/fqc 写真实槽位数。映射表存 `scratch/pm_walk_maps/`，pose 预览 `scratch/pm_walk_out/*.png`。
+
 ## RMV2 绑定诊断（二进制层）
 
-- v8 RMV2 头 offset 8 起是**骨架名 ASCII 字段**（如 `bigcat01`、`scorpion01`、`humanoid01b`），肉眼可直接读。
+- v8 RMV2 头 **offset 12** 起是**骨架名 ASCII 字段**（`RMV2` magic 4B + offset4 版本 u32=8 + offset8 u32 + offset12 null 结尾 ASCII；旧记 offset 8 实测是 1 个 u32 字段）（如 `bigcat01`、`scorpion01`、`humanoid01b`），肉眼可直接读。
 - 未蒙皮 v7 文件特征：该字段为空，且全文无 bone/skin/weight 相关字符串；AssetEditor 显示 `No Skeleton`、动画 `0/0` 帧。
 - 网格信息面板的「顶点类型」：`Cinematic` = 蒙皮格式（有骨骼权重槽位）；静态格式则不会动。
 - ⚠️ 判断绑定坏没坏以"日志有 clip 加载 + 帧计数 >0 + 模型变形"为准；只改文件头骨架名**不够**（缺真实权重数据）。
@@ -96,8 +103,31 @@ AssetEditor 的 D3D 视口在本机截图里始终黑/白（UI 树和日志正�
 - 验收矩阵驱动：`scratch/_render_matrix.py`（每单位 idle×1帧 + attack×3帧，输出 `scratch/pose_shots/`）。
 - 检查要点：剪影连贯、无放射状碎片、脚/爪贴地、攻击帧有实际位移。
 
-## 遗留问题（进行中）
+## 历史诊断记录（旧本地模型；不属于现役 pack）
 
-- leishou_2 已完成 Skin Wrap（19 个 lzd 网格）并删除参考网格，但**动画预览仍未播放**：场景 Skeleton 节点为空，动画面板显示 `bigcat01.anim - bc1_attack_01.anim` 而日志无 `Loading animation: bigcat01.anim`——骨架文件未被引擎加载。待解：可能是预览控件状态问题，也可能需要让 RMV2 先写骨架名。下一步：保存文件→二进制验证 offset 8 骨架名与权重串→重开文件再播动画。
+2026-09-23 核对：现役 `zzz_czx_swarm_units` 不再打包本地 `g.rigid_model_v2`/`leishou_2.rigid_model_v2`，而是依赖 Imperial Arbiter 的完整 gou/cishe/leishou 资产。下面记录的是旧版本地网格的 Skin Wrap 诊断，不是当前运行时资产；本轮未改任何模型。三包自定义 RMV2 权重和动画链接已静态核对，游戏内播放仍待验证。
+
+- leishou_2 已完成 Skin Wrap（19 个 lzd 网格）并删除参考网格，但**动画预览仍未播放**：场景 Skeleton 节点为空，动画面板显示 `bigcat01.anim - bc1_attack_01.anim` 而日志无 `Loading animation: bigcat01.anim`——骨架文件未被引擎加载。待解：可能是预览控件状态问题，也可能需要让 RMV2 先写骨架名。下一步：保存文件→二进制验证 offset 12 骨架名与权重串→重开文件再播动画。
 - `bst_warhounds_head_02` ×2（雷兽头部件）未包裹，需对它们单独跑一轮 Skin Wrap（重新导入 warsphinx 参考→删）。
 - `g.rigid_model_v2`（跳虫，wolf01 骨架）同样未蒙皮，流程相同，参考源用原版恐狼网格（anim pack `animations\skeletons\wolf01.anim`）。
+
+
+## chr###（Digimon 原包）剪辑 → czx 骨架重定向：已验证通路（2026-09-25）
+
+社区大佬路线「重建模型→转移动作数据→绑定动作替换原有动作→shader」在本地离线链路上逐环验证完毕：
+
+1. **转移数据**：`scratch/dgm_digimon_extracted/` 已全量解包 `dgm_digimon.pack`。`animations/skeletons/chr###.anim` 是 v7 骨架（如 chr050=亚古兽，22 骨 J_* 命名：J_root/J_center/J_leg_l/J_knee_l/J_spine01/J_arm_l/J_hand_l/J_neck/J_head/J_joe/J_tail）。`parse_anim_skeleton.py` 只认 v8；v7 骨架用 `parse_anim_clip.parse_anim_clip` + `world_from_locals` 手工组 skel JSON（见 `scratch/dump_chr_skel.py` -> `scratch/chr_clips/skel_chr050.json`）。
+2. **重定向**：`tools/retarget_bonemap.py <donor_clip> <donor_skel.json> <our_skel.json> <bonemap.json> <out.anim> --pose out.pose.json`。bonemap 方向是 `{我们的骨名: donor骨名}`。chr050->czx_agumon 实测映射：root->J_center、spine_0/1/2->J_spine01/02、upperleg->J_leg、lowerleg->J_knee、foot->J_foot、toe->J_toe、upperarm->J_arm、lowerarm->J_elbow、hand->J_hand、neck_0->J_neck、head->J_head、jaw->J_joe、尾巴可借 cape_0/skirt_back_0->J_tail。产物为 v8 .anim，skeleton_name=czx_agumon，72 骨全量。
+3. **离线验证**：`blender_pose_render.py` 渲染 `czx_dgm_agumon_bound.glb` + pose.json——idle f12 呈自然待机（下颌张开=J_joe->jaw 生效），move f7 呈迈步交叉步态。**非 T-pose 非滑步**，证明旋转 delta 重定向成立。截图在 `scratch/chr_clips/`。
+4. **绑定动作（bin）**：chr### 的 animset 是**极简 bin**（chr050.bin 仅 947B），格式：`u32 ver | u32 ? | str16 key | u32 0 | str16 key | u8 0x38? | str16 动画图路径(entity_locomotion_graph.xml) | u16 0 | u32 条目数 | u32 ? | 每条: float混合时间(0.2)+float速度(1.0)+u32+u8+u32+str16剪辑路径`。原版只用 8 个剪辑填 ~14 槽（eat x3 充攻击槽、move x3 充移动槽）——这正是「绑定动作到人物原有动作替换」的实现：**不必凑齐全套动作，少量专属剪辑+槽位复用即可**。槽位不靠名字靠条目顺序/序号，authoring 建议用 AssetEditor 的 AnimPack 编辑器界面做，别手写字节。
+5. **进包链路**：bin 入 `.animpack`（pack_animsets.py），unit `man_animation` 指 bin 内部名，`battle_skeletons` 注册 czx 骨架，骨架 .anim + `.bone_inv_trans_mats` + `.anm.meta` 随包。注意：`animations/battle/bin/*.bin` **散放不注册**，必须进 animpack 容器。
+   - **bin 内部套件名必须等于 animpack 条目文件名 stem（= man_animation 引用的 key），不能保留 donor bin 的原名**。[实测 2026-09-25] 虫群包 4 个 bin 克隆自 vanilla donor 后内部名仍是 donor 名（`cr1_cst_promethean`/`hu11b_dlc17_ghorgon`/`hu1_dlc25_empire_sword_hochland_long_rifle`/`wm_steam_tank01`），DB key `czx_*` 无法解析到套件 → 单位无动画集、不能攻击。对照组：可工作的 pokemon/digimon 包全部 bin 均为 内部名==文件名stem==DB key。补丁方式：bin blob offset 8 处是 u16 长度前缀字符串，重写长度+字符串即可（`scratch/patch_swarm_internal_names.py`，与数码宝贝 `patch_dgm_animpack_names.py` 同法——后者当时就是把所有 bin 内部名统一改为 stem）。**切勿改成其他 vanilla 套件名**：内部名若撞上真实 vanilla key 会让自定义 bin 遮蔽原版套件，殃及原版单位。
+   - 旁证坑：`czx_inf_marine` 还缺 variantmesh 武器槽（无 weapon_1/weapon_2 → 步枪网格不挂载），已按原版火枪手镜像补齐 `weapon_1`=步枪prop@be_prop_0、`weapon_2`=剑prop@be_prop_1。远程单位武器槽缺失可能独立导致无法开火，两项修复需一并验证。
+
+## NPR/toon shader 可行性结论（2026-09-25，离线调研）
+
+- **WH3 shader 是双层**：`data.pack` 的 `shaders/*.xml.shader`（720 个）是**运行时读取的描述文件**（TECHNIQUE 块选 vs/ps 入口名+光栅/深度状态）；真正的 HLSL 是 `shaders.pack` 里 4000+ 个**预编译 `.hlsl_compiled`**（按 `x_<名>_hlsl_<hash>` 索引）。**不能注入新 HLSL**，但**可以写新的 .xml.shader 重组已有编译入口**——NPR 的正路。
+- 「跳过战锤自己的光照」= 用 unlit/emissive 系入口。素材：`shaders/vfx/vfx_weighted4_character_emissive_unlit.xml.shader`（直接写了 unlit）、`weighted4_character_emissive*.xml.shader`（材质带 `t_xml_emissive_texture` 槽+emissive params）。
+- 「用战锤的色阶图重新算颜色」= 色阶/ramp 贴图驱动颜色：材质 XML 的纹理槽可指 `commontextures/colour_gradient_cth.dds`、`commontextures/gradient_linear_01.dds` 等现存 ramp；更稳的做法是**离线把 base_colour 按 toon ramp 量化烘焙**（把光影烘进贴图），配 emissive/unlit 输出 -> 二次光照被旁路，呈 cel 色块。
+- 角色材质槽速查（weighted4_character_emissive_alpha 例）：t_xml_base_colour/blood_map/emissive_distortion/emissive_texture/mask/material_map/normal/dither/distortion/distortion_noise + params(diffuse_tint_colour、emissive_direction、edge_emissive_colour 等)。material_map 的金属/高光通道压 0 可去油腻感。
+- 待验证：自定义 .xml.shader 用 vfx unlit PS 配角色加权 VS 是否被引擎接受（入口名须存在于已编译库）；先在 AssetEditor 里预览再进包。[需验证]

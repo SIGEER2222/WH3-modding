@@ -116,8 +116,11 @@ def parse_wsmodel(payload):
     return geo.text.strip().replace('\\', '/'), mats
 
 
-def decode_verts(raw, count, vsize):
-    """-> pos f32[n,3], uv f32[n,2], nrm f32[n,3], boneidx u8[n,4], bonew f32[n,4]"""
+def decode_verts(raw, count, vsize, vtype=4):
+    """-> pos f32[n,3], uv f32[n,2], nrm f32[n,3], boneidx u8[n,4], bonew f32[n,4]
+    vtype 4=Cinematic(36B): pos4f16 bi4 bw4 nrm4 uvf16x2 binorm4 tan4 colour4
+    vtype 3=Weighted(32B):  pos4f16 bi(u8x2) bw(u8x2) nrm4 uvf16x2 binorm4 tan4 pad4
+    """
     a = np.frombuffer(raw, dtype=np.uint8).reshape(count, vsize)
     if vsize == 36:          # v8 cinematic
         pos4 = a[:, 0:8].copy().view('<f2').reshape(count, 4).astype(np.float32)
@@ -125,6 +128,15 @@ def decode_verts(raw, count, vsize):
         bi = a[:, 8:12].copy(); bw = a[:, 12:16].copy()
         nrm_b = a[:, 16:20].astype(np.float32)
         uv = a[:, 20:24].copy().view('<f2').reshape(count, 2).astype(np.float32)
+    elif vsize == 32 and vtype == 3:
+        pos4 = a[:, 0:8].copy().view('<f2').reshape(count, 4).astype(np.float32)
+        pos = pos4[:, :3] * pos4[:, 3:4]
+        bi = np.zeros((count, 4), dtype=np.uint8)
+        bi[:, :2] = a[:, 8:10]
+        bw = np.zeros((count, 4), dtype=np.uint8)
+        bw[:, :2] = a[:, 10:12]
+        nrm_b = a[:, 12:16].astype(np.float32)
+        uv = a[:, 16:20].copy().view('<f2').reshape(count, 2).astype(np.float32)
     elif vsize == 32:        # v7 weighted: 两种布局
         pos = a[:, 0:12].copy().view('<f4').reshape(count, 3)
         if np.isfinite(pos).all() and np.abs(pos).max() < 1000:
@@ -351,12 +363,14 @@ def export_unit(target, out_dir, clips=None, lod=0, no_tex=False,
         lod_models = d['models'][lod] if lod < len(d['models']) else d['models'][0]
         for mi, m in enumerate(lod_models):
             vsize = (m['index_off'] - m['vertex_off']) // m['vertex_count']
-            if vsize not in (32, 36):
-                print('skip non-weighted mesh vsize', vsize)
+            vt = m['material']['vertex_type']
+            if vsize not in (32, 36) or vt in (0, 1, 13):
+                print('skip non-weighted mesh vsize=%d vtype=%d' % (vsize, vt))
                 continue
             raw_v = d['bytes'][m['vertex_off']:m['index_off']]
             raw_i = d['bytes'][m['index_off']:m['index_off'] + m['index_count'] * 2]
-            pos, uv, nrm, bi, bw = decode_verts(raw_v, m['vertex_count'], vsize)
+            pos, uv, nrm, bi, bw = decode_verts(
+                raw_v, m['vertex_count'], vsize, m['material']['vertex_type'])
             idx = np.frombuffer(raw_i, dtype='<u2').copy().astype(np.uint32)
             texs = m['material']['textures']
             meshes.append({

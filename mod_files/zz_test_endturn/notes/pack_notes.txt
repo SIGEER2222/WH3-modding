@@ -1,0 +1,1 @@
+[TEST] auto end turn for crash repro

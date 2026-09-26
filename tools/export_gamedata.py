@@ -70,6 +70,91 @@ class PackEntry:
     payload: bytes
 
 
+@dataclass
+class PackIndexEntry:
+    """Index-only view of a packed file (no payload read)."""
+    name: str        # '/'-normalised utf-8 path
+    raw_name: bytes  # raw index bytes (invisible-char forensics)
+    size: int
+    compressed: bool
+    offset: int      # payload offset inside the pack file
+
+
+def read_pack_header(path: Path) -> dict | None:
+    """Parse the 28-byte PFH5/PFH6 header + dependency block."""
+    with path.open("rb") as f:
+        header = f.read(28)
+        if len(header) != 28 or header[:4] not in (b"PFH5", b"PFH6"):
+            return None
+        ptype, dep_cnt, dep_size, fcnt, isz, stamp = struct.unpack_from(
+            "<6i", header, 4)
+        deps_raw = f.read(dep_size) if 0 < dep_size < 16 * 1024 * 1024 else b""
+        file_size = f.seek(0, 2)
+    deps = [d.decode("utf-8", "replace") for d in deps_raw.split(b"\0") if d]
+    return {
+        "magic": header[:4].decode("ascii", "replace"),
+        "pack_type": ptype,
+        "dep_count": dep_cnt,
+        "dep_size": dep_size,
+        "file_count": fcnt,
+        "index_size": isz,
+        "timestamp": stamp,
+        "deps": deps,
+        "data_offset": 28 + dep_size + isz,
+        "file_size": file_size,
+    }
+
+
+def iter_pack_index(path: Path):
+    """Yield PackIndexEntry for every file in the pack index (no payload I/O)."""
+    h = read_pack_header(path)
+    if h is None:
+        return
+    with path.open("rb") as f:
+        f.seek(28 + h["dep_size"])
+        index = f.read(h["index_size"])
+    cursor = 0
+    offset = h["data_offset"]
+    for _ in range(h["file_count"]):
+        if cursor + 5 > len(index):
+            break
+        size = struct.unpack_from("<i", index, cursor)[0]
+        compressed = index[cursor + 4] == 1
+        cursor += 5
+        end = index.find(b"\0", cursor)
+        if end < 0:
+            break
+        raw = index[cursor:end]
+        name = raw.decode("utf-8", errors="replace").replace("\\", "/")
+        cursor = end + 1
+        yield PackIndexEntry(name, raw, size, compressed, offset)
+        offset += size
+
+
+def read_pack_payload(path: Path, entry: PackIndexEntry) -> bytes:
+    """Read (and decompress when flagged) one packed file's payload."""
+    with path.open("rb") as f:
+        f.seek(entry.offset)
+        payload = f.read(entry.size)
+    if (entry.compressed or payload[:4] in (ZSTD_MAGIC, LZ4_MAGIC)
+            or payload[4:8] in (ZSTD_MAGIC, LZ4_MAGIC)):
+        try:
+            payload = _decompress(payload)
+        except Exception:
+            pass  # keep raw on failure
+    return payload
+
+
+def iter_pack_entries(path: Path, prefixes=()):
+    """Yield PackEntry for index entries whose path starts with a prefix."""
+    prefixes = tuple(p.casefold() for p in prefixes)
+    for e in iter_pack_index(path):
+        if prefixes and not any(e.name.casefold().startswith(p)
+                                for p in prefixes):
+            continue
+        yield PackEntry(e.name, read_pack_payload(path, e))
+
+
 def _decompress(raw: bytes) -> bytes:
     """Decompress a payload that carries a zstd/lz4 frame (maybe at offset 4)."""
     offsets = []
@@ -103,42 +188,6 @@ def _decompress(raw: bytes) -> bytes:
             except zlib.error:
                 pass
     raise ValueError("unknown compression")
-
-
-def iter_pack_entries(path: Path, prefixes=()):
-    """Yield PackEntry for index entries whose path starts with a prefix."""
-    prefixes = tuple(p.casefold() for p in prefixes)
-    with path.open("rb") as f:
-        header = f.read(28)
-        if len(header) != 28 or header[:4] not in (b"PFH5", b"PFH6"):
-            return
-        _, _, dep_size, file_count, index_size, _ = struct.unpack_from("<6i", header, 4)
-        f.seek(28 + dep_size)
-        index = f.read(index_size)
-        data_offset = 28 + dep_size + index_size
-        cursor = 0
-        offset = data_offset
-        selected = []
-        for _ in range(file_count):
-            size = struct.unpack_from("<i", index, cursor)[0]
-            compressed = index[cursor + 4] == 1
-            cursor += 5
-            end = index.find(b"\0", cursor)
-            name = index[cursor:end].decode("utf-8", errors="replace")
-            cursor = end + 1
-            norm = name.replace("\\", "/")
-            if not prefixes or any(norm.casefold().startswith(p) for p in prefixes):
-                selected.append((norm, offset, size, compressed))
-            offset += size
-        for norm, off, size, compressed in selected:
-            f.seek(off)
-            payload = f.read(size)
-            if compressed or payload[:4] in (ZSTD_MAGIC, LZ4_MAGIC) or payload[4:8] in (ZSTD_MAGIC, LZ4_MAGIC):
-                try:
-                    payload = _decompress(payload)
-                except Exception:
-                    pass  # keep raw on failure
-            yield PackEntry(norm, payload)
 
 
 # ------------------------------------------------------------ schema parse

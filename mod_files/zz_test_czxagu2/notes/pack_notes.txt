@@ -1,0 +1,1 @@
+chr050剪辑重定向到czx_agumon骨架的专属动画集POC（eat=攻击/down=死亡/win=胜利等槽位替换），仅测试用不进playset

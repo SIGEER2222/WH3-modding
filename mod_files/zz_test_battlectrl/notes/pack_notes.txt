@@ -1,0 +1,1 @@
+test-only: scripted battle auto-attack orders

@@ -9,9 +9,13 @@ WH3-modding/
 ├── AGENTS.md
 ├── README.md
 ├── .codex/
-│   └── project_context.md
+│   ├── project_context.md           # 当前状态+持久事实（必读）
+│   ├── project_context_history.md   # 按日事件叙事归档（按需查阅）
+│   └── handoff_*.md / model_check_*.md  # 会话交接与进度文档
 ├── .agents/
 │   └── README.md
+├── .devin/
+│   └── skills/
 ├── assets/
 │   └── image/
 ├── docs/
@@ -40,8 +44,10 @@ WH3-modding/
 | 路径 | 职责 | 版本管理 |
 |---|---|---|
 | `AGENTS.md` | Codex 和代理的项目规则入口 | 纳入 |
-| `.codex/project_context.md` | Codex 专用上下文摘要 | 本地隐藏配置，默认忽略 |
+| `.codex/project_context.md` | Codex 专用上下文摘要（当前状态+持久事实） | 纳入 |
+| `.codex/project_context_history.md` | project_context 拆出的按日事件叙事归档 | 纳入 |
 | `.agents/README.md` | 其他代理入口说明 | 本地隐藏配置，默认忽略 |
+| `.devin/skills/` | Devin 项目级 skill（如 `tabbit` 浏览器自动化本机对接说明） | 纳入 |
 | `docs/` | 项目级说明文档 | 纳入 |
 | `assets/image/` | 用户维护的图片、美术源素材、参考图 | 忽略 |
 | `mod_files/` | MOD 打包前的可维护源文件 | 纳入 |

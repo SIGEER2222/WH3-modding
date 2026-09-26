@@ -218,13 +218,17 @@ def convert_unit(u):
         f"{texbase}_mask": Image.new('RGBA', (16, 16), (0, 0, 0, 255)),
         f"{texbase}_specular": Image.new('RGBA', (16, 16), (64, 64, 64, 255)),
     }
+    # stage the intermediate pngs in the OS temp dir: texconv only needs
+    # them as input, and leaving them inside the mod source dir forced a
+    # per-unit cleanup pass (50+ unlinks per batch run).
+    import tempfile
+    stage_dir = Path(tempfile.mkdtemp(prefix="wh3_tex_"))
     for name, im in pngs.items():
-        im.save(tex_dir / (name + '.png'))
+        im.save(stage_dir / (name + '.png'))
     for name in pngs:
         subprocess.run(
             [str(TEXCONV), '-f', 'BC7_UNORM', '-y', '-o', str(tex_dir),
-             str(tex_dir / (name + '.png'))], check=True, capture_output=True)
-        (tex_dir / (name + '.png')).unlink()
+             str(stage_dir / (name + '.png'))], check=True, capture_output=True)
 
     mat_dir = out_dir / 'materials'
     mat_dir.mkdir(exist_ok=True)

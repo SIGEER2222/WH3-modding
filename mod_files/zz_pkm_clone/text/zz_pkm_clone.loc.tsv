@@ -1,0 +1,6 @@
+﻿key	text	tooltip
+#Loc;1;text/zz_pkm_clone.loc
+units_onscreen_name_zz_pkm_test	TestClone	false
+land_units_onscreen_name_zz_pkm_test	TestClone	false
+unit_description_short_texts_text_zz_pkm_test	Clone of marine for crash bisect testing only	false
+unit_description_historical_texts_text_zz_pkm_test	Clone of marine for crash bisect testing only, not for release	false

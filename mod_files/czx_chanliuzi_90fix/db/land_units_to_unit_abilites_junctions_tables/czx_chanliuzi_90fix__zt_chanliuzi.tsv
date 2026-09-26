@@ -1,0 +1,15 @@
+ability	land_unit	culture
+#land_units_to_unit_abilites_junctions_tables;1;db/land_units_to_unit_abilites_junctions_tables/zt_chanliuzi
+wh_main_lord_passive_the_hunger	zt_chanliuzi	*
+zt_chanliuzi_prologue_3	zt_chanliuzi	*
+zt_chanliuzi_prologue_7	zt_chanliuzi	*
+zt_chanliuzi_evil_3	zt_chanliuzi	*
+zt_chanliuzi_evil_5	zt_chanliuzi	*
+zt_chanliuzi_pure_1	zt_chanliuzi	*
+zt_chanliuzi_unique_1	zt_chanliuzi	*
+zt_chanliuzi_character_1	zt_chanliuzi	*
+zt_chanliuzi_character_2	zt_chanliuzi	*
+zt_chanliuzi_evil_1	zt_chanliuzi	*
+zt_chanliuzi_prologue_4	zt_chanliuzi	*
+zt_chanliuzi_evil_4_conduit	zt_chanliuzi	*
+zt_chanliuzi_pure_4_passive	zt_chanliuzi	*

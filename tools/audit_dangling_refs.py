@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import difflib
 import os
 import re
 import sys
@@ -301,8 +302,12 @@ def audit(mod_filter=None, report_path=None):
                             tt, tc, cov = tgt
                             if v not in vanilla.get(tt, {}).get(tc, ()):
                                 lvl = "ERROR" if v.startswith(SEVERITY_ERR) else "WARN"
+                                # 给最接近的合法键（含包内键池），悬空键常见于前缀漏段
+                                cand = list(vanilla.get(tt, {}).get(tc, ())) + list(flat_pool)
+                                near = difflib.get_close_matches(v, cand, n=1, cutoff=0.6)
+                                hint = f" (近似键: {near[0]})" if near else ""
                                 add(lvl, mod, t, f.name, f"row{ri+3}.{cname}",
-                                    f"{v!r} 不在 {tt}.{tc} (cov={cov:.0%})")
+                                    f"{v!r} 不在 {tt}.{tc} (cov={cov:.0%}){hint}")
 
         # ---- 文件级检查：variantmesh / unit_card / loc ----
         mdir = MOD_FILES / mod

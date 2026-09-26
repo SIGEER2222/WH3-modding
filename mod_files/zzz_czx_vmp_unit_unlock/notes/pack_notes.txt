@@ -1,0 +1,1 @@
+Vampire Counts 战役解锁补丁：把 DGM、虫群与 DGM mini patch 单位挂到原版一级死灵法师建筑，仅限 Vampire Counts 使用，不接入 AI 随机军池。Pokemon 另有可选解锁补丁。

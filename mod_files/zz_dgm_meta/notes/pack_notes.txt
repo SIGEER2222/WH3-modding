@@ -1,1 +1,1 @@
-Digimon mini patch: adds Agumon & Gabumon (custom models/anims) wired like swarm units (all-faction custom battle + rogue armies + building recruitment). Swarm-style DB: no battle_skeletons/culture_to_battle_animation tables.
+Digimon mini patch: adds Agumon & Gabumon (custom models/anims) for custom battle. Campaign access is supplied by the standalone zzz_czx_vmp_unit_unlock.pack; this base pack has no faction/building/random-army fan-out.

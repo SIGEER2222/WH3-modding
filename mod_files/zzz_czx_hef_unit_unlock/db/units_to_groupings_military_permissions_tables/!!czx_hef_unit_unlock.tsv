@@ -1,0 +1,19 @@
+unit	military_group
+#units_to_groupings_military_permissions_tables;0;db/units_to_groupings_military_permissions_tables/!!czx_hef_unit_unlock
+czx_feilong	wh2_main_hef
+czx_zhanglang	wh2_main_hef
+czx_jibian	wh2_main_hef
+czx_hd_green	wh2_main_hef
+czx_hd_white	wh2_main_hef
+czx_hd_black	wh2_main_hef
+czx_hd_dblack	wh2_main_hef
+czx_baochong	wh2_main_hef
+czx_mangshou	wh2_main_hef
+czx_baolongshou	wh2_main_hef
+czx_inf_tank	wh2_main_hef
+czx_dehaka	wh2_main_hef
+czx_inf_diamondback	wh2_main_hef
+czx_inf_marine	wh2_main_hef
+gou	wh2_main_hef
+cishe	wh2_main_hef
+leishou	wh2_main_hef

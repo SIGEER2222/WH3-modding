@@ -1,0 +1,1 @@
+9.0 兼容补丁：修复 wyccc_base_lib 中已被 9.0 重命名的 effect key（dignitary_empire -> dignitary_warrior_priest）

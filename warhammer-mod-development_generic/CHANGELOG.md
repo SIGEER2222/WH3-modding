@@ -1,3 +1,104 @@
+## 2026-09-25 深夜：自定义兵种扩展应用到 9.0 新阵营「亡灵军团」
+
+1. `wh3_dlc29_nag_host_of_nagash`（纳迦什军团=亡灵军团，DLC29/9.0 新增）：military_group `wh3_dlc29_nag_group_undead_legions`、subculture `wh3_dlc29_sc_nag_undead_legions`，主城链 `wh3_dlc29_nag_settlement_necropolis_1..5`，小城三选一 `mausoleum/cove/chambers_1`，特殊城 `pyramid_of_nagash_nag_2..5(_floating)`。
+2. 新建 `zzz_czx_nag_undead_unlock`（部署 pos 112，依赖 swarm+pokemon+digimon_v2）：129 单位组授权 + 25 单位派系独占授权（仅虫群18+宝可梦7）+ 2064 条建筑解锁（全单位挂 necropolis1-5/小城/pyramid）+ 凯瑞甘 wizard/general 两条 agent 许可。
+3. **语义坑**：`units_to_exclusive_faction_permissions` 是白名单表——单位一旦有行就只认行内 allowed=true 的派系。虫群/宝可梦原被 VC 解锁包限死在 `wh_main_vmp_vampire_counts`，加 nag 行是正确扩展；数码兽原本无行=全派系可用，绝不能给它加 exclusive 行（会把 104 只数码兽锁成亡灵专属，AI 其他派系全丢）。
+4. 招募可用性三件套：组权限（military_group）+ 派系独占（可选白名单）+ `building_units_allowed`（建筑→单位入口，faction='' 即对能建该建筑的派系生效；enabled 列原版绝大多数 false）。
+5. playset《全合集-非震旦》：移除两个仅对 `wh_main_vmp_vampire_counts` 生效的旧解锁包（vmp_unit_unlock / vmp_pokemon_unlock——nag 战役用不到），现 113 项。英灵召唤 Lin_Summon_Servant 本就在集（pos 95，派系无关）。
+6. 待实测：亡灵军团战役中三类生物兵在招募面板的实际出现情况（静态链路已验证：compat+dep 全绿）。
+
+## 2026-09-25 晚续：崩溃排查工作流收口——签名速查表 + 首查顺序 + 三个遗漏案例补档
+
+1. **§一新增"首查顺序"**（0-5 步）：Event 2004→OOM 不二分 → bad_mods_report → mdmp 内层签名分流 → 启动层（steam_api64/Steam 握手）→ vanilla 也崩查 AppData/环境；全程先确认无并发会话拉起游戏。
+2. **§三新增"签名速查表"**：11 类内层签名（`0xe06d7363` bad_alloc / `+0x1a0be3b` 悬空 key / `+0x2ccd917` matched-combat / `+0x157acc6` junction 悬空 / `+0x52a21a`+`+0x538a0a` 9.0 挂载 / `+0x1a957e7`+`+0x4e5b30` 环境级 / `+0x4926f0` stub / UAF exec / `0xc000041d`）→ 判定 + 首查节号，替代翻遍 §10.x 案例找签名。
+3. **§10.1/§10.20 补 9.0 废弃警告**：`game_startup_mode battle` 在 9.0 vanilla 也定死，仅适用 ≤8.1.1；判据精神由前端二分承载。
+4. **补档三个此前只在记忆/CHANGELOG 散落的案例**：§10.34 matched-combat `+0x2ccd917`（含 9-25"内部名==stem==DB key、勿改 vanilla 名"修正）；§10.35 junction 悬空键 `pkm_solar_beam`（含 pack_subset 字节二分假阳性陷阱、audit_dangling_refs 近似键教训）；§10.36 AI 回合 UAF（未最终定案，嫌疑清单留档）。
+5. AGENTS.md 排查入口表"启动二分排错"行补 9.0 前端二分指针。
+
+## 2026-09-25 晚：9.0 兼容审计流程固化为 `wh3diag.py compat` + 6 个扩展包兼容补丁
+
+1. **工具固化**：`wh3diag.py` 新增 `compat <pack> [--dep PACK]... [--emit FIX]` 子命令，把当天散在 scratch 的一次性审计脚本（`_ver_report_all`/`_audit_refs`/`_audit_nondb`/`_gen_90fixes`/`_dedupe`）收敛为一条命令。审计三段输出：旧版 DB 表（头版本 vs vanilla 基线 + 新增列清单）、悬空外键（RON `is_reference` 元数据 + vanilla∪本包∪依赖键域）、过期 twui 判定（抹 GUID 行集合 diff → stale-copy/tweak/rewrite）。`--emit` 直接产出 `mod_files/<fix>/` 补丁源（TSV 按列名映射重编码、已知改名键改写、主键去重、stale-copy twui 用 vanilla 同路径落盘、notes/+预览图）。
+2. **维护点**：9.0 新列默认值表 `COMPAT_NEWCOL_DEFAULTS` 与已验证键改名表 `COMPAT_KEY_RENAMES` 维护在 wh3diag.py 顶部常量，后续补丁季追加。
+3. **schema 优先级修正**：`schema_ron()` 原优先 RPFM appdata 副本（陈旧、缺 v12/v39）导致 compat 误报 DECODE-FAIL；已改为项目 `tools/schema/schema_wh3.ron`（已同步上游）优先、RPFM 副本兜底。
+4. **回归验证**：compat 对 Imperial Arbiter（v11→v12 单表）、Arthas（5 表+3 改名+twui stale-copy）、Prayer（14 表+2 改名组+2 twui）、Luke（2 表）的审计结果与当天手工审计逐项吻合；Arthas `--emit` 自动去重 7 个改名撞键行，与手工 `_dedupe.py` 结果一致。
+5. **流程文档**：references 新增 §10.33「大版本兼容排查的固化流程」八步 runbook（基线新鲜度→compat 审计→人工复核改名→--emit→build_pack --deploy→补丁排目标前→回读验证→归因边界）；tools/README.md 与 AGENTS.md 排查入口表同步登记。
+6. **当日补丁交付回顾**：`czx_{ia,luke,psw,chanliuzi,arthas,boudicca,xiang}_90fix` 共 7 包已部署并插入《全合集-非震旦》pos 96-104、目标包 105-111（补丁全部排前），playset 114 项一致；详细修法见 §10.32。静态验证通过，游戏内回归待下次实测。
+7. **遗留**：compat 暂未并入 anim/rmv2/bnk 头版本检查（手工比对路径仍在）；`stale-copy` 判定是启发式，mod 在旧 vanilla 拷贝上小改也会命中（本次 `settlement_hostile_slots.twui.xml` 即属此类，遮蔽前需眼看）。
+
+## 2026-09-25 虫群枪兵不能攻击：animpack bin 内部名≠套件 key + variantmesh 缺武器槽
+
+1. 症状：`czx_inf_marine`（自定义骨架 czx_marine 的远程枪兵）战局中不开火。DB 行与原版火枪手逐字段比对无差异、23 条自定义剪辑全在盘、骨架/prop 节点齐全、属性组无禁攻项——静态链路全部干净。
+2. 根因A（套件注册）：animpack 内 `czx_empire_sword_rifle.bin` 的内部套件名残留 donor 名 `hu1_dlc25_empire_sword_hochland_long_rifle`，DB key `czx_empire_sword_rifle` 解析不到套件。对照已验证包（宝可梦 pm001/pkm_*、数码 v2 `patch_dgm_animpack_names.py`）：**内部名==animpack 条目文件名stem==DB key**。已将 4 个 bin 全部改为 stem（`czx_cst_promethean`/`czx_dlc17_ghorgon01`/`czx_empire_sword_rifle`/`czx_steamtank01`），原位重写 offset 8 处 u16 长度前缀字符串（`scratch/patch_swarm_internal_names.py`）。注意先前一版误把内部名改成 vanilla `hu1_empire_sword_rifle`——会遮蔽原版火枪手套件，方向错误。
+3. 根因B（武器挂载）：`czx_inf_marine.variantmeshdefinition` 无 weapon_1/weapon_2 槽，步枪网格从不挂载。已镜像原版火枪手：weapon_1=`emp_young_nobles_rifle_2h_set1`@be_prop_0、weapon_2=`emp_state_troops_swords_set1`@be_prop_1、shield@be_prop_2、weapon_3-5 空槽。
+4. 已重建部署（189MB/386 文件，data\ 与 mod_output md5 一致），wh3diag 静态验收通过；游戏内实测被 Steam 更新（24237342→25509431，exe 暂缺）+ Lin_Summon_Servant 坏 DB 记录（缺 Lin_Generic_Framework 依赖时弹 bad_mods 终止框）双重阻塞，待更新完成后用 `battle_marine_fire.xml` + 完整依赖链重测。[实测/需随版本复查]
+
+## 2026-09-24 战役初始化闪退根因：ability junction 悬空键（pkm_solar_beam）
+
+1. 症状：所有存档加载 + 新战役初始化 ~15-20s 必崩 `0xc0000005`（`+0x157acc6` 读 null+0x18）；自定义战斗正常；全 playset 去掉 `zzz_czx_pokemon.pack` 即存活。[实测/需随版本复查]
+2. 二分方法学教训：字节级 pack 子集（`pack_subset.py` 抽出部分 db 表重打包）会**制造新的悬空引用**——`main_units+land_units` 双子集崩溃其实是缺 variants/weapons 支撑表导致的假阳性，一度误导方向。正确做法是从 **TSV 源重建行子集**（`scratch/mk_pkm_row_subset.py`），保证引用闭包完整。
+3. 关键反转：部署包与 TSV 重建包逐字节比对，13 张共享表**仅 GUID 不同**——行内容完全一致，崩源只在重建子集**未包含**的表里。分组追加测试（G1 战役杂表 / G2 权限表 / G3 技能链）→ G3 崩。
+4. 根因：`land_units_to_unit_abilites_junctions` 有一行 `pkm_solar_beam → pkm_003_venusaur`，但真实技能键是 `pkm_003_solar_beam`（缺 `003_` 段）。战役初始化解析单位→技能映射时取空指针 → 崩。该悬空是 9/23 技能重命名时的残留。
+5. 教训：`audit_dangling_refs.py` 当天曾报过 `pkm_solar_beam` 悬空但被当作误报忽略（误判它指向已存在的 `pkm_003_solar_beam`）——**junction 表的 ability 列必须同时对照包内 unit_abilities 键 + vanilla 键，两表键名不一致时前缀相似不等于存在**。[实测]
+6. 修复后验证链：单包 G3 存活 90s → 生产包重建部署（playset pos 107）→ 全 playset 115 包新战役 120s 存活 → 用户真实存档加载 150s 存活。
+
+## 2026-09-23 宝可梦/数码v2/虫群补 animpack 容器（无移动/攻击动画根因）
+
+1. 用户实测三包单位"模型在但无移动/攻击动画"。排查确认 clip 数据、battle DB、battle_skeletons、culture 映射、RMV2 骨架名全链路完好——根因是动画集以 loose `.bin` 提供，未被战斗系统注册（同 9-19 数码兽白模已记录的规则，但生成脚本产物从未落地该要求）。
+2. 新增 `tools/pack_animsets.py`：离线把 mod 的 `animations/database/battle/bin/*.bin` 打成 `.animpack` 容器（格式 u32 条目数 + 每条 {str16 内部路径 + u32 长度 + bin 原字节}），不依赖 AssetEditor。
+3. 三包生成 `<mod>_animsets.animpack`（PKM 7 / DGMv2 104 / swarm 4 条 animset），离线解析全部到 payload 末尾、引用 bin 无缺失；顺带修复 4 个 bin 引用 `reference_poses/czx_*.anim` 但文件为旧名 `pm###.anim` 的不匹配。
+4. 第二轮修正：把工作范本数码 v1（50 个 animpack、**0 个 loose bin**）与三包（animpack+loose bin 并存）对比后，删除三包全部 loose `.bin`——消除 loose bin 若被扫描可能与 animpack 条目重复注册/遮蔽的风险，使包结构与已验证范本逐字节同构。animpack 允许裸表（count+str16+len+bytes，v1 格式）或 LZ4 包裹表（vanilla/IA 格式），两种游戏都认。
+5. 重建并部署：`zzz_czx_pokemon.pack`、`zzz_czx_digimon_v2.pack`、`zzz_czx_swarm_units3.pack`（swarm 部署名不同），data\ 与 mod_output SHA-256 一致。游戏内验证受环境级早期初始化崩溃（+0x2cfe551/+0x4926f0，vanilla 同签名）阻塞，重试中；移动/攻击动画确认待实测。
+5. 附带修正文档错误：RMV2 v8 头骨架名实际在 **offset 12**（offset 4=版本 u32、offset 8=u32 字段），旧记 offset 8 有误，已改 pipeline/asseteditor 两处。
+
+## 2026-09-22 实际战役闪退：移出残留 battle_preferences
+
+1. 全合集经 Mod Manager 载入最新存档进入战斗时复现 `0xc0000005` 读 `0x20 @ Warhammer3.exe+0x1a0be3b`，script log 为 148B battle stub，且无 Event 2004；vanilla/full-playset vanilla/gou 最小战斗对照均通过。
+2. AppData 二进制 `.singleplayer.battle_preferences` 中发现旧 `czx_kerrigan` key；当前 swarm 已改用 `lin_all_kerrigan_zerg`，该缓存属于旧战斗军表状态。已备份并移出，未删除存档或 army_setups。
+3. 首次移出缓存后 WMM 曾进入战役/战斗结果面板；但用户后续在最新与较早存档再次进入战斗，22:38、22:46、22:50 仍复现 `+0x1a0be3b`。因此 battle_preferences 处理不是最终修复，问题继续收敛到 campaign→battle 公共路径或外部/存档上下文。
+
+## 2026-09-22 Pokemon A/B 变体 battle init 闪退定界
+
+1. 自动化 `pkm_ab.py` 的多个 Venusaur A/B 变体只加载 runtime + `zzz_czx_pokemon.pack`，在 148B battle stub 阶段以 `0xc0000005` 读 `0xfffffff8 @ Warhammer3.exe+0x5c0ce5` 崩溃；同一时段无 System Event 2004，因此不是本轮 OOM。
+2. 真正触发条件是 Venusaur variant 链不一致：`unit_variants` 的 `pmv001`、`pm003.variantmeshdefinition` 指向 Bulbasaur、donor `man_animation` 等错误组合均失败；恢复 `pm003` 全链后通过。`causes_fear/causes_terror` 互换不改变结论。
+3. 用 Windows Python313 执行 `tools/build_pack.py zzz_czx_pokemon --deploy`，静态 `wh3diag` 验收通过；固定 `pkm_venu_fixed` 战斗运行 161 秒、峰值 7.74GB、无新 dump。
+
+## 2026-09-21 重装后第三方 Steam API 再次覆盖官方 DLL
+
+1. 用户反馈重装后曾短暂恢复，随后普通战斗再次黑屏；核对发现 `steam_api64.dll` 已被 3,511,296B 的第三方 DLL 覆盖，SHA1=`980ea8cce849c7dbd529786058851800028c2930`，与 `steam_api64_goldberg.bak` 相同。
+2. `steam_api64_o.dll` 是官方 298,856B DLL，SHA1=`40d0ae44e090db49b2309fb152fbd3e11124a376`；当前已备份第三方文件、禁用 `cream_api.ini` 并恢复官方 DLL。
+3. 该变量与 MOD DB/解锁补丁无关，需在官方 DLL 状态下重新测试普通战斗。
+
+## 2026-09-21 纯净播放集仍复现普通战斗 init 崩溃
+
+1. 通过 Mod Manager 新建空播放集，仅加载 `!!!!wyccc_runtime_options.pack`，从主菜单新开 Vampire Counts 战役；进入第一场普通战役仍复现 `0xc0000005 @ Warhammer3.exe+0x1a0be3b` 与 148B battle stub。
+2. 该轮无 gameplay MOD、无旧存档/军表缓存、无新 Event 2004；确认当前普通战斗黑屏不是 DGM、swarm 或独立 Vampire 解锁补丁的 DB 问题。
+3. 原《全合集-非震旦》110 项播放集已通过 Mod Manager 恢复；纯净诊断播放集保留供后续 Steam/NVIDIA 覆盖层、第三方注入和安装/驱动环境 A/B。
+
+## 2026-09-21 基础兵种包与 Vampire Counts 解锁补丁拆分
+
+1. 将 DGM、swarm、DGM mini patch 的 Vampire Counts campaign 接入行迁移到独立 `zzz_czx_vmp_unit_unlock.pack`；基础包只保留单位资源与自定义战斗链。
+2. 主解锁补丁包含 68 行建筑、军事组和 exclusive faction 数据，依赖 `zzz_czx_digimon.pack`、`zzz_czx_swarm_units.pack`、`zzz_czx_dgm_patch.pack`；Pokemon 另拆为可选 `zzz_czx_vmp_pokemon_unlock.pack`，依赖 `zzz_czx_pokemon.pack`，避免主补丁自动把 Pokemon 拉回 playset。
+3. 新增 `tools/split_vampire_unlock_patch.py` 与 `tools/split_optional_pokemon_unlock.py`；当前稳定 playset 已移出 Pokemon，主解锁补丁已重部署。
+
+## 2026-09-21 A/B：DGM+swarm 可过 campaign，Pokemon 触发 commit OOM；Bhashiva preset 独立修正
+
+1. 通过 Mod Manager 重启验证：DGM + DGM mini patch + swarm（110 项）完整进入 savegame 阶段，无新 dump；加入 Pokemon 后 campaign load 触发 Event 2004，WH3 commit 43.65GB。
+2. battle_preferences 清空后仍自动回填 `wh3_cp1_bhashiva_qb1` 并触发 `+0x1a0be3b`；已做可回滚等长替换为普通原版 `wh3_cth_desert_01_01`，后续启动不再出现该 null-deref，OOM 单独处理。
+3. 当前稳定基线保留 DGM+swarm+patch，Pokemon 暂时移出当前 playset；Pokemon 需要后续低资源版本或更小 playset 才能重新启用。
+
+## 2026-09-21 Vampire Counts 低扇出战役接入
+
+1. 用户选择把自定义单位挂到当前吸血鬼派系的原版一级建筑，而不是恢复全派系招募。
+2. 新增 `tools/add_vampire_custom_unit_access.py`：DGM 50、swarm 16、Pokemon 7、DGM mini patch 2 个单位各增加一条 `wh_main_vmp_necromancers_1` 建筑入口、一条 `wh_main_group_vampire_counts` 军事组和一条 `wh_main_vmp_vampire_counts` exclusive faction 限定。
+3. `cdir_military_generator_unit_qualities` 保持 0 行；不会把这些单位恢复到 AI 随机军生成器。安全包已重建，尚未部署到正在运行的游戏。
+
+## 2026-09-21 自定义单位包战役安全版：移除全派系随机军池扇出
+
+1. 用户实测：禁用 `zzz_czx_dgm_patch`、`zzz_czx_digimon`、`zzz_czx_pokemon`、`zzz_czx_swarm_units`、`!!ia_all_factions`、`@z_all_agent_actions` 后，新战役初始化不再在 Event 2004/42.96GB commit 处崩溃；当前 107 项清单成功运行至脚本完整加载。
+2. 根因不是磁盘包大小，而是 DGM/swarm/Pokemon 源表把单位扩展到全军事组、全建筑和 AI 随机军生成器，campaign load 时形成高扇出运行时组合。
+3. 新增 `tools/trim_custom_unit_campaign_pools.py`：备份并清空三个单位包及 DGM mini patch 的 `building_units_allowed`、`units_to_groupings_military_permissions`、`cdir_military_generator_unit_qualities` 数据行；保留单位 DB、模型/动画和 custom battle 权限。安全版默认“自定义战斗可用、战役招募/AI 随机军关闭”。
+4. 已生成未部署测试包到 `mod_output/*_safe.pack`；由于游戏仍在运行，未覆盖 `data\\`，待退出后经 Mod Manager 重启回归。
+
 ## 2026-09-21 固化 tools/wh3diag.py：游戏侧排查只读 CLI（替代 scratch 一次性解析脚本）
 
 1. 新增 `tools/wh3diag.py`——固化崩溃排查会话中反复手写的取证路径：`crashes`（mdmp 异常码/params/故障地址→模块偏移/上下文寄存器/stack.txt 符号链）、`scriptlog`（各 script_log 加载枚举数/最后枚举文件/marker 命中，自动标注 148B stub=崩在枚举前、枚举截断=崩在加载中段）、`which`（跨包反查内部路径，data\+工坊 1142710+mod_output 全扫）、`ls`/`meta`/`cat`（PFH5 索引/头/依赖块/rpfm_reserved/单文件提取）、`db`（按 schema_wh3.ron 解码表行）、`usedmods`（清单序号/grep/两清单 diff）、`paths`。pack 参数支持裸文件名自动解析；Windows Python313 与 WSL python3 双跑（`X:\` ↔ `/mnt/x` 自动映射，`WH3_GAME_ROOT`/`WH3_APPDATA`/`RPFM_SCHEMA_WH3` 可覆盖）。
@@ -84,3 +185,85 @@
 2. 根因：%APPDATA%attle_preferences\.singleplayer.battle_preferences 缓存的上次军表含 3x czx_dgm_agumon；该 key 随数码宝贝包重建改名（dgm_chr050_agumon）且 digimon 曾禁用——所有已加载 pack 都不提供此 key，战斗 init 恢复军表解析出 NULL 定死。
 3. 教训：悬空引用在 AppData 缓存而非 modlist，二分 pack 永远收敛不了；纯原版+空 modlist 也崩是强信号。修法=删/改名该 prefs 文件（已改名 .bak_dead_agumon，证据在 scratch/crash_20260920/）。自造单位改名/删 key 时需同步清理 battle_preferences/army_setups/saved_characters/存档中的旧 key 引用。
 4. references/crash_and_load_order_diagnostics.md 新增 §10.14 记录触发条件、判据速查与清理范围。
+
+## 2026-09-22 数码宝贝 v2 补齐与三包整合
+
+1. **骨架/动画/bin 命名口径**：`animations/skeletons/<骨骼名>.anim`、`animations/battle/<骨骼名>/` 按 `battle_animations_table.skeleton` 列命名；`animations/database/battle/bin/<动画表key>.bin` 按 `battle_animations_table.key`（即 land_units.man_animation）命名——审计脚本必须走 `man_animation→BAT key→skeleton` 两级映射，直接拿 skeleton 名对 bin 名会全报缺失。
+2. **`battle_skeletons_tables` 主键列是 `name`** 不是 `key`/`skeleton`，静态检查取列时要兼容。
+3. **`ground_stat_effect_group` 无 `medium` 值**（原版只有 small/large/large_bst/ethereal/aquatic_*/elves_wef*/small_strider 等）；同表 `capture_tier`/`key_building_capture_tier`/`score_capture_tier` 的 `medium` 是合法值——**TSV 批量替换必须按列定向**，全文替换会误伤合法列。
+4. 法术弹丸 `soul_quench` 正确 key 是 `wh2_main_spell_high_magic_soul_quench`（wh2_ 前缀），写 wh_main_ 会成悬空引用。
+5. `ui_unit_groupings` 自定义分组的 loc key = `ui_unit_groupings_onscreen_<group_key>`；漏了游戏里兵种分类标签显示原始 key。
+6. **同骨架多代产出可移植**：同一管线两代输出（dgmslim/dgmB2）若 rmv2 逐字节一致，则 skeleton .anim + animations/battle/<skel>/ + bin 三件可整套平移补齐缺漏单位；反之骨架重生成后旧骨架不可混用。
+7. `build_pack.py` 构建门槛：每单位需 `units_onscreen_name_*`/`land_units_onscreen_name_*` 齐全、`unit_description_short_texts_text_*` 非占位（≥8字）、`unit_description_historical_texts_text_*` ≥40 字，否则拒绝打包。
+
+## 2026-09-22（续）：animpack bin 骨架一致性
+
+- [实测/需随版本复查] 自定义骨架单位的三方一致性检查：`db/battle_animations_table` 行骨架、rigid_model_v2 内嵌骨架名、animpack `.bin` 内嵌 `animations/skeletons/*.anim` 路径必须指向同一骨架。czx 虫群包曾出现前两者已是自定义骨架但 bin 仍引原版 `humanoid01/humanoid11b`——骨架名等长时可原位二进制补丁（如 `humanoid01`→`czx_marine` 均 10 字符）。补丁仅替换 `animations/skeletons/` 前缀路径，勿动 `animations/battle/` 剪辑借用。
+- [实测] bin 中引用不存在的 `.anm.meta`/`.snd.meta` 是原版常态（软引用，游戏容忍），不算悬空错误；`.anim` 引用缺失才是真问题。
+- [实测] 剪辑内嵌骨骼列表顺序与骨架 `.anim` 不一致属正常（WH3 按骨名匹配）；WM 引擎 bin 通常不含 skeleton 路径。
+- 工具：`scratch/bin_missing_check.py`（bin 引用对账）、`scratch/clip_bone_audit.py`（剪辑骨骼 vs 骨架）、`scratch/vmd_skel_map.py`（vmd→wsmodel→rmv2 骨架声明）。
+
+## 2026-09-22（续）：基础兵种一级建筑解锁
+
+- `building_units_allowed` 无链内继承：单位要在建筑链各级都可招，须每级各写一行（原版僵尸在 settlement 链 1-5 级重复出现即此模式）。只写 1 级会在建筑升级后消失 `[实测/需随版本复查]`。
+- 链补全法：`building_levels_tables.level_name -> chain` 反查后取链内全部等级，可把"成熟期起挂 2/3 级建筑"的脚手架一键下放到 1 级；一次性脚本 `scratch/tier1_recruit_20260922.py`。
+- VMP "开局即招"模板 = 僵尸同款 23 建筑集合：`wh_main_vmp_settlement_major_1-5` + `minor_1-3` + `wh_main_special_settlement_{altdorf,castle_drakenhof,couronne}_1-5_vmp`。
+- 坑：本地包换文件名重打后 mod_id（`local:data:<sha256(小写/正斜杠路径)[:18]>`）变化会让旧 playset 引用失效——`zzz_czx_vmp_unit_unlock` 就因此静默掉出 playset，表现是"文件在 data\ 但游戏里完全没有"。排查：算 hash 对 playset_items。
+- 游戏运行中 `data\` pack 被进程锁定，build_pack --deploy 拷不进去；可把 state.db 侧先做（备份后插 playset_items+enabled_order），文件复制挂监视器等游戏退出。
+- `zzz_czx_vmp_unit_unlock` 历史遗留两张地雷已清：`czx_kerrigan`/`czx_kerrigan_lord` 在 groupings/building/exclusive 三表的行全删（战役内凯瑞甘改走 Lin_Summon_Servant 的 `lin_all_kerrigan_zerg` 召唤，见 swarm pack notes）；52 个 v1 `dgm_chr###` 死 key 全删（v1 包不在 playset）。虫群精英（baolongshou/dehaka/hd_dblack/inf_tank/mangshou）与宝可梦进化型（venusaur/charizard/blastoise）移 `wh_main_vmp_necromancers_2`（原版 terrorgheist 同级），中阶留 necromancers_1。
+- **残缺单位恢复法（donor 变体路线）**：gou（跳虫）/cishe（刺蛇）原本只有 main_units+ability+loc+裸 rigid_model_v2，缺 land_units/variants/wsmodel/材质——按悬空清掉后用户要求恢复。做法：land_units/main_units 直接克隆原版 donor 行改 key 与文本（dire wolf→跳虫、sepulchral stalker→刺蛇），unit_variants.variant 与 unit_card 直接引用原版 variant_name/兵牌 key（`wh_vmp_dire_wolves`/`wh2_dlc09_tmb_sepulchral_stalkers_halberd`），variants 表零新增。比"补网格三件套+材质"快且零资产风险；裸 rigid_model_v2 留 pack 里等以后想做真模型再接。
+- wh3diag `db` 输出单表只打前 ~25 行（`... +N rows` 截断），核对行数以 `rows=N` 计数为准，或直接 grep pack 二进制。
+
+## 2026-09-23：兵牌图规范与 ? 排错
+
+- unit_variants.unit_card 的值是 ui/units/icons/<key>.png 的文件 stem，与 variant key 无关——把 variant key（如 pmv003）误填为 unit_card 会得到 ? 兵牌。审计法：对每个 unit_card 检查本 pack ui/units/icons/ 存在同名文件，或用 wh3diag.py which "units/icons/<key>" 确认由 vanilla/其他 pack 提供。
+- 兵牌三件套尺寸：icon 60×130、portrait(ui/portraits/units/<culture>/) 60×130、infopic(ui/units/infopics/) 120×260，均 RGBA。方形立绘 cover 居中裁切即可（垂直 bias ~0.4 保头）。
+- 立绘来源[实测]：wikimon.net 可直连（数码宝贝官方立绘，Special:FilePath/<页名>.jpg 直接 302 到图；页名有空格分词习惯，X 抗体为 Xxx (X-Antibody)）；starcraft fandom/liquipedia/github 主站/百度百科在本机网络均被拦，bing 图搜结果会退化——SC2 虫族立绘暂无可靠源，donor 单位直接引用原版兵牌 key 是最稳解。
+- wikimon 的 MediaWiki 版本无 prop=pageimages，用 prop=images（记得 redirects=1）+ stem 归一化匹配挑 <页名>.jpg。
+
+- **donor pack 复用模式**：当工坊包已含同名单位的完整实现时，优先引用其 variants/兵牌 key 而非自建不完整资产；自建包 position 靠前胜出可保留自定义 main/land 数值。必须删除与 donor 同路径的不完整文件防遮蔽；依赖写进 notes/dependencies.txt 让 PFH5 头与 Mod Manager 都认。
+- wh3diag cat 出的 PNG 前可能带 pack 包装头（非 PNG magic 起始），找 PNG 魔数偏移截取；若为 zstd 帧（magic 28 b5 2f fd）先解压。
+- **数值平衡审计法**：对 main/land_units 两表按 unit key join 出 人数/费用/ma/md/士气/hp/甲 一行一单位快照，重点查"单体怪血量×多人数"型克隆残留（蟑螂 12×6012 即此类——donor 是单体怪时 bonus_hit_points 必须确认实体语义，不能只按 main_units.num_men 机械相乘）。
+
+## 2026-09-23 三包复审：技能补齐、动画文化路由与坦克血量回正
+
+- Pokemon 7 只单位此前没有 `unit_abilities` 链；现补每只一个主动技能和按草/火/水/电定位的被动技能，复用已存在的 vanilla projectile/contact/phase 效果，并补齐 22 条技能 Loc。施法动画表现仍需游戏内复查。审计还发现基础型护甲 key `wh_main_body_40` 不存在，已修正为 vanilla `wh2_main_body_40`。
+- 动画静态审计确认 7 个 Pokemon 的 RMV2 权重有效、攻击 clip 有动态轨道，但每只 `move.anim` 与 `idle.anim` 字节完全相同，**没有独立步行动画**。已通过新工具 `tools/retarget_bonemap.py` 用显式语义骨映射生成 walk cycle：妙蛙种子←wf1_walk_01(wolf01)、妙蛙花←hq01_walk_1(heavyquadruped01，Stegadon 宽展腿与妙蛙花匹配)、小火龙/喷火龙/杰尼龟←rp1_walk_01(raptor01 双足带尾)、水箭龟/皮卡丘←hu1_sws_walk_01(humanoid01)。注意 PM 骨架 L/R 与 vanilla 镜像相反，映射必须 our-L→donor-right；animroot 前进位移按骨盆高度比缩放（0.15~0.72）。骨映射存 `scratch/pm_walk_maps/`。
+- Digimon 属性组原先把 `causes_terror` 无差别施加给多类低阶单位；拆为14个阶段/编制属性组与40条 junction：16只 Rookie 去掉 fear/terror/wallbreaker，34只 T4+ 单体精锐/Boss 保留 terror，其余中高阶按 archetype 保留 fear。104只中103只已有主动技能；RosemonBM 的“慈悲/提法雷特”按恢复与自我增益设计保留两项被动，不强加主动。
+- Digimon v2 的 104 个自定义动画 key 原先只在 Cathay culture 注册；扩展到合法 `culture_pack_ids` 清单。Pokemon 原有 24 个文化映射补齐其余有效文化包；swarm 补齐 4 个自定义 animation set 与 VMP donor `sn1`/`bc1` 等缺失 pair。custom-battle 权限本身不会代替动画文化映射。
+- 修复 swarm：`cishe` 的 `requires_effect_enabling=true` 没有 enable junction，改为直接可用；补回 `czx_ability_hydralisk_grooved_spines` 被刺蛇引用；爆虫被动改用实际 `wh2_dlc11_unit_passive_extra_powder` 图标/source type，修正重复 `unique_id`。
+
+- 坦克血量复核：`wh_main_emp_veh_steam_tank` 原版 donor 同样 `main_units.num_men=3`，但土地战斗实体/steam-tank mount 是单辆坦克；此前把 3 误读为 3 辆并将 `bonus_hit_points` 降至 3200 属过度削弱，已恢复 donor 的 9052。蟑螂 700/只修正保留。
+- 三个 pack 已构建至 `mod_output`，静态悬空引用审计 0 ERROR（148 WARN 为既有北方行省权限与 IA donor `leishou` 跨包引用提示）。首轮 watcher 更新了未加载的 `zzz_czx_digimon.pack`；used_mods 与 playset 确认实际加载名是 `zzz_czx_digimon_v2.pack`，误生成文件未在 playset，Fast End Turn pos113 保持不动。swarm/Pokemon/Digimon v2 data 已于 08:14/08:28 部署且 SHA-256 与 mod_output 一致，playset 未重排，Fast End Turn pos113 保持不动。错误名 DGM 文件仍留在 data 但未加载。Warhammer3 PID 20688 当前仍运行，本轮未中断/接管；最后的 used_mods 快照含 `zzz_czx_fast_end_turn.pack`，而 Fast Off 的 60 秒回归是另一轮配置，不在当前状态。本轮未对 Digimon 被动/宝可梦技能做游戏内画面回归，战役验证需避开已知 Fast End Turn campaign-battle crash。
+
+## 2026-09-23：Fast End Turn 触发 campaign battle-init 闪退（已源码修复）
+
+- 用同一战役存档、通过 Mod Manager，并手动点击预战界面的手动战斗按钮进行逐组 A/B。`zzz_czx_fast_end_turn.pack` 单独回加即可复现 `0xc0000005` 读 `0x20 @ Warhammer3.exe+0x1a0be3b`、148B stub；无 Event 2004。Global Lua Guard 单独回加、Pokemon+解锁组、虫群+数码宝贝+VMP 解锁组均通过。
+- 原 114 项播放集仅排除 Fast End Turn 的 113 项回归通过（battle-start hook 27.4 秒、存活 >60 秒），证明它是充分触发项。
+- **源码级定位**：首帧 `cm:add_first_tick_callback` 中的三条图形/内存偏好写入（`gfx_texture_quality`、`gfx_unlimited_video_memory`、`minimise_memory_usage`）是触发组——只删 `_apply_all` UI 回调仍崩，全删 `SetPref` 保留 UI 回调则通过；仅保留 `fast_forward_end_turns` 单项也通过最终回归。
+- **修复与回归**：`czx_fast_end_turn.lua` 现只保留 `SetPrefAsBool('fast_forward_end_turns', true)` + `_apply_all` 速度下拉自动化，图形/内存偏好改由 `tools/set_memory_safe_prefs.py` 离线管理。已重打部署（pack 4694B），同一存档经 WMM 手动进入战斗：64 个 battle 脚本枚举完成、battle-start hook 26.5 秒执行、进程存活 >10 分钟、无新 dump、无 Event 2004。活动播放集改名 `WH3 Campaign Stable`（114 项含修复版 Fast End Turn）；原 114 项《全合集-非震旦》与《测试2》保留。详见诊断指南 §10.30。
+
+
+## 2026-09-23：PM 动画补齐第二阶段——guard/getup 重定向
+
+- 在第一轮 move clip 之后，按各 unit 的 `bin` 实际引用补齐剩余动作槽：`guard.anim`（7 只全员，bin 有 defend 引用）与 `getup.anim`（仅 pm004/007/009/025——其 hu1 系 bin 引用 `knockdown_facedown_getup`；pm001/003/006 bin 无 getup 引用，保留 idle 副本）。
+- 经验：同一单位不同动作槽可混用不同 donor，**映射文件必须跟 clip 的 donor 骨架对应**——pm003 的 move 用 hq 映射、guard 用 wolf 映射（`pm003_wolf.json`），混用会在 bonemap 阶段报 donor 骨缺失。
+- 全员 guard：pm001/003←`wf1_defend_01`(wolf01)、pm004/006/007←`rp1_defend_front_01`(raptor01)、pm009/025←`hu1_sws_defend_front_01`(humanoid01)；getup 统一 `hu1_sws_knockdown_facedown_getup_01`，pm004/007 另建 hu 骨映射。
+- 落包静态验证：21 个新 clip 均非 idle 副本、skeleton_name/骨数与各自 PM 骨架一致；pack 15,202,032B/199 文件；游戏运行中由 `deploy_pending5` watcher 待退后复制。游戏内目视验收待做。
+
+## 2026-09-25：Update 9.0 闪退定案——8 个版本不兼容包被禁用
+
+- 9.0（build 25509431）晨间自动更新打穿 116 项《WH3 Campaign Stable》播放集；两个签名：`0xc0000005` 读 `0x20` @ `+0x52a21a`（挂载期崩）与读 `0x8` @ `+0x538a0a`（挂载完成后崩），均早于脚本枚举，非 OOM、非 CreamAPI、非当日更新包。
+- 前端二分（`Warhammer3.exe <modlist>;` + `modified.log`/`mp_log.txt` 判据）定位 8 个真凶：`Unique_Faction_UI_III`、SFO 五包（main/warband/fesir/tla/brt）、`longer.pack`（依赖 SFO 主包）、`zz_diag_junction.pack`（本地诊断包，junction 指向 WH3 不存在的 WH2 Tomb Kings 组，单包复现 `+0x538a0a`）。其余 108 项前端验证通过；已从 `state.db` 当前播放集与 `enabled_order` 移除（备份 `scratch/crash_20260925/state.db.bak_*`），diag 包本体移至 scratch。
+- 重要方法修正：`game_startup_mode battle` autotest 在 9.0 上 vanilla 也定死（`+0x1a957e7`），不能再当二分基线；改用前端启动二分，且"进程存活"须配合 `modified.log` 挂载数判据（挂载完会停在 press-any-key 待输入，不是卡死）。详见 §10.31。
+- 遗留：8.1.1 老战役档 `campaign_load` 无 mod 也崩（`+0x243ae98`），为独立存档兼容问题；`twwh3-memreader.dll` 硬偏移注入物建议停用。
+
+## 2026-09-25 晚：扩展玩法包 9.0 兼容补丁组（6 包全量修复部署）
+
+- 对崩溃排查期被移出的 9 个扩展包做逐表审计（版本头对比 vanilla db.pack + RON `is_reference` 悬空键 + twui/bin/rmv2/bnk 格式头 + lua 外部调用），产出 6 个独立兼容补丁包 `czx_{luke,psw,chanliuzi,arthas,boudicca,xiang}_90fix`，均已部署进《全合集-非震旦》（补丁 pos 99-104、目标 pos 105-111，靠前遮蔽）：
+  - 按当前版本重编码旧版表分片 44 张（psw 14 + chanliuzi 7 + arthas 5 + xiang 15 + luke 2 + boudicca 1），新增列填 vanilla 典型默认；v0 无标记表保持 v0。
+  - 修 9.0 已删/改名键：`wh3_dlc20_group_chs_festus`→`wh3_dlc20_group_chs_festus_glottkin`（20 行）、`wh3_main_sla_cav*`→`wh3_dlc27_sla_cav_*_tormentors`、unit_sets 死键 `skv_infantry`→`skv_all`/`vmp_corpses`→`vmp_corpse_units`/`wh2_dlc11_emp_spearmen_swordsmen_flagellants_halberdiers`→`emp_infantry`（改名后按主键去重 7 行）。
+  - twui：psw 过期 v141 `dlc24_formless_horror.twui.xml` 与 arthas 过期 `dilemma.twui.xml`（旧 `CanMakeChoice` 签名）均为无 mod 内容的旧版拷贝，已用当前 v142 vanilla 文件遮蔽还原；xiang 的 `character_details_panel` 系为真改写，保留。
+  - `!!Prayer_of_star_witch_movie`、`zzz_czx_hero_grants`、`zzz_czx_vmp_pokemon_unlock` 审计零问题，直接回归播放集。
+- 工具：`build_pack.py` 的 `encode_value` 补齐 `ColourRGB`/`ColourU32`/`I16`/`I24` 编码（修 ritual_targets 表必需）。
+- 验证：全部补丁包逐表 `decode_db_table` 通过、头部版本=vanilla 当前版、非改名行逐值回读一致；播放集 `playset_items` 与 `enabled_order` 均为 114 项一致，补丁→目标顺序全部满足。游戏内回归待做。详见 references §10.32。

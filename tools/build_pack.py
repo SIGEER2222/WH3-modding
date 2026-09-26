@@ -45,7 +45,13 @@ def _schema_paths() -> list[Path]:
             paths.extend(d.glob("schema_*.ron"))
         except (PermissionError, OSError):
             continue
-    return sorted(paths)
+    paths = sorted(paths)
+    # Repo-pinned latest schema wins per-version conflicts (Schema merges all
+    # texts; later files overwrite earlier definitions for the same version).
+    pinned = Path(__file__).resolve().parent / "_dl" / "schema_wh3.ron"
+    if pinned.exists():
+        paths = [p for p in paths if p.name != pinned.name] + [pinned]
+    return paths
 
 
 SCHEMA_PATHS = _schema_paths()
@@ -244,8 +250,12 @@ def encode_value(value: str, field_type: str) -> bytes:
         return b"\x00" if value == "" else b"\x01" + encode_string(value)
     if field_type == "Boolean":
         return b"\x01" if value.lower() == "true" else b"\x00"
-    if field_type == "I32":
+    if field_type in ("I32", "ColourRGB", "ColourU32"):
         return struct.pack("<i", int(float(value or 0)))
+    if field_type == "I16":
+        return struct.pack("<h", int(float(value or 0)))
+    if field_type == "I24":
+        return int(float(value or 0)).to_bytes(3, "little", signed=True)
     if field_type == "I64":
         return struct.pack("<q", int(float(value or 0)))
     if field_type == "F32":
@@ -417,6 +427,28 @@ def pack_reserved_files(pack_notes: str = "", dependencies: list[str] | None = N
     }
 
 
+def read_src_bytes(path: Path) -> bytes:
+    """Read a source file, transparently unwrapping CA pack-compressed blobs.
+
+    Some asset exports dump the raw pack entry bytes: [u32 decompressed_size]
+    followed by a zstd frame (magic 28 B5 2F FD). We store entries
+    uncompressed, so feeding such a blob through raw makes the game parse
+    compressed bytes as the real format -> garbage header fields -> giant
+    allocations (observed 22-38GB commit spikes -> bad_alloc crash).
+    Unwrap in memory and self-heal the source file.
+    """
+    data = path.read_bytes()
+    if len(data) >= 8 and data[4:8] == b"\x28\xb5\x2f\xfd":
+        import zstandard as zstd
+        dec = zstd.ZstdDecompressor().decompress(data[4:], max_output_size=256_000_000)
+        if int.from_bytes(data[:4], "little") == len(dec):
+            path.write_bytes(dec)
+            print(f"  !! unwrapped zstd-container source {path.name}: {len(data)} -> {len(dec)}B")
+            return dec
+        print(f"  warning: {path} looks zstd-packed but size header mismatches; packed raw")
+    return data
+
+
 def build(mod_name: str, out_path: Path | None = None):
     mod_root = ROOT / "mod_files" / mod_name
     if out_path is None:
@@ -453,7 +485,7 @@ def build(mod_name: str, out_path: Path | None = None):
                 internal = path.relative_to(mod_root).as_posix()
                 internal = PACK_PATH_OVERRIDES.get(mod_name, {}).get(internal, internal)
                 internal = internal.replace("/", "\\")
-                files[internal] = path.read_bytes()
+                files[internal] = read_src_bytes(path)
                 print(f"file {internal}: {path.stat().st_size} bytes")
 
     notes_path = mod_root / "notes" / "pack_notes.txt"

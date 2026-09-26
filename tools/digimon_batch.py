@@ -1192,15 +1192,22 @@ def biped_landmarks(slots):
     # spine: interpolate pelvis->neck across any real spine joints
     sp = [v[1] for k, v in sorted(slots.get("spine", {}).items())]
     top = neck or head or (sorted(sp, key=lambda p: p[1])[-1] if sp else None)
-    if not neck and head and pelvis:
-        neck = lerp(pelvis, head, 0.78)      # synth neck below head
-        probs.append("synth neck")
     if pelvis and top:
         pts = [pelvis] + sorted(sp, key=lambda p: p[1]) + [top]
         for i in range(3):
             t = (i + 1) / 4 * (len(pts) - 1)
             a, b = int(t), min(int(t) + 1, len(pts) - 1)
             lm[f"spine_{i}"] = lerp(pts[a], pts[b], t - a)
+    if not neck and head:
+        # synth neck: halfway between the top spine link and the head.
+        # lerp(pelvis, head, 0.78) landed too low on hunched/quad rigs
+        # (gabumon, taomon) and dragged chest verts into the neck group;
+        # anchoring on spine_2 also keeps the neck bone non-degenerate.
+        base = lm.get("spine_2") or (max(sp, key=lambda p: p[1]) if sp
+                                     else pelvis)
+        if base is not None:
+            neck = lerp(base, head, 0.5)
+            probs.append("synth neck")
     lm["root"] = pelvis
     if neck:
         lm["neck_0"] = neck
@@ -1987,7 +1994,16 @@ def main():
     ap.add_argument("--form", default="")
     ap.add_argument("--units", default="")
     ap.add_argument("--limit", type=int, default=0)
+    ap.add_argument("--mod", default="zzz_czx_digimon",
+                    help="mod source dir under mod_files/ to write into "
+                         "(default zzz_czx_digimon). Needs ROSTER.tsv.")
     args = ap.parse_args()
+
+    global MOD, ROSTER, PORTED
+    if args.mod != "zzz_czx_digimon":
+        MOD = ROOT / "mod_files" / args.mod
+        ROSTER = MOD / "ROSTER.tsv"
+        PORTED = MOD / "PORTED.tsv"
 
     roster = load_roster()
     want = set(args.units.split(",")) if args.units else None

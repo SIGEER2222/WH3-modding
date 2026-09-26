@@ -12,6 +12,15 @@
 
 注意：Bad Mods 对话框弹出时**也可能**同时写出 .mdmp；判断标准以 `bad_mods_report.txt` 是否被本次启动刷新为准（比较文件 mtime 与启动时间）。`[实测/需随版本复查]`
 
+**首查顺序（2026-09-25 固化，禁止跳步）**：
+
+0. `Get-WinEvent -FilterHashtable @{LogName='System'; Id=2004}`——与 dump 同秒命中即 **OOM** 定案（§10.10/10.19/10.21），不要去二分 pack；顺手查 `Select-String preferences.script.txt -Pattern 'minimise_memory_usage'` 是否被干净退出写回（§10.19）。
+1. `bad_mods_report.txt` 被本次启动刷新 → DB 校验路线（§二）。
+2. 有新 `.mdmp` → 原生崩溃，读**内层**异常码并按 §三的签名表分流（§三）。
+3. 两者都无、进程起不来 → 启动层：`steam_api64.dll` 完整性（§10.17/10.24）、Steam 客户端是否在跑（stub 两段式 `+0x4926f0`，§10.26）。
+4. **vanilla/空 modlist 也崩** → 根因在 AppData 缓存或系统环境，不在 modlist：先 grep `battle_preferences`/`army_setups` 里的 mod key（§10.14），再怀疑注入层/驱动/引擎竞态（§10.16、§10.31 环境签名）。
+5. 排查全程先确认**无第二个会话在拉起游戏/部署 pack**——并发压测与半写 mmap 是已实锤的归因污染源（§10.12、§10.27）。
+
 ## 二、读 `bad_mods_report.txt`
 
 ```text
@@ -42,6 +51,22 @@ BadMods
 - 崩溃地址 `0x14xxxxxxx` 位于 `Warhammer3.exe` 代码段；同一根因多次崩溃地址通常一致或相近。
 - 若多次原生崩溃地址相同、而换 MOD 组合后地址变化，说明不是同一根因，不要合并归因 `[实测/需随版本复查]`。
 - 原生崩溃阶段（pack 解析 / DB 合并 / 资源加载 / UI）大致可用存活时长区分：pack 解析阶段崩溃通常在 5-20 秒内；进战役/主菜单后崩溃多为实体/资源/脚本问题。
+
+**签名速查表**（2026-09-25 汇总；外层 `0xc0000409 @ +0x10da8f1` 只是通用 fail-fast 外壳，**不是根因**，一律读内层）：
+
+| 内层签名 | 判定 | 首查/详见 |
+|---|---|---|
+| `0xe06d7363`（param0=`0x19930520`） | `std::bad_alloc` = OOM | Event 2004；commit 上限核算 §10.21；prefs 降档 §10.19 |
+| `0xc0000005` 读 `0x20` @ `+0x1a0be3b` | battle init 空指针 | AppData `battle_preferences`/`army_setups` 悬空单位 key §10.14；Lua 首帧写 gfx 偏好 §10.30 |
+| `+0x2ccd917` | matched-combat 套件查表返回 -1 | 自造动画 bin 内部名规则 §10.34 |
+| `+0x2cfe551`（`mov ebx,[r13+0x5a0]`，r13=null） | battle setup 序列化空对象 | vanilla 同崩=环境竞态，勿二分 §10.23 |
+| `+0x157acc6` 读 `null+0x18`（战役/存档加载 ~15-20s） | 战役初始化单位→技能映射空指针 | junction 表悬空 key §10.35 |
+| `+0x52a21a`（9.0 挂载期） | 过期/不兼容 pack | 前端二分 §10.31 |
+| `+0x538a0a`（9.0 挂载完成后） | junction/引用悬空 key | 嫌疑包 DB 审计 §10.31/10.33 |
+| `+0x1a957e7` / `+0x4e5b30`（9.0，vanilla 同崩） | 环境级早期 init | 非内容问题 §10.31 |
+| `+0x4926f0`（stub 期，进程仅 1-4GB） | 启动 stub 空指针/Steam 握手失败 | Steam 客户端是否在跑 §10.26 |
+| rip=堆地址、`param0=8`（DEP exec） | UAF 坏虚表调用 | 监听器级联竞态 §10.12a/10.13/10.36 |
+| `0xc000041d`（ntdll 回调） | fatal user callback | TSF/IME/overlay 交互 §10.11 |
 
 ## 四、同名 DB 片段的遮蔽规则（实测）
 
@@ -175,6 +200,8 @@ u32 row_count                      行数
 ## 十、自动化战斗实测与动画资源验证（2026-09-19，`[实测/需随版本复查]`）
 
 ### 10.1 `game_startup_mode battle` 无人值守战斗测试
+
+> **⚠️ Update 9.0 起该入口已废（2026-09-25 实测，详见 §10.31）**：vanilla 空 modlist + 合法 XML 也定死 `+0x1a957e7`/`+0x1a0be3b`，与 mod 无关——不能再当二分/回归基线。改用前端启动二分 `Warhammer3.exe <modlist.txt>;`，判据 = 新 dump + `modified.log` 挂载行数（进程存活≠成功，"press any key" 假存活坑）。本节命令行细节仅适用于 8.1.1 及更早版本。
 
 验证过的工作方式：直接跳过主菜单把单位送进战斗，比"启动到主菜单"强得多——能实测单位生成、模型渲染、弹药消耗、交战、阵亡全流程。
 
@@ -378,3 +405,170 @@ pack 文件数在偏移 +16；索引从 +28 开始，每条 = `size(u32)` + `fla
 - **空 modlist 语义陷阱**：`Warhammer3.exe game_startup_mode battle <xml> ; ;`（两个分号之间为空）可能不等价于"不加载 mod"——游戏可能回退到扫描 data\ 全部 pack。用 `--mods packs:<file>` 写一个至少含一个 mod 行的 modlist 文件来控制变量。
 - **OOM 与竞态叠加**：`--mods full`（114 项 playset）→ bad_alloc（45.5GB commit + Event 2004）；`--mods none` → 间歇 +0x1a0be3b。两个根因并存时，先修 OOM（prefs/baseline），再看剩余崩溃是否为竞态。
 - **判据速查**：`alive_after_Ns=True && new_dumps=0` = 过；`new_dumps=1` 且 `+0x1a0be3b` = 竞态重试；`new_dumps=1` 且 `0xe06d7363`/`0xc0000409` + Event 2004 = OOM 未修好。
+- **9.0 修正**：`game_startup_mode battle` 入口在 9.0 本身不可用（§10.31）；本节"必须实际进战斗"的判据精神不变，改由前端启动二分 + 存档战役实战承载。
+
+### 10.21 commit 上限容量核算：满 playset 在 52GB cap 下结构性跑不动（2026-09-21 定案）
+
+- **核算公式**：`commit_limit ≈ 物理RAM + pagefile`。本机 16GB + 系统托管 36GB = **52GB**。`Get-Counter '\Memory\Committed Bytes','\Memory\Commit Limit'` 直接读。
+- **满 playset 需求实测**：WH3 进程 Event 2004 反复记到 40-51GB commit（18:23=40.85GB、15:5x-16:00=51GB）。脚本化 `--mods full` bad_alloc 于 45.5GB；真实 `wyccc_launch_mods.txt` 启动同样 bad_alloc（0xe06d7363，param 0x19930520）。
+- **基线占用**：883 个进程合计私有字节 ~35.9GB（97 python + 42 devin = AI 会话 spawn 树各 ~2.7/2.4GB，其余为浏览器/steamwebhelper/AweSun/GameViewer/Huorong HipsDaemon/QQ拼音长尾）。内核 pool 仅 ~1.4GB 正常。
+- **结论**：余量 `52 - ~33基线 ≈ 19GB` < 满 playset 需求 40-50GB → **必然 bad_alloc/OOM**，与是否竞态无关。vanilla 战斗（~7GB）塞得进余量故能过。
+- **回归点**：9-19 手动 pagefile 48GB（cap~64GB）时满 playset 能加载（那时崩的是战斗峰值撞 64GB）；9-21 改回系统托管 36GB（cap 52GB）后，满 playset **连加载都过不去**。缩 cap 是本次"打不开"的回归因。
+- **修复方向（cap 52GB 下满 playset 无解）**：① 抬 commit 上限=加大 pagefile（治本，需用户决策）；② 砍 playset；③ 压基线 commit（杀 AI 树+浏览器最多省 ~10GB，对 45GB 需求不够）。
+- **与 null-deref 竞态区分**：`+0x1a0be3b`/`+0x2cfe551`/`+0x1ad5c65` 崩溃时游戏 commit 仅 1-4GB、系统 committed ~38GB 未触顶 → 与 commit 无关，是独立的引擎 init 竞态。**判据**：dump code=0xe06d7363 → OOM/commit；code=0xc0000005 + params(0,小偏移) → null-deref 竞态。
+
+### 10.22 自定义单位包的随机军池扇出会把小 pack 放大成 OOM（2026-09-21，实测/需随版本复查）
+
+- **A/B 结果**：114 项 playset 同时加载 `zzz_czx_dgm_patch`、`zzz_czx_digimon`、`zzz_czx_pokemon`、`zzz_czx_swarm_units` 及两个小包 `!!ia_all_factions`、`@z_all_agent_actions` 时，新战役初始化命中 Event 2004，WH3 commit 达 42.96GB；用户禁用这 6 项后，107 项清单于 21:52 启动并完整加载 356 个脚本，运行约 109.7s 无新 dump。
+- **根因形态**：磁盘体积不是充分指标。原始源表把 50 个 DGM 单位扩展到 5250 行 `units_to_groupings_military_permissions`、5955 行 `building_units_allowed` 和 50 行 `cdir_military_generator_unit_qualities`；swarm 为 1500/4270 行，Pokemon 为 728/1011/7 行。单位、建筑、军事组和随机军生成器的全派系交叉引用会在 campaign load 运行时展开。
+- **修复策略**：`tools/trim_custom_unit_campaign_pools.py --apply` 备份并清空这些战役扇出表，只保留 `main_units`、模型/动画链和 `units_custom_battle_permissions`，因此三个单位包和 DGM mini patch 变为“自定义战斗可用、战役建筑招募/AI 随机军默认关闭”的安全版。若以后需要战役使用，应新增低扇出的指定人类派系接入，不要恢复全派系/全建筑笛卡尔积。
+- **验证**：安全包的 `wh3diag.py db` 显示上述扇出表均为 0 行；DGM/swarm/Pokemon 的自定义战斗权限仍分别为 1250/400/175 行。`audit_dangling_refs.py` 无新增 ERROR；该修复需通过 Mod Manager 重启后再做连续 3 次 battle/campaign 回归，单次进主菜单不算通过。
+- **低扇出战役接入**：[实测/需随版本复查] 当前方案把 DGM 50、swarm 16、Pokemon 7、DGM mini patch 2 个单位各自只挂到原版 Vampire Counts 一级建筑 `wh_main_vmp_necromancers_1`，并各加一条 `wh_main_group_vampire_counts` 军事组和一条 `units_to_exclusive_faction_permissions` → `wh_main_vmp_vampire_counts`。安全包中对应行数为 50/16/7/2，不恢复全派系×全建筑扇出；用户可在死灵法师一级建筑的招募栏使用这些单位。工具：`tools/add_vampire_custom_unit_access.py`。
+- **资产总量阈值**：[实测 2026-09-21/需随版本复查] 同一台机器在 52.5GB commit 上限、level1 画质下，DGM+mini patch+swarm（110 项 playset）能完整进入 savegame 阶段；再加入 Pokemon（111 项）会在 campaign load 把 WH3 commit 推到 43.65GB 并命中 Event 2004。低扇出 DB 表不能抵消全部模型/动画/贴图资源的运行时内存，单位包应支持按组合启用。
+- **Bhashiva preset 独立触发器**：[实测 2026-09-21/需随版本复查] `battle_preferences/.singleplayer.battle_preferences` 清空后仍会自动生成 `wh3_cp1_bhashiva_qb1`，并重复触发 `+0x1a0be3b`；将等长 preset key 替换为普通原版 `wh3_cth_desert_01_01` 后新启动不再出现该 null-deref，但仍需把 OOM 与 battle init 路径分开判定。
+- **基础兵种包/解锁补丁拆分**：[实测/需随版本复查] 基础包只维护 `main_units`、模型/动画、custom battle 权限；DGM/swarm/mini patch 的 Vampire Counts 接入集中放入 `zzz_czx_vmp_unit_unlock.pack`（68 行，依赖三个当前稳定基础包），Pokemon 另有可选 `zzz_czx_vmp_pokemon_unlock.pack`（7 行，仅依赖 Pokemon 基础包）。这样更新单位资源不会覆盖招募接入，且启用主补丁不会自动把 Pokemon 拉回 playset。
+
+### 10.23 纯净播放集仍复现普通战斗 init 空指针（2026-09-21 实测）
+
+- 通过 Mod Manager 新建并切换 `WH3_diag_vanilla_0921` 空播放集，实际 `wyccc_launch_mods.txt` 仅包含 `!!!!wyccc_runtime_options.pack`；`used_mods.txt` 为 0 个游戏 MOD。
+- 从该播放集主菜单新开 Vampire Counts 战役并触发普通战役战斗，仍稳定产生 148B `script_log` stub：只写入 `battle_scripted.lua loaded: a new battle is being initialised`，随后 `0xc0000005` 读 `0x20 @ Warhammer3.exe+0x1a0be3b`。
+- 该轮提交约 21GB、提交上限约 56GB，未出现新的 System Event 2004；因此不是 OOM，也不是 DGM/swarm/解锁补丁、旧存档或旧 `battle_preferences`/`army_setups` 军表造成的内容问题。
+- [实测/需随版本复查] 退出 QQ 拼音辅助进程后重新启动纯净播放集，辅助进程在游戏启动后自动重新出现；最新崩溃栈本身只含 Warhammer3/ntdll/KERNEL32，未出现 QQ 拼音栈帧。下一步应转向 Steam/NVIDIA 覆盖层、第三方安全软件注入与游戏安装/驱动环境 A/B，不再继续修改自定义单位表。
+
+### 10.24 重装后第三方 `steam_api64.dll` 再次覆盖官方 DLL（2026-09-21 实测）
+
+- 用户反馈“卸载重装后好了一段时间，之后复发”。随后核对游戏目录发现 `steam_api64.dll` 为 3,511,296B，SHA1 `980ea8cce849c7dbd529786058851800028c2930`，与工作区 `steam_api64_goldberg.bak` 完全相同；同目录 `steam_api64_o.dll` 为 298,856B，SHA1 `40d0ae44e090db49b2309fb152fbd3e11124a376`，且仍存在 `cream_api.ini`。
+- 这解释了重装后的暂时改善：重装恢复了官方 Steam API，后续第三方 DLL/配置又被放回。诊断修复已把第三方 DLL 与 `cream_api.ini` 备份到 `scratch/crash_20260921/`，用官方 `steam_api64_o.dll` 恢复 `steam_api64.dll`，并将 ini 改名为 `cream_api.ini.disabled`；修复后官方 DLL SHA1 已核验一致。
+- [实测/需随版本复查] 进行 WH3 原生战斗 A/B 时必须先确认 `steam_api64.dll` 是官方版本；Steam API shim/解锁配置应与 MOD 内容问题分开，不能把第三方启动层覆盖误判为兵种 DB 崩溃。
+
+### 10.25 重装后恢复本地 MOD 的指纹/文件名映射（2026-09-21 实测）
+
+- Steam 重装 WH3 会清空 `common\Total War WARHAMMER III\` 全部文件（含 `data\` 里所有已部署本地包），但**不会**触碰 `%APPDATA%\The Creative Assembly\Warhammer3\`（battle_preferences、save_games、scripts\mct_* 全保留），也不会触碰 `steamapps\workshop\content\1142710\` 工坊包。
+- `local:data:<hash>` 的 mod_id = `sha256(规范化绝对路径)[:18]`（小写、`/` 分隔、含盘符），与文件内容无关——只要把同名 pack 拷回 `data\`，playset 条目自动复活，无需改 `state.db`。
+- 部署名 ≠ 源文件名时（`--deploy-name`），名字对不上的 mod_id 可用 `state.db` 的 `load_order_backups.ordered_mod_ids` 配合 `backups\used_mods-*.txt` 对齐求出：`used_mods.txt` 先列全部 `add_working_directory`（每工坊 mod 一行），随后按 playset 顺序列 `mod "X.pack"`，mod_id 索引 i 对应第 `97+i` 行的包名（1 起始，视目录行数而定）。
+- 实测：装备管理增强工具实际部署名为 `zzz_czx_ancillary_sell4.pack`（源 `mod_output\zzz_czx_ancillary_sell.pack`）；Lalolalo9 自动建设部署名为 `Lalolalo9Autoconstruction.pack`（源 `lalolalo9_autoconstruction.pack`）。
+- 重装前建议先把 `battle_preferences\` 整目录备份清空——重装不清它，旧的自定义战斗预设会原样带进新安装继续触发 `+0x1a0be3b`。
+
+### 10.26 `0xe06d7363` = std::bad_alloc；pagefile 配置不重启不生效（2026-09-22，⚠️ 基线结论已被 10.27 推翻）
+
+- **签名定案**：`0xe06d7363`（参数含 `0x19930520`）是 MSVC C++ 异常抛出码，WH3 语境下即 `std::bad_alloc`。同日纯原版空 modlist（modlist 文件内容仅 `;`，`modified.log` 确认零 pack）进自定义战斗，WH3 单进程 commit 仍达 **~40GB**、系统 commit 51.6/53.8GB——连"零 mod"都在 battle init 的 Deployed→sim 阶段顶到天花板，证明 40GB 级基线 commit 是引擎行为而非 MOD 内容泄漏。
+- **pagefile 运行时不会扩**：`Win32_PageFileSetting` 配的 InitialSize/MaximumSize（49152/65536）只在**重启后**重建 pagefile 时生效；运行期 `Win32_PageFileUsage.AllocatedBaseSize` 停在 37583MB。实测用受控分配器把系统 commit 推到 48GB（上限 52.5GB 的 92%）也不触发在线扩容，commit limit 不变。**唯一有效修复 = 管理员设固定大 pagefile（建议 64GB）+ 重启**，上限→~80GB。
+- **第二种独立签名 `0xc0000005 @ Warhammer3.exe+0x4926f0`（参数 0x0/0x3e8，进程仅 1–4GB）** = 启动 stub 阶段空指针/Steam 握手失败，与 OOM 无关。WH3 启动是 stub→spawn 子进程→stub 退出的两段式，stub 卡在 ~188MB/2 线程属正常窗口；真失败 = 没有后继进程。Steam 客户端不在运行时直启 exe 大概率死在这条路径；`steam.exe -applaunch 1142710` 可用但属绕过 Mod Manager 的应急手段。
+- **battle_autotest.py 的 `wait` 到期会主动 taskkill 游戏**——监控里"进程存活到 N 秒后消失"是工具杀的，不是崩溃；判存活须看 wait 窗口内有无新 dump。
+- **排除项**：9400 个 `.anim`（DB+动画、无 mesh 的 136MB 包）跑 4min+ commit 峰 ~23GB 未爆——动画解压是分钟级 CPU 消耗但内存可控；纯 DB+UI 包存活至工具超时；致命组合只在"网格+贴图+动画齐全、commit 顶限"时出现。同一台机器 16GB RAM + 53.8GB 上限下，113 项满 playset 结构性跑不动，与单包正确性无关。
+- **处置（已被 10.27 修正）**：内容侧当时判定"已无可修项"是错的——真正根因是 `mod_files` 里的 zstd 容器源文件裸存进 pack（见 10.27）。本条保留作为并发测试污染的反面教材：多会话互抢时的共享 commit 读数会把"独占 7GB"污染成"40GB 基线"。
+
+### 10.27 真凶定案：`mod_files/` 里的 zstd 压缩源文件 = 22–38GB 内存爆炸（2026-09-22 晚，受控 A/B 实锤）
+
+- **推翻 10.26 的"与内容无关"**：10.26 的"零 mod 也 40GB"读数取自多会话并发窗口（共享 commit 互相放大）。独占单实例受控下 vanilla 战斗实测 **6.8–7.3GB** 平顶——基线并不高。真正的爆炸由**pack 内容**驱动。
+- **机制**：`mod_files/<mod>/` 里的 `.anim` / `.bone_inv_trans_mats` 等文件若是 `[u32 解压后大小][zstd 帧]`（偏移 4 起为 zstd magic `28 B5 2F FD`）——这是 CA pack 的**条目级压缩容器**，由导出工具按 pack 原始字节 dump 而来。`build_pack.py` 把所有文件按原始字节写入、索引**不置压缩标记**（官方 anim2.pack 的同类条目带 `z` 标记，游戏靠标记解压）→ 引擎把压缩字节当裸格式读 → 头部字段（骨骼数/帧数等）= 垃圾 → 分配暴涨 22–38GB → `0xe06d7363` bad_alloc。
+- **受控对照（同日）**：`zzz_czx_pokemon` 仅把 14 个 zstd 骨架 .anim 解压回裸格式，其余不动 → 38GB 爆 → **7.04GB 通过**；`zzz_czx_digimon_v2` 解压全部 9195 个 zstd 文件（296MB 包）→ 29.9–35.3GB 爆 → **7.61GB/150s 到 Deployed**。判据：源文件头 4 字节为小端解压大小 + `28 B5 2F FD`；解压后大小字段校验可验证完整性。
+- **修复工具化**：`build_pack.py` 已内置 `read_src_bytes()` 哨卡——入 pack 前自动识别 zstd 容器、解压内容并**回写源文件**（自愈），打印 `!! unwrapped zstd-container` 行。头部大小校验不符时按原样打包并告警。
+- **不要顺手压缩回去**：本工具链的 pack 全部条目不压缩，源文件保持裸格式；从 pack 提取文件用 `wh3diag.py cat`（已自动解压），不要用 dump 原始扇区字节的工具。
+- **残留教训**：二分排障时若嫌疑文件是 zstd 容器（`.anim`/`.bin`/`.bone_inv_trans_mats`/`.anm.meta` 均可能），"文件存在与否"的二分会同时改变"格式正确与否"两个变量——pokemon 骨架层二分（删 skeletons→仍爆；全删 animations→过）曾误判方向。先 `xxd | head` 看偏移 4 是否 `28 b5 2f fd` 再分层。
+- **并存事实仍有效**：`+0x4926f0` stub 期空指针（Steam 不在/互斥竞争/高并发）与 OOM 无关；直启需 `SteamAppId=SteamGameId=1142710` + modlist 含 `!!!!wyccc_runtime_options.pack`（否则 stub 冻结 ~890MB）；两段式 spawn 需盯子进程；autotest 工具到点 taskkill。
+
+### 10.28 Pokemon A/B 变体导致 battle init 空指针（2026-09-22，实测/需随版本复查）
+
+- `stage4_pkmonly.txt` 只加载 runtime options + `zzz_czx_pokemon.pack`，`battle_venu.xml`/`battle_pika_solo.xml` 只生成 Pokemon 单位；崩溃脚本日志为 148B battle stub，mdmp 为 `0xc0000005` 读 `0xfffffff8`、`Warhammer3.exe+0x5c0ce5`，同一时段无 System Event 2004。该批不能归为全合集 OOM。
+- A/B 矩阵先后验证了多种错误链：donor `man_animation`/空文化映射、`unit_variants` 把 Venusaur 指向 `pmv001`，以及 `pm003.variantmeshdefinition` 指向 Bulbasaur 模型；这些组合均在 battle init 以同一 `0xc0000005` 读 `0xfffffff8 @ Warhammer3.exe+0x5c0ce5` 崩溃。属性表的 `causes_fear/causes_terror` 变体也未改变结果。真正的必要条件是单位的 variant 链自洽：`land_units.man_animation=pm003`、`unit_variants.variant/unit_card=pmv003`、`variants pmv003 -> pm003`、`pm003.variantmeshdefinition -> pkm_003_venusaur`。
+- 修复：恢复 Venusaur 的完整 `pm003` variant/model 链，保留用户当前的 Venusaur armour 实验值，使用 `tools/build_pack.py zzz_czx_pokemon --deploy` 重建/部署。固定组合 `pkm_venu_fixed` 运行 161 秒存活，峰值私有内存 7.74GB，无新 dump；静态验收：PFH5 192 文件、`unit_variants` 7 行、`battle_animations` 7 行、`battle_skeletons` 7 行、文化映射 168 行、pm003 variant mesh 指向 Venusaur 模型。
+
+### 10.29 实际战役闪退：残留 battle_preferences 的旧 agent key（2026-09-22，实测）
+
+- 全合集经 Mod Manager 载入最新存档进入战斗时，内层为 `0xc0000005` 读 `0x20 @ Warhammer3.exe+0x1a0be3b`，`script_log` 为 148B battle stub，无 System Event 2004；同一机器的 vanilla battle、full playset vanilla battle、gou 最小 battle 均可通过。
+- AppData 二进制 `%APPDATA%\The Creative Assembly\Warhammer3\battle_preferences\.singleplayer.battle_preferences` 取 ASCII 字符串发现残留 `czx_kerrigan`；当前 swarm 已改为 `Lin_Summon_Servant` 的 `lin_all_kerrigan_zerg`，该缓存属于旧战斗军表状态。已备份并移出为 `.bak_stale_czx_kerrigan_20260922_2153*`，没有删除存档或 army_setups。
+- 首次移出缓存后通过 Mod Manager 重新载入同一最新存档，曾进入 campaign/战斗结果面板；但用户随后再次进入战斗，22:38、22:46、22:50 在最新与较早存档上仍复现同一 `+0x1a0be3b`。因此移出 `battle_preferences` 只是排除了一个旧输入，**不是最终修复**；当前剩余问题收敛到 campaign→battle 公共引擎路径、存档战斗上下文或外部注入。后续仍应首查 AppData 二进制 key，再做新战役/覆盖层/第三方注入 A/B，不要继续盲目二分 gameplay pack。
+
+### 10.30 campaign→battle 闪退由 Fast End Turn 包触发（2026-09-23，[实测/需随版本复查]）
+
+- 复现签名仍为 `0xc0000005` 读 `0x20 @ Warhammer3.exe+0x1a0be3b`、148B `battle_scripted.lua` stub；新 dump `D2026-09-23_T07-15-00.mdmp` 无同刻 Event 2004。测试经 Mod Manager 使用同一战役存档，并在 `popup_pre_battle` 中明确点击手动战斗按钮，避免把“停在预战界面”误判为通过。
+- 受控对照：①稳定基线（AIG3 Plus 保持加载、7 个近期包未加载）战斗运行 606 秒正常结束；②虫群+数码宝贝+VMP 虫群解锁通过，battle-start 钩子执行且存活 >60 秒；③数码宝贝+Pokemon+VMP Pokemon 解锁通过，存活 >45 秒；④仅 Global Lua Guard 对照通过；⑤重新加入 Fast End Turn（不加载 Global Lua Guard/Pokemon 对）后复现同一 `+0x1a0be3b`；Fast End Turn+Global Lua Guard 组合也复现。AIG3 Plus 在成功基线中已实际加载，因此不是单独触发包。
+- 最终回归：原 114 项完整集仅排除 `zzz_czx_fast_end_turn.pack`（113 项），其余待测包均加载；同一存档手动进入战斗，`battle-start hidden ability guard completed` 于 27.4 秒出现，实例继续存活 >60 秒，无新 dump、无 Event 2004。
+- 源码级 A/B（同存档、同一播放集、同路径手动点战斗）：①保留全部 4 条 `SetPref` 写入、去掉 `_apply_all` UI 回调 → 仍崩（`D2026-09-23_T08-03-47`），排除 UI 点击为必要触发；②4 条 `SetPref` 全删、保留 UI 回调 → 进入战斗并存活；③仅保留 `SetPrefAsBool('fast_forward_end_turns', true)` + UI 回调 → 同一存档手动进入战斗，battle-start hook 26.5 秒执行、64 个 battle 脚本枚举完成、进程存活 >10 分钟无新 dump。**触发组收敛为三条图形/内存偏好写入**：`SetPrefAsInt('gfx_texture_quality', 2)`、`SetPrefAsBool('gfx_unlimited_video_memory', false)`、`SetPrefAsBool('minimise_memory_usage', true)`（组内未再单条隔离）。
+- 修复：`mod_files/zzz_czx_fast_end_turn/script/campaign/mod/czx_fast_end_turn.lua` 的首帧回调不再写图形/内存偏好，只保留 `fast_forward_end_turns` 开关与 `_apply_all`（把 armies/heroes/fleets 速度下拉设为 Fastest）。图形/内存档位改由 `tools/set_memory_safe_prefs.py` 在游戏关闭后离线管理，避免战役首帧运行时切换渲染器状态。`notes/pack_notes.txt` 已同步改述。
+- 稳定播放集 `WH3 Campaign Stable`（原 `WH3 Campaign Stable Fast Off` 改名）现为 114 项、含修复后 Fast End Turn；原 114 项《全合集-非震旦》和《测试2》保留。注意：pack 名不变，旧播放集里引用同一 `local:data` id 的条目加载的就是修复版。
+- 后续遇到相同签名，除检查战斗缓存外，也应对照实际启动的 `wyccc_launch_mods.txt`/`modified.log`；管理器界面当前播放集可能已在游戏启动后变化。回归必须点击手动战斗按钮，并以新 dump、battle-start 日志和持续存活共同判断。教训：campaign 首帧 `SetPrefAs*` 改 `gfx_*`/`minimise_memory_usage` 这类渲染/内存偏好可使后续 battle init 以 `+0x1a0be3b`（读 `0x20`）崩——此类全局偏好不要在 Lua 首帧动态改写。
+
+### 10.31 Update 9.0 大版本闪退：pack 挂载期 `+0x52a21a` 签名与前端二分法（2026-09-25 定案）
+
+- **背景**：2026-09-25 晨 Steam 自动把 8.1.1→9.0（build 25509431，`Warhammer3.exe` 与全部 vanilla pack 重下 ~60GB），为 8.1.1 调好的 116 项 `WH3 Campaign Stable` 播放集整体失效。无 Event 2004 → 非 OOM；无 148B script stub → 死得比脚本枚举更早。
+- **新签名**：`0xc0000005` 读 `0x20` @ `Warhammer3.exe+0x52a21a`，发生在 pack 挂载阶段（`modified.log` 截断于挂载中段、`script_log` 根本未生成、`mp_log.txt` 只到 Clockwork/EOS init）。区别于 battle-init 的 `+0x1a0be3b` 与旧档载入的 `+0x243ae98`（读 `0xb0`）。
+- **`game_startup_mode battle` 在 9.0 上不可用作二分基线（重要修正 §10.20/10.16）**：空 modlist + 各种合法阵营/兵种组合的 XML（震旦/基斯里夫/帝国/VMP 新 key）均定死于 `+0x1a957e7`（读 `0x20`）或 `+0x1a0be3b`，与 mod 无关——脚本化战斗入口本身在 9.0 有引擎级问题。**改用前端启动二分**：`Warhammer3.exe <modlist.txt>;`（或 `czx_launch_mods.txt`/`wyccc_launch_mods.txt` 生成法），判据 = 新 dump 有无 + `modified.log` 挂载进度 + `mp_log.txt` Clockwork 行。每组跑 2 次。
+- **二分收敛路径**：116 项 → 嫌疑集 24（当日更新包，全清白）→ 对半 55/55 → `f1_b` 崩 → 27/28 两败 → 13/14 → 逐块收，最终实锤 **8 个**（分属两个签名）：
+  - `+0x52a21a` 组（挂载期崩）：`!!!!!!!!!!!!!!!!unique_faction_ui_iii.pack`（ws 2789999718）单独回加即崩；SFO 全家 `sfo_grimhammer_3_main`(2792731173)、`sfo_warband_upgrade`(3683416886)、`!!fesir_warband_upgrades_sfo`(3743536241)、`!!sfo_tla_upgrade`(2902803962)、`tla_upgrade_brt`(2853239091)——主包单独回加即崩；`longer.pack`(3430887175) 声明依赖 SFO 主包，**不能当"非 SFO"组测**。
+  - `+0x538a0a` 组（全部挂载完成后崩）：`zz_diag_junction.pack`（**本地自制诊断包**，内含 `unit_attributes_to_groups_junctions` 行指向 WH2 Tomb Kings 组 `wh2_dlc09_tmb_art_casket_of_souls_0`——WH3 不存在的悬空 key，单包必崩）。此包上午 10:24 才为诊断目的加入播放集，首轮二分只清掉了 SFO 签名，残留第二签名差点被误判为"组合问题"。
+- **教训：双签名=双元凶**。移除 SFO 组后若仍崩但签名变了（`+0x52a21a`→`+0x538a0a`），说明第一组已清、另有真凶——继续按新签名二分，不要回头怀疑已排除项。诊断期间新增的测试包（diag/fixture 类）本身也会变成新元凶；二分前先把"会话中临时生成的包"列入嫌疑。
+- **已排除（本轮清白）**：当日更新的 ~24 个工坊包（Lin 系/nanu RoR/TLA 主表等）、`twwh3-memreader.pack`（pack 级未复现；但其配套 `twwh3-memreader.dll` 是硬偏移原生注入物，版本边界仍属高危，建议同步停用）、CreamAPI（官方 `steam_api64.dll` 298,856B 下同样复现）、AppData battle_preferences/存档缓存、画质 OOM、两个 PSW 大包（单测存活）。
+- **独立遗留问题**：8.1.1 老战役存档在无 mod 下 `campaign_load` 也崩（`+0x243ae98` 读 `0xb0` / `+0x52a21a`），与 pack 挂载崩溃是两条线——老档兼容性需单独验证，不能用来说明 mod 问题。
+- **落库修法（不停 app 可生效）**：备份 `state.db` → `delete from playset_items where playset_id=? and mod_id in (...)` → 按 position 重排 → 同步删 `app_state` 里 `enabled_order:warhammer3` JSON 对应条目。后端 `storage.get_enabled_order` 每次新建 sqlite 连接读库，**不用重启 Mod Manager** 即按新列表生成 `wyccc_launch_mods.txt`；但 UI 展示可能为旧缓存，让用户重启 app 核对更稳。
+- **前端通过判据的坑（假存活）**：前端挂载完成后进程会停在"press any key"画面等输入——RSS ~1.18GB、CPU≈0 维持不动，看起来像卡死其实是正常待机。**判据 = 无新 dump 且 `modified.log` 挂载行数达到列表数**，不能只看进程存活；纯 Popen 拉起不按键会一直停在那里，属预期。要区分"假死"可用 wmic 查 CPU 增量 + RSS 是否持续增长。
+- **教训**：大版本更新后的"挂载期空指针"二分要按 mod_id 切 `enabled_order` 并依赖感知分组（先 `wh3diag.py meta <pack>` 查 rpfm_reserved 依赖）； scripted-battle autotest 的崩溃签名与前端挂载崩溃签名要分开记录，不能混用判据。
+
+### 10.32 Update 9.0 扩展包兼容补丁：版本升位 + 改名键 + 过期 twui（2026-09-25 晚）
+
+- **DB 版本错位修法（纯追加列场景）**：9.0 多数表升版只是**末尾追加列**（`missile_weapons` v11→v12 加 `hide_secondary_range_ammo_statistics_ui`、`battle_vortexs` v19→v20 加 `subsequent_vortex`/`subsequent_vortex_delay`、`land_units` v53→v54 加 `default_guard_mode` 等）。修法 = 按旧版 schema 解码 → 新列填 vanilla 典型默认（bool=`false`、数值=`0`/`0.0`、引用=`''`，`land_units_to_unit_abilites_junctions.culture` 用通配 `'*'`，`ritual_targets.max_range_ap` 用 `-1`）→ 以**同内部路径** TSV 重编码进补丁包，靠前遮蔽原分片。审计脚本：`scratch/_ver_report_all.py`（逐包对 vanilla 头版本）、`scratch/_verify_90fixes.py`（补丁逐行回读比对）。
+- **v0（无版本标记）表在 9.0 仍合法**：`units_to_groupings_military_permissions`/`cai_construction_system_building_values` 等 vanilla 仍是 markerless v0——重编码非错位表时保持 v0（meta `;0;`），不要顺手升位。而 `land_units_to_unit_abilites_junctions`/`special_ability_groups_to_units_junctions`/`slot_sets` 已从 v0 升到 v1，mod 的旧 v0 分片需升。
+- **9.0 已确认的 vanilla 键改名/删除**（悬空外键审计 `scratch/_audit_refs.py` 发现，RON 的 `is_reference` 元数据可用）：
+  - `building_chains`：`wh3_main_sla_cav` → `wh3_dlc27_sla_cav_tormentors`；levels `wh3_main_sla_cav_1/2/4` → `wh3_dlc27_sla_cav_{1,2,4}_tormentors`（无 _3）。
+  - `groupings_military`：`wh3_dlc20_group_chs_festus` → `wh3_dlc20_group_chs_festus_glottkin`（Festus 并入 Glottkin 组）。
+  - `unit_sets`：`skv_infantry` 解散（最接近 `skv_all`）、`vmp_corpses` → `vmp_corpse_units`、`wh2_dlc11_emp_spearmen_swordsmen_flagellants_halberdiers` → `emp_infantry`。
+  - `building_levels`：`wh3_main_ksl_ice_guard_1` 删除（仅剩 `_2`）——无对应键时留死行比错配安全。
+  - **改名后必须按表主键去重**：arthas `unit_set_to_unit_junctions` 改名后产生 7 个 (unit_record,unit_set) 重复对，需丢弃（`scratch/_dedupe.py`）。
+- **过期 twui 遮蔽**：mod 常把**整份旧版 vanilla twui**打进包里当遮蔽物。判定法：正则抹掉 GUID 后做行集合 diff，若 mod-only 只有坐标/尺寸/GUID 噪声且无 mod 自有内容（搜 mod 前缀 token=0），直接用**当前 vanilla 文件**同路径遮蔽即修复。psw 的 `dlc24_formless_horror.twui.xml` 是 v141 旧拷贝（vanilla 已 v142），arthas 的 `dilemma.twui.xml` 虽标 v142 但缺 9.0 新增的 182 行且用了旧 `CanMakeChoice( StoredContext("CcoCdirEventsDilemmaChoiceDetailRecord").ChoiceKey )` 签名——9.0 已改为 `dilemma.CanMakeChoice( choice_record.ChoiceKey )`，旧签名会导致 dilemma 按钮失效。
+- **xiang 的 `character_details_panel*.twui.xml` 是真改写**（LayoutEngine 全换 HorizontalList + armory 常显 hack），不能遮蔽还原——版本已是 v142 保留原样。判断“是拷贝还是改写”就用抹 GUID diff。
+- **build_pack.py 编码器缺口已补**：`ColourRGB`/`ColourU32`/`I16`/`I24`（ritual_targets 用到 ColourRGB，原来是 NotImplementedError）。
+- **部署**：6 个补丁包 `czx_{luke,psw,chanliuzi,arthas,boudicca,xiang}_90fix`（每包声明对目标 pack 的依赖），playset 补丁 pos 99-104、目标 pos 105-111 全部“补丁在前”。`pswmv`（movie）与本地 `hero_grants`/`vmp_pokemon_unlock` 审计干净直接回归。
+
+### 10.33 大版本兼容排查的固化流程（`wh3diag.py compat`，2026-09-25 晚定稿）
+
+每次 CA 大版本更新后，对"疑似不适配"的 pack 按此跑一遍，**禁止再写一次性审计脚本**：
+
+1. **先确认基线新鲜度**：`tools/schema/schema_wh3.ron` 与上游 rpfm-schemas 同步（旧 schema 会把新表误判为解码失败）；wh3diag 的 `schema_ron()` 已固定优先项目副本、RPFM appdata 副本兜底。
+2. **一条命令审计**（须 Windows Python313，compressed 条目需 zstandard）：
+
+   ```text
+   wh3diag.py compat "<pack 名>" [--dep <依赖 pack>]...
+   ```
+
+   输出三段报告，分别对应三类不兼容：
+   - `stale DB versions`：包内分片头版本 vs 原版当前版本（原版基线 = `data\*.pack` 中无 `*.rpfm_reserved` 的包），并列出升版新增列；
+   - `dangling references`：RON `is_reference` 元数据驱动的悬空外键——键域 = 原版 ∪ 本包 ∪ `--dep` 依赖包（mod 自定义键不会误报）；命中 `COMPAT_KEY_RENAMES` 的直接给改名建议；
+   - `twui / formats`：同路径遮蔽 vanilla twui 的判定——抹 GUID 行集合 diff，`stale-copy`（过期拷贝）/ `tweak` / `rewrite`（真改写，保留）。
+3. **人工复核改名**：`COMPAT_KEY_RENAMES` 只放已验证改名；`dead key` 无安全替代时留死行（如 `wh3_main_ksl_ice_guard_1`）。发现新改名→先确认新键存在→加入 wh3diag 的 `COMPAT_KEY_RENAMES` 常量。
+4. **生成补丁源**：
+
+   ```text
+   wh3diag.py compat "<pack 名>" --dep <依赖> --emit <fix_mod_name>
+   ```
+
+   自动产出 `mod_files/<fix>/`：全部旧表按当前版本重编码为 TSV（按列名映射，列序变化也安全）、已知改名键改写、按 schema 主键去重（自动处理改名撞键）、`stale-copy` twui 用当前 vanilla 同路径落盘、`notes/`（dependencies=目标包名、alias、pack_notes）+ 工坊预览图。
+5. **人工检查 TSV**（改名值、新列默认值是否合理）→ `tools/build_pack.py <fix> --deploy`（自动部署 data\ + user_mod_data + playset 尾部）。
+6. **playset 排序**：补丁必须排在目标 pack **之前**（靠前遮蔽）。改完 `state.db` 必须重启 Mod Manager，否则内存旧状态会回写覆盖。
+7. **验证**（对照 §10.32 的 `_verify_90fixes.py` 思路）：补丁表按当前版本解码、行数与源一致、非改名行逐值回读相同、无重复主键、`which <分片名>` 确认同路径遮蔽、playset_items 与 enabled_order 一致。
+8. **归因边界**：审计发现"含有不兼容内容"≠"它就是崩溃元凶"——两类结论分开记录（本次 6 扩展包确有版本错位，但崩溃真凶另属 SFO 组等 8 包）。
+
+已知局限：`stale-copy` 判定是启发式（+mod_only/-van_only 行数），mod 在旧 vanilla 拷贝上小幅改动时也会命中，遮蔽前仍需眼看确认；非 DB 的 anim/rmv2/bnk 头版本检查暂未并入 compat（需要时沿用 §10.32 前的手工比对）。
+
+### 10.34 matched-combat 注册表：自造动画套件遇特定敌人即崩（2026-09-23 晚定案，修法于 9-25 修正）
+
+- **现象**：自定义单位包加载正常，但遭遇**可触发 matched-kill 的敌人**（绿皮等 hu21 系）时崩 `0xc0000005 @ Warhammer3.exe+0x2ccd917`；基斯里夫/帝国/震旦敌人不触发——曾因敌人种类不确定被误判为"随机崩"。
+- **根因**：自定义动画套件 bin 的**内部套件名**未注册进 vanilla `animations/matched_combat/attila_generated.bin` 注册表，matched 查询返回 -1 → 空解引用。
+- **修法（初版，后被修正）**：当日把每个带 matched 引用的 bin 内部名改成 donor 的 vanilla 套件名（`emp_sws1`→`hu1_empire_sword_and_shield`、`sn1_serp`→`sn1_serpent`、`bi1_eagl`→`bi1_eagle`、`empire_sword_rifle`→`hu1_dlc25_empire_sword_hochland_long_rifle`、`dlc17_ghorgon`→`hu11b_dlc17_ghorgon`、`cst_promethean`→`cr1_cst_promethean`），崩溃消除（亚古兽 vs 绿皮兽人 75s 零崩）。
+- **9-25 修正（marine 不开火案定案）**：内部名撞 vanilla 套件名会**遮蔽原版套件**（曾把 `czx_empire_sword_rifle` 写成 vanilla 注册名导致原版火枪手失效）。正确规则 = **内部名 == animpack 条目文件名 stem == `battle_animations_table.key`**；attila 注册表实际按**剪辑名前缀**索引而非套件名——bin 内剪辑路径指向真实存在的剪辑即可，套件名保持自有 key 不再触发查表失败 `[实测/需随版本复查]`。
+- **补丁法**：bin blob offset 8 处是 u16 长度前缀字符串——**重写时必须同步更新长度**，只换字符串不更新长度会让头部解析错位产生隐性损坏。套件命名细则另见 `asseteditor_animation_workflow.md` 进包链路节。
+
+### 10.35 战役/存档加载 ~15-20s 定死：junction 表悬空 key（2026-09-24 收官定案）
+
+- **现象**：所有存档加载与新战役初始化 ~15-20s 必崩 `0xc0000005`（`+0x157acc6` 读 `null+0x18`）；自定义战斗正常；去掉 `zzz_czx_pokemon.pack` 即存活。
+- **根因**：`land_units_to_unit_abilites_junctions` 有一行 `pkm_solar_beam → pkm_003_venusaur`，但真实技能键是 `pkm_003_solar_beam`——9-23 技能重命名时漏改 junction。战役初始化解析"单位→技能"映射时取空指针即崩。**战役加载路径会校验 junction，自定义战斗不校验**——单测战斗全绿不代表战役安全。
+- **二分方法学教训**：字节级 pack 子集二分（`pack_subset.py` 抽部分 db 表重打包）会**制造新的悬空引用**——main+land 双子集崩溃其实是缺 variants/weapons 支撑表的假阳性。正确二分法 = 从 **TSV 源按行重建**子集（`scratch/mk_pkm_row_subset.py` 模式）保证引用闭包完整；再用"部署包 vs TSV 重建包逐字节比对（除 GUID 全同）"证明崩源在未重建表里。
+- **审计工具教训**：`tools/audit_dangling_refs.py` 当天曾正确报告 `pkm_solar_beam` 悬空，被误判为误报（"其实 `pkm_003_solar_beam` 存在"）——junction 的 ability 列校验必须**同时**对照包内 `unit_abilities` 键与 vanilla 键，前缀相似≠存在；工具已加 difflib 近似键提示。注意该审计器对 vanilla key 有假阴性，结论须对照 `gamedata/db/`。
+- **泛化**：任何"重命名单位/技能/组 key"的操作必须全库搜旧 key 残留（junction/preferences/存档文本化部分）；此类崩溃只需"单位存在+技能链"即可触发，权限表/单位集/资产文件全无关。
+
+### 10.36 AI 回合处理中 UAF 崩溃（2026-09-24，未最终定案）
+
+- **现象/签名**：22:39 与 23:04 两次崩溃同型——`rip`=堆地址（`0x398cfdd80`/`0xbad64020`）、`0xc0000005` params=`[0x8, addr]`（**执行违例**）、rcx/rbx/rip 同页 → 经坏虚表/函数指针调用已释放对象，UAF 特征（同 §10.12a/10.13 族）。
+- **现场**：AI 回合处理中叛军 `PendingBattle` 自动结算 + 恶魔英雄批量 `CharacterCreated` + `wh2_main_trait_builder` 刷屏；同一回合在另一会话安全通过 → **非确定性竞态**，不是坏数据。
+- **嫌疑清单（未隔离）**：`sm0_recruit_defeated`（回合边界 `spawn_character`×5 + `create_force`×14 批量造英雄）、`wyc_choujiang1` 的 `check_char_valid` 对新生角色无防护直接调 `faction:subculture()`、`wh2_campaign_traits.lua`（no_lazy_trait 遮蔽版）的 `check_exclusion` 对 `faction:culture()` 零防护。
+- **排查方向**：给上述监听器条件/回调函数补"取不到派系/角色→早退"空防护（§10.13 v9 熔断模式可复用）；复现依赖特定回合级联，注意**不要杀用户手动拉起的 Warhammer3.exe**（曾因误杀玩家进程中断调查）。

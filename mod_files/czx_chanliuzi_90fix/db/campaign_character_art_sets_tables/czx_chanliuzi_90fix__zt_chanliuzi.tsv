@@ -1,0 +1,3 @@
+agent_type	art_set_id	culture	subculture	faction	is_custom	is_male	agent_subtype	campaign_map_scale	prebattle_separation_offset
+#campaign_character_art_sets_tables;7;db/campaign_character_art_sets_tables/zt_chanliuzi
+general	zt_chanliuzi				false	true	zt_chanliuzi	1.0	0.0

@@ -1,0 +1,3 @@
+key	precursor	default_projectile	audio_type	use_secondary_ammo_pool	hide_secondary_range_ammo_statistics_ui
+#missile_weapons_tables;12;db/missile_weapons_tables/skv_chongzu
+cishe	false	cishe	razordon_spike	false	false

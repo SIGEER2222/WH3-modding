@@ -34,7 +34,7 @@
   → 6. 技能/属性：复用现有链或按列名克隆原版链
   → 7. gen_new_unit_cards.py → 图标
   → 8. build_pack.py → 部署 data 目录
-  → 9. AssetEditor 日志验证骨架加载（或二进制读 RMV2 头 offset 8）
+  → 9. AssetEditor 日志验证骨架加载（或二进制读 RMV2 头 offset 12）
   → 10. blender_pose_render 多帧动作截图验收
   → 11. Mod Manager 游戏内实测
 ```
@@ -154,7 +154,7 @@ blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+
 1. `fit_skeleton.py` 按 landmarks 重摆骨位 → `write_skeleton()` 从模板 `.anim` 生成新骨架 `animations/skeletons/<新名>.anim` + `write_invmats()` 生成 `<新名>.bone_inv_trans_mats`；`.anm.meta` 直接复制原版改名即可（内部不含骨架名）。
 2. `retarget_clip.py` 把所需 clips 重定向：clip 内 `skeleton_name` 改新名、static/动态轨道写新 bind local。**注意 retarget 读 `skel['custom_name']`**——fitted JSON 里加 `"custom_name": "<新名>"`。
 3. 动画集接入：`man_animation`/`gun_animation_table` 键 → `battle_animations_table`（key→skeleton 两列）→ `animations/database/battle/bin/<key>.bin`。bin 内嵌 clip 路径全集（非引用 fragment）——fragment .txt 不必提供。
-   **⚠ 实测修正（2026-09-19，数码兽白模 T-pose 根因）**：loose `.bin` 放在 `database/battle/bin/` **不会被战斗系统加载**——扫遍本机全部创意工坊包（SFO/银影/arbiter 等 20+ mod）与 vanilla 数据，战斗套件**无一例外**用 `.animpack` 容器（内部嵌 `<key>.bin` 定义+骨架名+clip 路径表）；loose `.bin` 仅用于战役 agent。症状：单位进场但渲染为白色半透明占位人形、全程绑定姿势（骨架从未注册）。配套表：自定义骨架必须有 `battle_skeletons` 行（骨节点语义映射）+ `culture_to_battle_animation` 行（套件挂到文化包，**每个会用到的文化包一行**，vanilla 同套件本就映射 5+ 文化）`[实测/需随版本复查]`。`.animpack` 由 AssetEditor 生成；没有工具链时优先移植已验证 mod 的整套 animpack+骨架资产（数码兽原包 chr050/chr151 即此结构：J_* 原生骨架 + animpack + rmv2 直连 VMD）。
+   **⚠ 实测修正（2026-09-19，数码兽白模 T-pose 根因）**：loose `.bin` 放在 `database/battle/bin/` **不会被战斗系统加载**——扫遍本机全部创意工坊包（SFO/银影/arbiter 等 20+ mod）与 vanilla 数据，战斗套件**无一例外**用 `.animpack` 容器（内部嵌 `<key>.bin` 定义+骨架名+clip 路径表）；loose `.bin` 仅用于战役 agent。症状：单位进场但渲染为白色半透明占位人形、全程绑定姿势（骨架从未注册）。配套表：自定义骨架必须有 `battle_skeletons` 行（骨节点语义映射）+ `culture_to_battle_animation` 行（套件挂到文化包，**每个会用到的文化包一行**，vanilla 同套件本就映射 5+ 文化）`[实测/需随版本复查]`。`.animpack` 由 AssetEditor 生成，**或离线用 `tools/pack_animsets.py` 直接打包**（格式已逆向：u32 条目数 + 每条 {str16 内部路径 `animations/database/battle/bin/<key>.bin` + u32 长度 + bin 原字节}，文件名自由，可命名为 `<mod>_animsets.animpack`；vanilla `animation_tables*.animpack`、Imperial Arbiter `h3_yu_monsters.animpack`、数码 v1 `chr*.animpack` 均同构）；没有工具链时优先移植已验证 mod 的整套 animpack+骨架资产。**生成后离线验证法**：解析 animpack 列出全部 animset 路径并检查每个 bin 在包内存在——loose bin 集合 = animpack 条目集合时必须逐一相等。**animpack 落地后删除 loose `.bin`**：已验证工作范本（数码 v1）= 50 animpack + 0 loose bin，并存有重复注册/遮蔽风险（2026-09-23 三包补容器部署，离线解析通过，游戏内移动/攻击确认待用户实测 `[实测/需随版本复查]`）。animpack 载荷两种都认：裸表（count+str16+len+bytes，v1 格式）或 u32 解压尺寸 + LZ4 frame 包裹表（vanilla/IA 格式）。（数码兽原包 chr050/chr151 即此结构：J_* 原生骨架 + animpack + rmv2 直连 VMD）。
 4. **bin 克隆技巧**：bin 全是 u16 长度前缀字符串+定长二进制字段，**选等长新名即可原位打补丁**：骨架名 `steamtank01`(11)→`czx_stank01`(11)，集名 `wm_steam_tank01`(15)→`czx_steamtank01`(15)，clip 目录 `engine/steamtank01/`→`engine/czx_stank01/`（文件名不变）。
    **致命细节（实测崩溃）**：`crab01`→`czx_ms` 这种裸词全局替换会把 `.anm.meta`/`.meta`/`animations/audio/...snd.meta` 也改名 → 引擎找不到文件崩溃。只能改两处：`animations/battle/<skel>/**/*.anim`（我们提供的 clip）和 `animations/skeletons/<skel>.anim` + 裸骨架名字段；`.anm.meta`/`.meta`/`.snd.meta`/persistent/locomotion_graphs 引用必须保留原版路径。改写时逐字节流复制——找到旧名后只写新名、**continuation 字节必须原样写回**（跳过一次文件名就把 bin 截短 2KB，结构性损坏）。
 5. RMV2 头骨架名写新名（`convert_new_units.py` 支持 `rmv2_skel_name` 字段覆盖 donor 骨架名）。
@@ -173,7 +173,7 @@ blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+
 - jmap 安全兜底=空间最近骨，配件链（bkpk_arm/scarf/武器）→trunk/cape 系；`toe` slot 目标骨名是 `toe_left_0`/`toe_right_0`。
 - QA 高度比阈值对鸟/蛇误报（展翅/昂首攻击高度翻倍属正常），需人工看图复核。
 
-- 输出 RMV2 **v8** 格式，头部 offset 8 写骨架名——游戏靠这个字段挂动画。
+- 输出 RMV2 **v8** 格式，头部 offset 12 写骨架名（offset 4=版本 u32=8，offset 8=u32，offset 12 起 null 结尾 ASCII；旧记"offset 8"实测有误）——游戏靠这个字段挂动画。
 - **单 LOD** 可把 6MB 压到 ~1.5MB/模型；贴图 base 2048、normal/mr 1024 再省体积。
 - 每个单位产物：`.rigid_model_v2`、`.wsmodel`、`.xml.material`、DDS×5、`.variantmeshdefinition`。
 - VMD 必须指向真实存在的 wsmodel——死链会让单位无声失败（本项目 leishou 曾有此坑）。
@@ -226,7 +226,7 @@ unit_variants.variant ──→ 乘员 VMD（原版是 wh_emp_state_troops：乘
 
 ## 8. 验收层级（由轻到重）
 
-1. **二进制**：RMV2 头 offset 8 骨架名非空；文件含权重数据。
+1. **二进制**：RMV2 头 offset 12 骨架名非空；文件含权重数据。
 2. **AssetEditor 日志**：打开 RMV2 后日志出现 `<skel>.anim` + 自动匹配 idle clip 即绑定成功。**WPF/D3D 视口截图可能全黑/白屏，日志才是可靠证据** `[实测]`。
 3. **无头 pose render / GIF 动图**：
    - 单帧：`blender_pose_render.py`。

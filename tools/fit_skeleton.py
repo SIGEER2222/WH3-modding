@@ -226,8 +226,10 @@ def write_invmats(world_pos, world_quat, dst_path):
         m43 = np.vstack([R, t.reshape(1, 3)])  # 4x3
         out += m43.astype('<f4').tobytes()
     payload = bytes(out)
-    Path(dst_path).write_bytes(struct.pack('<I', len(payload)) +
-                             zstd.ZstdCompressor(level=19).compress(payload))
+    # vanilla .bone_inv_trans_mats are RAW — no in-file zstd (loader reads
+    # header directly; a zstd frame here makes it read the magic as a
+    # bone count -> bad_alloc at battle init)
+    Path(dst_path).write_bytes(payload)
     return len(payload)
 
 

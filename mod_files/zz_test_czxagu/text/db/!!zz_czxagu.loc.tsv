@@ -1,0 +1,6 @@
+key	text	tooltip
+#Loc;1;text/db/!!zz_czxagu.loc
+units_onscreen_name_zz_czxagu	亚古兽（专属动画测试）	
+land_units_onscreen_name_zz_czxagu	亚古兽（专属动画测试）	
+unit_description_short_texts_text_zz_czxagu	czx骨架+专属动画集隔离验证单位，测试完整动作集注册与驱动。	
+unit_description_historical_texts_text_zz_czxagu	使用v2重定向动画管线产物：350条目专属动画集 bin + czx_agumon 骨架 + v8网格。	

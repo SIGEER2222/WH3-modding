@@ -92,14 +92,9 @@ end
 
 cm:add_first_tick_callback(function()
 	if cm:is_multiplayer() then return end
-	-- 兜底：确保过回合 fast-forward 开关处于开启
 	common.call_context_command("SetPrefAsBool('fast_forward_end_turns', true)")
-	-- 加快战斗加载：纹理 High（减半贴图读取量）、显存预算封顶防驱动换页、
-	-- 开 minimise_memory_usage 降内存缓存（16GB+110mod 过回合 OOM 崩溃，牺牲加载速度换稳定）。
-	-- pref 退出时写盘，下次启动生效 [需验证]
-	common.call_context_command("SetPrefAsInt('gfx_texture_quality', 2)")
-	common.call_context_command("SetPrefAsBool('gfx_unlimited_video_memory', false)")
-	common.call_context_command("SetPrefAsBool('minimise_memory_usage', true)")
+	-- 兜底：确保过回合 fast-forward 开关处于开启
+	-- 图形与内存偏好由 preferences 配置管理，不在战役首帧动态切换。
 	cm:callback(_apply_all, 0.5)
 	out(_LOG .. " installed")
 end)

@@ -1,0 +1,4 @@
+destroyed_model	destruction_animation	engine_type	gun_animation_table	key	missile_weapon	model	battle_entity	asset_folder	variant	draught_attachment_point	tech_folder	rider_attachment_point	destruct_model	destruct_anim	destruct_meta	audio_armour_type	riders_shoot_behaviour	scale	crew_reserve_distance_offset
+#battlefield_engines_tables;24;db/battlefield_engines_tables/psw_战争机器
+warmachines\engines\emp_great_cannon\emp_great_cannon_destroyed.rigid_model_v2	emp_great_cannon_destruct	Generic_3_Crew	wm_great_cannon01	psw_ldsr_wgqstp	psw_ba_zysxwy_missile	emp_great_cannon	wh_main_emp_art_great_cannon										all_riders_shooting	1.0	0.0
+warmachines\engines\chd_skullcracker\chd_skullcracker_destroyed_01.wsmodel	chd_skullcracker_destruct	Generic_No_Crew_Fixed	wm_dlc23_loco01_skullcracker	psw_boss_ex_lhz		chd_skullcracker	psw_boss_ex_lhz				warmachines/engines/chd_skullcracker/tech/	ap_crew				heavy_metal	all_riders_shooting	1.0	0.0
