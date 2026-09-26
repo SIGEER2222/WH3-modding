@@ -303,3 +303,24 @@ STATUS: DONE（104/104 结论清零：100 只 chr 原生激活 + 4 只 serpent �
 - **graft+部署**：3 只 bi1_eagl 槽位 68/68 满填，骨架名三检（skel json == battle_animations_table == 剪辑内嵌）3/3 OK；animpack 重打（bin 只引槽路径，载荷不变）。WH3 进程 17:32 拉起、17:38 退出后 build_pack --deploy：**492,314,053B / 10,898 文件，sha256 60ad37ab mod_output==data 双侧一致**，playset pos 85。
 - **L4 全行 ⏭环境阻塞维持**：+0x4e5b30 环境级签名未复核（vanilla 控制组同址复现已证非本包）；待环境恢复后跑前端二分+单位抽验。
 - **STATUS 终态**：**104/104 全清零**——100 只 chr 原生套件激活、4 只 serpent vanilla 通过、3 只鸟系 fit 修复部署 ✅；❌/🔧 归零，仅 L4 环境级阻塞遗留。
+
+### iter 12 — 挂载件焊腿骨修复（susanoomon 平台 + imperialpm 巨剑）已部署
+
+- **缺陷定位**（用户截图指出 susanoomon「模型站在飞行器上」两部分应独立）：bound GLB 探查发现 `part0` 下两 prim——本体走全身骨架，平台 prim1 全部顶点被管线最近骨配重焊到 foot/toe/lowerleg（源模型里平台本来就是独立 `J_wep/J_wep1` 武器骨挂载件）。
+- **susanoomon**：平台 5237v 权重全改 `animroot`（刚性挂载）。RMV2 验证：verts>=9247 全部 bone0/weight255，本体 0 误伤。工作室实拍：idle/walk 平台刚性不动，death 尸体平躺落地、平台悬停原位 =「人从车上摔下」正确分离。
+- **imperialpm**：同法扫描全 104 bound GLB（无躯干骨 prim 探测）又抓出 `_001_chr420` 401v 巨剑（Omega Blade，源绑 J_weapon）焊在脚骨拖地 4.47m。修法：顶点绕柄部（源点）前俯 -12° 平移到 `hand_right` bind 位、全权重绑 hand_right —— Blener 渲染确认持剑前伸、剑尖自然垂地。
+- **同类扫描结果**：ikkakumon 164v 腹甲片贴身穿戴正常（不动）；gallantmonx/shinegreymonbm/metalgarurumon 的无躯干骨 prim 均为手部武器合法绑定。
+- **坑**：GLB 补丁切片写入必须用 `nbytes`（元素数×4 会错位截断文件——第一版补丁给 three.js 报 RangeError: Invalid typed array length 1152，Python 解析器容忍所以难发现）。JSON chunk 改写必须保持原长度（空格补齐）。
+- **部署**：两单位 convert_unit 重生 RMV2 → build_pack --deploy：491,621,358B / 11,392 文件，playset pos 86，sha 双侧一致。
+- **产物**：`scratch/_sweep/fix_imperialpm_sword.py`、`scratch/_sweep/regen_susano.py`；GLB 备份 `.preprop.bak`/`.presword.bak`。
+
+## iter13（2026-09-26）原版惯例导出学习
+
+- 用户指示「先从游戏导一批模型学人家怎么做骨骼和动画」。用 `tools/wh3_export_unit_glb.py`（本轮修复：stump 槽跳过、VMD 直链 rmv2、无骨架 prop 跳过）导出 7 只代表到 `scratch/ref_export/`：stegadon/hurricanum/giant_spider/greatswords/eagle/medusa/dragon。
+- **惯例归纳**（详 `references/vanilla_bone_conventions.md`）：
+  1. 平台/载具件=专用骨链（platform_back/front、pole、bow / spider 的 platform+section_0..7）挂 root 或 rear_0 下，剪辑逐骨写轨道——susanoomon 改 animroot 属同一思路的最刚性版。
+  2. 武器=无骨架 prop + `<SLOT name="weapon_1" attach_point="be_prop_0">` 运行时挂骨；hu1 原版剪辑 be_prop_0..5 全有武器弧线轨道。
+  3. **graft 管线缺陷实锤**：重定向剪辑里 be_prop_*/root 轨道全恒等（czx_imper0 attack 55 帧 be_prop_0 钉原点）→ 现阶段 prop 槽挂法不可用；imperialpm 的「顶点搬手位+焊 hand_right」是当前正确解。若启用 CA 式挂载需 graft 阶段生成 be_prop 轨道（每帧=持械手世界变换）。
+  4. 羽骨全链带动画轨道（czx_bi/czx_ho 实测外层羽活动 2-3.4m），graft 保 feather 数据，bind fit 必须准。
+  5. snake02 蛇系 tail_0..19 主链+侧链+发蛇 jaw，供 seadramon 族后续 graft 参考。
+- **遗留 TODO**：graft 补 be_prop 轨道生成 → 之后可把 imperialpm 剑改成 CA 式 weapon_1 attach_point（可换 variant、跟武器弧线）。
