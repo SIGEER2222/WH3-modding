@@ -1,3 +1,62 @@
+## 2026-09-26 深夜:digimon be_prop 挂点轨道补写 + 非单位四元数坑定案
+
+1. **grafted 剪辑 be_prop_* 轨道从"全静态钉原点"修复为 CA 惯例动态轨道**:`scratch/fix_beprop_tracks.py`(全动态剪辑逐帧重写 prop 局部 TRS) + `fix_beprop_tracks_dyn.py`(tb/rb 混合压缩剪辑经 resolve_locals 重建为全动态)。映射 `be_prop_0/1→hand_right`、`2→hand_left`、`3→spine_2`、`4→root`、`5→hand_left`;`L_prop = inv(W_animroot) ⊗ W_driver`(animroot 带 X180° 常量翻转,不能直接抄世界值)。
+2. **digimon_v2 全量结果**:9496 剪辑 ok=8765 / no-prop=731 / other=0;其中 799 个压缩剪辑(czx_meg/met/ple/sea/dorugo/omega0/shine0/veemo0/wargr0 九族)由 static-map 重建为全动态。抽样 140 剪辑归一化 FK 下 prop 世界位置与 driver 逐帧零偏差、四元数半球连续、非 prop 通道保真(位置 0 差、旋转 ≤0.003° 量化级)。
+3. **新坑定案(可复用)**:v8 压缩编码(rb=4,s8 range 解码)解出的四元数**非单位**(实测 animroot |q|=1.0011)。`q·v·conj(q)` 对非单位 quat 按 |q|² 缩放向量——1.84m 力臂上 |q|⁴ 残差放大成 ~8mm 位置偏差。FK 与 inv 换算前必须逐 quat 归一化(引擎解码后按单位处理)。已写入 vanilla_bone_conventions.md 惯例 2/5 与 pipeline §3c-ii。
+4. **部署状态**:`mod_output/zzz_czx_digimon_v2.pack` 已重建 533MB(+42MB,799 剪辑全动态化)。部署挂 `scratch/deploy_digimon_when_free.sh` watcher——WH3(pid 22636)运行中 pack 锁定,待退出后自动 deploy + sha256 校验。**教训**:WSL 里 `tasklist //FI` 会被当非法参数静默失败误判"进程不存在",进程检测一律用 `powershell.exe Get-Process`。
+5. **遗留**:轨道≠挂载——武器实际显示仍需各 VMD `<SLOT attach_point="be_prop_N">` 指到 prop rmv2/wsmodel + variant 配装;当前武器仍以 skinned 方式在 body 网格内,prop 槽挂载为后续可选项。L4 复测仍受 WH3 初始化/loading-dismiss 崩溃族环境阻塞(与本改动无关)。
+
+## 2026-09-26 晚:dae UV 双重翻转定案 + 工作室预览动画源修正
+
+- **dae UV 双重翻转(101 单位贴图细节丢失定案)**:tools/fbx_to_glb.py 的 .dae 分支手动做 `uv.y = 1 - uv.y`,但 Blender glTF 导出器自身已翻 V——两次翻转抵消,glb_v == dae_v,而正确应为 `1 - dae_v`。后果:头部顶点采样到贴图腿脚区(同色区域肉眼难辨,眼睛/牙齿/爪尖等细节全丢)。**fbx 路径不受影响**(Blender 内部底原点 → 导出器单次翻转 → 正确)。实测源构成:101 dae + 2 fbx(tentomon/kabuterimon)+ 1 旧 GLB(imperialdm)。
+- **修法**:删掉 dae 分支的手动翻转;scratch/vflip_uv.py 就地字节补丁翻转既有 GLB 的 TEXCOORD_0(不改结构、动画权重原样),已翻 101 单位的 src/world/bound/studio 副本共 404 文件,rmv2/ui 重跑。验证:亚古兽 bound.glb 眼睛/牙/爪尖恢复,攻击动画正常。
+- **工作室预览动画源坑**:tools/inject_anims_glb.py 注的是原版骨架绝对局部 TRS,套到重适配骨架上必散(曾误判成蒙皮坏)。正确做法用 scratch/inject_rt.py 注 mod_files/.../battle/czx_*/ 下的已重定向 .anim(resolve_bone_locals 解析出本骨架局部量直接写节点)。scratch/reinject_studio.py 已把 models/ 104 只全部改注重定向 clip——工作室播放 = 游戏播放。
+- **自检盲区记录**:dgm_selfcheck 的 fail=0 只证"网格不爆炸",证不了动画源对不对;验证必须看中段帧+对已知好基线。
+
+## 2026-09-26 午后：vanilla A/B 定案 mod 侧触发 + 集中式 intro-settle 门控
+
+1. **vanilla 对照定案**：清空 `used_mods.txt`（备份 `.bak_wh3diag`）裸起 exe，主菜单无 `(modded)`——同路径新 nag 开局走完整 intro 序列至回合 1 可操作态**存活**。`+0x22c0f80`/`+0x22c8774`/`+0x132c34c` 族确认 **mod 侧触发**（非纯引擎竞态）。
+2. **集中门控落地 `zzz_czx_global_lua_guard`**：包 `core_object.progress_on_loading_screen_dismissed`——mod 源回调统一推迟到 intro 序列完结（引擎旗标先行、`movie_overlay_*`/loading-screen 存在性佐证、`has_intro_cutscene_played` 落档判定、12s 静默宽限）；`wh_campaign_faction_start` 的 vanilla intro 驱动回调放行（延迟即死锁）。mod 内嵌的 `real_callback` 推迟随外层一并出窗——prison/PSW×2/未来工坊回调全部覆盖，不再逐包改延迟。
+3. **`zzz_czx_auto_tools3` 配套部署**：`czx_horde_paging` first-tick 探测换 `probe_when_safe`（同门控判据），`--deploy-name ... --replace` 保 playset mod_id 哈希不变。
+4. 实测待办：下一次满 playset 新 nag 开局复测（竞态本有存活样本，单次存活不算封案）。
+
+## 2026-09-26 上午：dismiss 级联内联 UI 工作 → UAF 崩溃族 + prison 回调推迟修复
+
+1. **`+0x22c8774`（写违规）归因收窄**：08:56 崩寄存器 `rax=0x30f9b0040` 与崩址 `0x30f9b0391` 同页 = 写已释放区（UAF 写）；同窗口第三签名 `+0x132c34c`（写哨兵 `0xa0000000a`，09:27 会话老 prison 代码再录）。三签名全部死在 `custom_loading_screen` dismiss 级联回调段——日志尾=`intro_movie` overlay 打印夹在级联 pair 间。
+2. **级联语义定明**（lib_core.lua:2587-2684）：开局时 `progress_on_loading_screen_dismissed` 走 force_wait 分支注册一次性 `LoadingScreenDismissed` 监听，事件触发时**逐个内联跑回调**；回调体内的 CreateComponent/SetImagePath/Resize 与加载屏析构+overlay `show` 动画初始化并发 = 野写机制。
+3. **mod 侧唯一重活点**：zzz_czx_prison_default（playset pos90 遮蔽 wyccc_prison_system pos92）回调经 `after_battle_sequence(name,cb)` delay=0 → `is_processing_battle` false → **级联内联跑 `setup_ui()`**；PSW×2 走 `real_callback(500-600ms)` 推迟已安全。fast_end_turn 下拉点击在崩点 69s 前已跑完——排除。
+4. **修复已部署**：`after_battle_sequence(..., 0.5)` 把回调体推迟出级联；09:38 满 playset 新 nag 开局一次走通至回合 1（PrintWindow 截图取证）。**状态=强假设非封案**——竞态本有存活样本，复现则继续查引擎侧 overlay 时机。
+5. **wh3diag**：`_SIG_HINTS` 补 `+0x22c8774`/`+0x132c34c`，改写 `+0x22c0f80` 指向级联族。reference 新增 §10.40（级联语义+内联判别式+UAF 写签名特征+PrintWindow/script_log-cwd 取证技巧）。
+
+## 2026-09-26 晨：Steam 工坊订阅清零事件定案 + triage 工坊文件盘点
+
+1. **定案**：09-26 早晨的连环异常（`+0x1413537` 新开局 init 崩、前端卡 UICreated、零挂载静默退出）根因 = Steam 于 07:05:40 收到 `Subscribed items changed. Number of items: 0` 后**把空订阅列表当权威**，自动删除全部 89 个工坊项的本地文件（`workshop_log.txt` 批量 `removing unsubscribed item`）。非自家工具触发（Mod Manager 日志无 unsubscribe）。本地 data\ pack 完好。
+2. **wh3diag 新增**：triage §5「工坊文件缺失」盘点——`used_mods.txt` 的 `add_working_directory` 逐目录验存在+含 pack，缺失即报"先恢复订阅再归因 mod 内容"；`_SIG_HINTS` 补 `+0x1413537`（工坊抹除期次生崩）。
+3. **处置**：经 `steamworks_bridge` 一键重订阅 89/89（`already_subscribed:0` 证实订阅真丢）+ `force_update` 批量回拉；重建清单留档 `scratch/resubscribe/`。
+4. **次生风险**：07:26 落盘的 9.0 快速存档是在缺 89 个工坊包的初始化环境生成的，战役初始 mod 内容已固化缺失——建议弃档重开。
+5. reference 新增 §10.39（完整案例+判据），§一/§三表同步更新。
+
+## 2026-09-26：第三方 MOD 技术提取样例（temari_luna 整单位替换+技能播歌）
+
+1. 新增 `references/temari_luna_techniques.md`（仓库根参考样例）：拆解工坊 3807340793 `temari_luna.pack`（103MB/PFH5/99文件/零lua，疑似 AI 产出，已下架）的完整实现。
+2. 提取五条可复用模式：①整单位替换 = 同主键 `main_units` 行仅改 `land_unit` + `unit_variants` 同名重定向（vanilla 数值全保留）；②技能播歌 = `phase_audio`→`audio_ability_phases(unit_removal_event)`→`audio_metadata_tags` Play/Stop→`global_music_<id>.bnk`+wem，纯 DB 零脚本；③互斥 = junction 塞进 vanilla `exclusive_toggle` 组；④animpack 缺动作槽位全回填 idle.anim + 复用 vanilla locomotion graph；⑤`.snd.meta` SOUND_TRIGGER 把音频事件打进动画时间轴（卡点）。
+3. `audio_and_vo.md` 新增「技能触发音频链路」一节+清单行；`custom_model_unit_pipeline.md` §10 补样例指针。
+4. 风险标注：源包被工坊标记不兼容 WH3，行值勿照抄；仅作技术模板存档于 `workshop/content/1142710/3807340793/`，未进 playset。
+
+## 2026-09-25：开局上下文分层与冲突规则校正
+
+1. 将每次会话常驻内容压缩为 `AGENTS.md` + `.codex/project_context.md` 的项目路由与硬边界；本机路径、playset、Workshop、硬件和具体 MOD 最近状态迁入按需 `.codex/runtime_state.md`，历史叙事继续留在 `project_context_history.md`。
+2. 精简 `SKILL.md` 为入口、reference 路由、八步通用流程和高风险原则；详细打包、部署、diagnostics 与发布规则统一下沉 `references/rpfm_and_verification_workflow.md`。
+3. 修正三处冲突：默认自动 `build_pack.py --deploy`、发布预览源统一为 `preview.png`、不存在 `gamedata/documentation/script/` 时改查本地原版脚本与已核验在线文档。
+4. 明确加载顺序的两层相反语义：同内部路径文件级遮蔽靠前 pack 胜出；不同 DB 片段同主键行级冲突靠后 pack 胜出；同时需要两种覆盖方向时拆包 `[实测/需随版本复查]`。
+
+## 2026-09-25 深夜续：读档崩溃定案为跨版本存档 + wh3diag 存档指纹工具
+
+1. **`+0x257ce84` 三连读档崩定案 = 跨版本存档**：全部 12 个 `.save` 嵌 `v8.1.0/8.1.1 Build …` + `Patch_8_1` 戳（写入于 9.0 更新前 00:58），当前 exe=9.0.0.0 → 8.1.x 存档在 9.0 world-restore 期必崩（满枚举+全部 `Loading value` 打完后 ~44-69s），与 §10.31 的 `+0x243ae98` 同族。去掉监狱 mod 的对照组同签名同死点 → mod 无关、引擎级不可修，处置=起新战役（21:56 起新 nag 档可玩）。详见新 §10.38。
+2. **wh3diag 新能力**：`saveinfo <名|stem>`（裸名解析 save_games）打印存档 build 戳并与 exe FileVersion 比对出跨版本判定；triage §5 自动报"最新存档戳 vs exe"；`_SIG_HINTS` 补 `+0x257ce84`/`+0x247670a`/`+0x22c0f80` 三条本 build 签名；`_exe_version()` 内部把 WSL `/mnt/x/` 路径转 Windows 形式再喂 PowerShell。
+3. **`Loading value` 画像判据**：满战役存档 ~517 条 vs 新开局 ~91 条全默认值——新战役也打印同名行，勿误判为小存档；`save_named_value` key 在压缩序列化里 grep 不到，加载顺序只看 script_log。
+4. **`+0x22c0f80` 未解（两次归因均被反证）**：新 nag 开局 intro/loading-dismiss 期读 `null+0x58` 崩五次（21:18→22:57，326/249/240 项 modlist 均复现）。电影遮蔽与 fast_end_turn fleets 点击两个假设先后被证伪（22:57 崩溃会话该 mod 未加载仍同签名崩）；存活对照 22:49 会话 movie 自然播完后正常进战役——疑似 intro overlay 生命周期与 `progress_on_loading_screen_dismissed` 重入的 9.0 引擎级竞态，对策=重试让 intro 播完一次落地存档。fleets 点击仍按风险原则移除（非本签名根因）。**教训：日志尾最后 click 是强嫌疑非铁证，须做"无该 mod 仍崩"反证**。另：`camera_lock_diplomacy.lua` 120 条兜住噪音属工坊包 9.0 不适配；新增待查签名 `+0x22c8774`（写违规）与 `+0x1bb9418` 在精简测试清单复现各一。
+
 ## 2026-09-25 深夜：自定义兵种扩展应用到 9.0 新阵营「亡灵军团」
 
 1. `wh3_dlc29_nag_host_of_nagash`（纳迦什军团=亡灵军团，DLC29/9.0 新增）：military_group `wh3_dlc29_nag_group_undead_legions`、subculture `wh3_dlc29_sc_nag_undead_legions`，主城链 `wh3_dlc29_nag_settlement_necropolis_1..5`，小城三选一 `mausoleum/cove/chambers_1`，特殊城 `pyramid_of_nagash_nag_2..5(_floating)`。
@@ -267,3 +326,52 @@
   - `!!Prayer_of_star_witch_movie`、`zzz_czx_hero_grants`、`zzz_czx_vmp_pokemon_unlock` 审计零问题，直接回归播放集。
 - 工具：`build_pack.py` 的 `encode_value` 补齐 `ColourRGB`/`ColourU32`/`I16`/`I24` 编码（修 ritual_targets 表必需）。
 - 验证：全部补丁包逐表 `decode_db_table` 通过、头部版本=vanilla 当前版、非改名行逐值回读一致；播放集 `playset_items` 与 `enabled_order` 均为 114 项一致，补丁→目标顺序全部满足。游戏内回归待做。详见 references §10.32。
+
+## 2026-09-25 深夜：`[ui]` dump 定位法定案 `+0x1bb9418` + wh3diag 分诊套件（triage/events/recent/grep/scriptlog --ui/which --playset）
+
+- 三连崩 `0xc0000005 @ +0x1bb9418`（19:29/19:37/20:04）**强关联定案**：script_log 尾部 `[ui]` dump 显示崩溃时正在分发 `button_commodities`（`search_panel > panel_landmarks`，9.0 新增节点）的 click 事件，三次会话固定同序列 5 连击（button_predicted→apply_player→search_panel 页签）= 程序化点击非用户操作。点源为 `!!!!Chop_Mechanix_2_Rows_Fix_Overlap.pack` 过期 `hud_campaign.twui.xml` 遮蔽内的 `context_function_id="self.SimulateLClick"` 钩子在 9.0 新 UI 树上回放；`czx_chop_90fix` 20:12 部署（pos 66 压过 Chop 67）后 click 风暴与该签名同时消失。SCRIPT ERROR 风暴是 `ComponentLClickUp` 条件函数在 UI 半建状态误报（xpcall 兜住不致死）。详见 references §10.37。
+- 补丁部署（20:12）后签名漂移，triage 配对视图完整时间线：20:17/20:25/20:43 三连 `+0x257ce84`（读 0x1d1，无 click 无 SCRIPT ERROR=静默运行时崩）、20:38 一次 `+0x247670a`（读 0xa107）、20:02 会话无 dump 静默死亡（loads=26 枚举中段）——**不同签名不同根因**，均待排查。
+- wh3diag 新子命令：`triage`（一键分诊：recent+crashes+scriptlog-ui+Event2004+存活进程+AppData 判据；**dump↔script_log 按 mtime 双向互近配对**±180s——单向窗口会把无 dump 哑死会话错配到隔壁 dump；dump 行标配对 log+签名分布直方图+最近 Event2004 ±秒差（≤60s 同刻=OOM 嫌疑）；log 行标 phase=[stub|enum-mid|run-crash|ok]+会话墙钟跨度+配对 dump 签名；§5 含 bad_mods 最近会话刷新判定+prefs `minimise_memory_usage` 写回检查）、`events`（OOM 闸门+WER+进程）、`recent`（mtime 嫌疑清单）、`scriptlog --ui`、`grep <正则>`、`which --playset`（播放集内按加载序标胜者+twui `version=` 对比 vanilla 基线标 STALE）、`collect`（A/B 前冻结 mutable 证据到 scratch/crash_<ts>/）。
+- 固化事实：`used_mods.txt` 在游戏根目录；`mp_log.txt` 为 UTC 时钟；script_log `<Xs>` 为引擎秒数；9.0 下 `find_uicomponent` 失败可返回 `false`（`x ~= nil` 判空失效）。
+- 9-24 20:52 的独立 OOM（Event 2004，WH3 commit 62.65GB）与本案无关，勿混入今日签名序列。
+- triage 判据再补（同夜合并）：`crashes`/triage dump 行下挂 `==>` 内置签名判定表命中提示（§三 表偏移匹配）；`recent` 把 crash_report/temp/logs 等输出物移出嫌疑清单；`events` 进程行带启动时间与命令行；triage §5 新增 gfx_* 危险档（§10.19：minimise=true + gfx=3 仍会 OOM）、`modified.log` `Mod:` vs `used_mods` 挂载进度差、`no_clean_exit` 留痕、state.db 漂移检测；triage 的 recent/events 窗口自动对齐当前崩溃簇起点（>6h 静默分簇）。
+- **21:03 新案例（并发部署污染再演）**：`!!!!wyccc_runtime_options.pack` 于 21:03:09 写入 `data\` + `state.db` 同秒更新，11 秒后（21:03:20）产出 `+0x52a21a` dump——该 dump 无配对 script_log、`no_clean_exit` 落盘于 21:03:12、挂载进度停在 `Mod: 125/126`（movie、@Xiang_Necessary_Integration 未挂）= **部署动作撞上游戏挂载期**，正是 triage 新增判据全部命中的教科书实例，根因按 §10.12/10.27 并发污染处理、勿计入 mod 内容回归。
+
+## 2026-09-26：数码宝贝 v2 绑定修复——keep 权重通道真修复 + animroot 钉死全库清零
+
+- 报障：susanoomon/birdramon 腾空必杀解体拉丝。定案两个叠加 bug：
+  1. **jmap→keep 通道从未生效**——`blender_rig2.py` bake 循环 `o.vertex_groups.clear()` 先于 src_w 快照清光顶点组，`weightmap override verts` 恒为 0；叠加 Blender 4.5 `VertexGroupElement.group` 字段名变化。修复后 66 个 biped 单位真正吃到美术权重。
+  2. **animroot 系统性钉死**——92/104 模型有顶点绑在原点骨（chaosdramon 2491、jesmonx 1556、lilimon 1020），身体离地即拉丝。修复三处：内置排除正则 + bird/dragon env 覆盖同步加 `animroot`；`_remap_prim_weights` 剥掉落 animroot 的权重行（变零→回退 auto-bind）；keep 快照端再剥一次（Blender glTF 导入会把全零行规整成 joint0=1.0=animroot，单端清零不够）。
+- jmap 搬运策略：旧 jmap 只搬 biped 族（64 只）；骨架自带翼/尾骨的族不搬（birdramon 旧 jmap 把 J_wing*→neck/leg，搬了反而退化）；含 cape_* 骨的 9 个 biped 单位 J_mant* 重指披风骨；susanoomon 手工修（mant→cape 链、J_wep→hand_right、肩甲→shoulder_pad）；omegamon 剑→hand_right、炮→hand_left。
+- 验证：104/104 重绑后 animroot 顶点全库为 0；工作室 ult_skyfall 截图确认 susanoomon 凝聚/披风随骨/武器跟手。rmv2+verify+pack 全重跑，`zzz_czx_digimon_v2.pack`（491MB）部署回 data\（播放集 pos 86，mod_id `local:data:6d429f74a958fd64f5`），v2b 残留清理。
+- 关键坑沉淀进 §3b/§3c-ii/§9：world.glb 仅不存在时重建、phase 标记会跳过、Blender 零权重行规整、exec 层吞 `$VAR`。
+- 工作室 QA 闭环成型：bound.glb→model-studio/models/→程序化极端 clip 截图→顶点审计→改 jmap/规则→单兵重绑循环；`wh3_export_unit_glb.py` 导原版模型当流畅度基线。
+
+## 2026-09-26 续：游戏 UI 自动化禁动用户其他窗口（规范新增）
+
+- 用户报障"有些程序看不到窗口"。定因 `scratch/wh3_click.py`/`real_click.py`/`minimize_others.py`：为让程序化点击落在游戏上，对其他顶层窗口 `ShowWindow(h,0)`（SW_HIDE）/SW_MINIMIZE 并 `taskkill` steamwebhelper/gameoverlay——被隐藏窗口无任务栏按钮、Alt-Tab 不可见，只能重启程序找回。
+- 新规则：窗口/进程操作仅允许作用于 `Warhammer3.exe` 自身；遮挡用 `PrintWindow`（D3D 限制见 §10.7）或屏幕 DC 截图、`PostMessageW` 点击；仅游戏窗口可 `SetForegroundWindow`。细则见 references §10.41；AGENTS.md 项目硬约束与 SKILL.md 高风险原则同步加入。
+- 三个遗留脚本头部已加禁跑警告；复查工具 `scratch/_hidden_check.ps1`（EnumWindows 口径，-Restore 可批量恢复）。**注意**：`Process.MainWindowHandle` 不能用于排查——主窗口被藏后它归 0，首轮曾因此漏报；实际 Devin（pid 14956 的 1920x1059/1022x766 两窗）与 msedge（1920x1059）主窗口确曾被藏，已 ShowWindow 恢复。
+
+## 2026-09-26 深夜 — anim 量化钳位：全库级动画损坏修复（三视图 QA 实锤）
+
+- 病灶：write_anim8 对 tb==3/rb==4 量化轨按 donor 的 rt/rq 值域编码，
+  (v-mx)/mn*127 硬钳 ±127。retarget_delta 写回的局部 TRS 在适配骨架
+  坐标基下超出 donor 值域（taomon toe_left_0 超 740 倍）→ 编码钳死 →
+  中段帧腿过头、身体揉团。5 个 donor 族全部用量化轨 → 全库 109 骨架
+  目录 ~9.5k 剪辑不同程度受损（walk/run 轻微、attack/death 剧烈）。
+- 隐蔽点：pose_*.json dump 记的是 retarget 意图世界（正确），写盘产物
+  从未回读验证——文件与意图脱节，自检度量不到。旧 pack(.off)同款损坏
+  → 排除 beprop 补丁，定位到 retarget 序列化路径。
+- 修复：retarget_delta 写完帧数据后把动态量化轨提升为无损编码
+  (tb 3→12, rb 4→8)，写回四元数归一化；静态槽位照旧走 rt/rq 补丁。
+- 重建：scratch/regen_anims.py 全量重跑 9496 个 .anim（含 5 个 report
+  外变体骨架从 skeletons/*.anim 重建 fit_skel）；随后 fix_beprop_tracks.py
+  + fix_beprop_tracks_dyn.py 重跑（8765 剪辑 prop 挂点跟手 d=0.000）；
+  dgm_patch 190 文件按同路径同步。
+- 验证：taomon combat_walk 中段 f10 头 7.02 / 脚 1.45/0.66（修复前
+  7.14/8.71 过头）；全库 5669 个非死亡类剪辑审计仅剩 5 单位个别
+  attack_06/land/reaction 帧（合法腾空动作）。工作室 8 只代表模型
+  三视图重导出确认（model-studio/scratch/_viz/out3/）。
+- 部署：zzz_czx_digimon_v4.pack（816MB，全动态无损）→ pos 86，
+  旧条目已清。data/ 下 v2.pack / v2.pack.off / v3.pack 待用户清理。

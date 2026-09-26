@@ -275,11 +275,21 @@ def retarget_delta(clip, fit_skel, donor_skel, new_skel_name,
                     qip = qinv_norm(wqo[par])
                     lp_i = list(qrot(qip, [wpo[i][k] - wpo[par][k] for k in range(3)]))
                     lq_i = qmul(qip, wqo[i])
+                n = sum(c * c for c in lq_i) ** 0.5
+                if n:
+                    lq_i = [c / n for c in lq_i]
                 if part['tb'][i] > 0:
                     fr['transforms'][part['_tm_dyn'][i]] = list(lp_i)
                 if part['rb'][i] > 0:
                     fr['quaternions'][part['_rm_dyn'][i]] = lq_i
             world.append({'pos': [list(p) for p in wpo], 'quat': [list(q) for q in wqo]})
+        # Retargeted locals live in OUR skeleton's bone basis — the donor's
+        # per-bone quantize ranges (rt/rq) don't cover them and write_anim8
+        # clamps to ±127 -> limbs fold overhead (taomon etc). Promote
+        # quantized dynamic tracks to lossless encodings (tb 3->12, rb 4->8);
+        # static slots keep their ranges (already patched to encode exactly).
+        part['tb'] = [12 if t == 3 else t for t in part['tb']]
+        part['rb'] = [8 if r == 4 else r for r in part['rb']]
     return clip, world
 
 
