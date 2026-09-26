@@ -9,6 +9,7 @@
   --anim-dir X    auto 模式下限定 animations/battle/<skel>/<X>/ 子目录（武器类别）
   --limit N       auto 模式最多取 N 条（默认 10）
   --dry           只报告骨架匹配与 clip 命中，不写文件
+  --strip         先剥掉已有 animations 再注入（重做/修复用，会压实 BIN）
 
 轨道按骨名绑到 GLB 节点（bound.glb 用原版骨架骨名，直绑无需映射）。
 clip 中 GLB 缺少的骨被跳过；GLB 有而 clip 没有的骨保持 rest。
@@ -126,7 +127,7 @@ def detect_skeleton(node_names, unit_token=''):
     cand = [Path(n).stem for n in X.grep_pack('animations/skeletons/')
             if n.endswith('.anim') and '/' not in
             n.split('skeletons/')[1].strip('/')]
-    best = None
+    scored = []
     for name in cand:
         r = _skel_bones(name)
         if not r:
@@ -135,10 +136,9 @@ def detect_skeleton(node_names, unit_token=''):
         hit = len(set(node_names) & bset)
         cov = hit / max(1, len(bset))
         aff = _name_affinity(name, unit_token)
-        score = (hit, aff, cov)
-        if best is None or score > (best[2], best[4], best[3]):
-            best = (name, sk, hit, cov, aff)
-    return best
+        scored.append((name, sk, hit, cov, aff))
+    scored.sort(key=lambda t: (t[2], t[4], t[3]), reverse=True)
+    return scored
 
 
 # clip 语义挑选表：(stem 子串, 每类最多取几条)
@@ -183,8 +183,24 @@ def inject(gltf, binbuf, skel, clip_refs):
         if nm and 'mesh' not in n:
             name2node[nm] = i
     skel_frame = skel['frames'][0]
+    skel_bone = {b['name']: i for i, b in enumerate(skel['bones'])}
+    rest_pos = skel_frame['positions']
     app = BinAppender(gltf, binbuf)
     gltf.setdefault('animations', [])
+
+    # 平移缩放基准：GLB root rest 长 / 骨架 root rest 长
+    gscale = 1.0
+    for rn in ('root', 'animroot', 'pelvis'):
+        ni = name2node.get(rn)
+        bi = skel_bone.get(rn)
+        if ni is None or bi is None:
+            continue
+        g = np.asarray(gltf['nodes'][ni].get('translation', [0, 0, 0]),
+                       dtype=np.float64)
+        s = np.asarray(rest_pos[bi], dtype=np.float64)
+        if np.linalg.norm(s) > 1e-6:
+            gscale = float(np.linalg.norm(g) / np.linalg.norm(s)) or 1.0
+            break
 
     results = []
     for cref in clip_refs:
@@ -226,16 +242,30 @@ def inject(gltf, binbuf, skel, clip_refs):
                 prev = q
                 poss[f] = p
                 quats[f] = q
-            a_p = app.acc(poss, 'VEC3')
-            samplers.append({'input': a_t, 'interpolation': 'LINEAR',
-                             'output': a_p})
-            channels.append({'sampler': len(samplers) - 1,
-                             'target': {'node': ni, 'path': 'translation'}})
             a_q = app.acc(quats, 'VEC4')
             samplers.append({'input': a_t, 'interpolation': 'LINEAR',
                              'output': a_q})
             channels.append({'sampler': len(samplers) - 1,
                              'target': {'node': ni, 'path': 'rotation'}})
+            # 平移：仅 clip 中真实运动的骨注入轨道；GLB rest 锚定 + rest 长度比缩放
+            move = np.abs(poss - poss[0]).max()
+            if move > 1e-4:
+                bi = skel_bone.get(b['name'])
+                s_rest = np.asarray(rest_pos[bi], dtype=np.float64)                     if bi is not None else np.zeros(3)
+                g_rest = np.asarray(
+                    gltf['nodes'][ni].get('translation', [0, 0, 0]),
+                    dtype=np.float64)
+                s_b = (np.linalg.norm(g_rest) / np.linalg.norm(s_rest)
+                       if np.linalg.norm(s_rest) > 1e-6 else gscale)
+                if not np.isfinite(s_b) or s_b <= 0:
+                    s_b = gscale
+                poss_out = g_rest + (poss - poss[0]) * s_b
+                a_p = app.acc(poss_out.astype(np.float32), 'VEC3')
+                samplers.append({'input': a_t, 'interpolation': 'LINEAR',
+                                 'output': a_p})
+                channels.append({'sampler': len(samplers) - 1,
+                                 'target': {'node': ni,
+                                            'path': 'translation'}})
             kept += 1
         if not kept:
             results.append((cin, 'no bone tracks matched GLB nodes'))
@@ -245,6 +275,67 @@ def inject(gltf, binbuf, skel, clip_refs):
         results.append((cin, 'ok %d frames %d bones' % (nf, kept)))
     return app, results
 
+
+def strip_anims(gltf, binbuf):
+    """剥掉全部 animations 并压实 BIN（移除孤儿 accessor/bufferView）。"""
+    if not gltf.get('animations'):
+        return binbuf
+    used_acc = set()
+    for m in gltf.get('meshes', []):
+        for pr in m.get('primitives', []):
+            used_acc.update(pr.get('attributes', {}).values())
+            if 'indices' in pr:
+                used_acc.add(pr['indices'])
+            for t in pr.get('targets', []):
+                used_acc.update(t.values())
+    for s in gltf.get('skins', []):
+        if 'inverseBindMatrices' in s:
+            used_acc.add(s['inverseBindMatrices'])
+    accs = gltf.get('accessors', [])
+    used_bv = set()
+    for ai in used_acc:
+        bv = accs[ai].get('bufferView')
+        if bv is not None:
+            used_bv.add(bv)
+    for img in gltf.get('images', []):
+        if 'bufferView' in img:
+            used_bv.add(img['bufferView'])
+    bv_sorted = sorted(used_bv)
+    nb = bytearray()
+    bv_new_off = {}
+    for bvi in bv_sorted:
+        bv = gltf['bufferViews'][bvi]
+        off = bv.get('byteOffset', 0)
+        pad = -len(nb) % 4
+        nb += b'\x00' * pad
+        bv_new_off[bvi] = len(nb)
+        nb += binbuf[off:off + bv['byteLength']]
+    bv_idx = {o: i for i, o in enumerate(bv_sorted)}
+    gltf['bufferViews'] = [dict(gltf['bufferViews'][o], byteOffset=bv_new_off[o])
+                           for o in bv_sorted]
+    acc_sorted = sorted(used_acc)
+    acc_idx = {o: i for i, o in enumerate(acc_sorted)}
+    gltf['accessors'] = [dict(accs[o],
+                             **({'bufferView': bv_idx[accs[o]['bufferView']]}
+                                if 'bufferView' in accs[o] else {}))
+                         for o in acc_sorted]
+    for m in gltf.get('meshes', []):
+        for pr in m.get('primitives', []):
+            pr['attributes'] = {k: acc_idx[v]
+                                for k, v in pr['attributes'].items()}
+            if 'indices' in pr:
+                pr['indices'] = acc_idx[pr['indices']]
+            if 'targets' in pr:
+                pr['targets'] = [{k: acc_idx[v] for k, v in t.items()}
+                                 for t in pr['targets']]
+    for s in gltf.get('skins', []):
+        if 'inverseBindMatrices' in s:
+            s['inverseBindMatrices'] = acc_idx[s['inverseBindMatrices']]
+    for img in gltf.get('images', []):
+        if 'bufferView' in img:
+            img['bufferView'] = bv_idx[img['bufferView']]
+    gltf['animations'] = []
+    return bytes(nb)
 
 def main():
     args = sys.argv[1:]
@@ -256,7 +347,7 @@ def main():
         out, i = Path(args[1]), 2
     else:
         out, i = inp, 1
-    skel_name, clips, anim_dir, limit, dry = 'auto', 'auto', '', 10, False
+    skel_name, clips, anim_dir, limit, dry, strip = 'auto', 'auto', '', 10, False, False
     while i < len(args):
         a = args[i]
         if a == '--skeleton':
@@ -267,6 +358,8 @@ def main():
             anim_dir = args[i + 1]; i += 2
         elif a == '--limit':
             limit = int(args[i + 1]); i += 2
+        elif a == '--strip':
+            strip = True; i += 1
         elif a == '--dry':
             dry = True; i += 1
         else:
@@ -285,10 +378,16 @@ def main():
         unit_token = ''.join(c for c in unit_token if not c.isdigit()).strip('_')
         print('detecting skeleton over %d nodes (unit=%s)...'
               % (len(node_names), unit_token))
-        best = detect_skeleton(node_names, unit_token)
-        if not best:
+        cands = detect_skeleton(node_names, unit_token)
+        if not cands or cands[0][2] == 0:
             raise RuntimeError('no skeleton matched')
-        skel_name, skel, hit, cov, _aff = best
+        skel_name, skel, hit, cov = cands[0][:4]
+        clip_refs = pick_clips(skel_name, anim_dir, limit)
+        for name, sk2, h2, c2, _a in cands:
+            if clip_refs:
+                break
+            skel_name, skel, hit, cov = name, sk2, h2, c2
+            clip_refs = pick_clips(skel_name, anim_dir, limit)
         print('skeleton=%s hit=%d cov=%.2f' % (skel_name, hit, cov))
     else:
         r = _skel_bones(skel_name)
@@ -297,15 +396,17 @@ def main():
         _bset, skel = r
         hit = len(set(node_names) & _bset)
         print('skeleton=%s hit=%d' % (skel_name, hit))
-
-    if clips == 'auto':
         clip_refs = pick_clips(skel_name, anim_dir, limit)
-    else:
+
+    if clips != 'auto':
         clip_refs = clips.split(',')
     print('clips:', clip_refs)
 
     if dry:
         return
+    if strip:
+        binbuf = strip_anims(gltf, binbuf)
+        print('stripped anims, bin ->', len(binbuf))
     app, results = inject(gltf, binbuf, skel, clip_refs)
     for r in results:
         print('  ', r)

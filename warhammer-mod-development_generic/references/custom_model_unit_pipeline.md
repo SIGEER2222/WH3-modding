@@ -295,6 +295,32 @@ python tools/wh3_export_unit_glb.py emp_greatswords \
 - `hef_sun_dragon`（dragon01, 127骨, 2 mesh, 4 内嵌 clip）→ morph=quad，映射 17/17 + 附加骨 14（尾/翼/爪/jaw），自检 FAIL 集中在辅助骨阈值口径（14m 巨兽飞行 clip），非导出缺陷
 - `emp_greatswords`（humanoid01, 72骨, 6 mesh, 4 clip）→ morph=biped，自检 14P/3W/0F，WARN 全是 run/charge 位移动画真实位移触发
 
+## 8c. 原版动画注入自制 GLB（inject_anims_glb.py）`实测 2026-09-26`
+
+用途：给 `model-studio/models/` 里已绑定的自制单位 GLB **原地追加**原版 clip 轨道，让 studio 预览所见 = 游戏所得（自制单位本就挂游戏真动画，只是 bound.glb 没带）。修「自制单位动作太呆」的根因——DSL 相位合成 vs CA 真数据。
+
+```bash
+python tools/inject_anims_glb.py models/czx_dgm_agumon_bound.glb          # 自动检测骨架+挑 clip
+python tools/inject_anims_glb.py x.glb --skeleton humanoid01 --anim-dir 2handed_sword
+python tools/inject_anims_glb.py x.glb --clips a.anim,b.anim --dry       # 只看不写
+```
+
+机制：
+- **骨架检测**：扫 pack 全部 `animations/skeletons/*.anim`，按 GLB 节点名重合数排序；同分（czx_* 克隆骨架骨名全同）按单位名前缀亲和度选本单位自己的骨架（`czx_dgm_agumon` → `czx_agumon`）。
+- **clip 挑选**：`animations/battle/<骨架>/` 全树按语义取 ≤10 条：stand_idle×2 / walk / combat_walk / run / charge / attack×3 / hit / death / celebrate；`pose` 文件跳过（0 帧）。
+- **轨道（重定向式，关键）**：旋转全绑；**平移只给 clip 里真实运动的骨**写轨道，且以 GLB rest 为锚、按 rest 骨长比缩放差量——直接写绝对平移会把 clip 骨架的骨长套到自适配过比例的 bound 骨架上，肢节长度漂移 segDrift 爆表（第一版踩过）。GLB 缺的骨跳过，clip 没动的骨保持 GLB rest。
+- clip 内部 `skeleton_name` 与所认骨架不一致时拒收（防止跨骨架污染）。
+
+实测（model-studio 全库 136 GLB）：
+- **114 个 bound GLB 全部注入成功**，132/136 现有动画（4 个 ref_* 战争机器无 animset 属正常）。
+- czx 系自动对到单位专属骨架目录：agumon→czx_agumon（95 clips 库）、birdramon→czx_bi（bi1_ 鸟系飞行动画）、charizard→dr1b 龙系、jibian→centaur01 半人马系。
+- studio 定量验证：attack hand 位移 0.29m、fly_charge 翼骨 0.27m、stand_idle 有呼吸级微动——全为 CA 真实曲线。
+- 批量脚本 `scratch/batch_inject_anims.py`：遍历 models/ 无动画 GLB 原地注入（skel_cache 缓存骨架文件）。
+
+--strip：剥掉已有 animations 并压实 BIN（孤儿 accessor/bufferView 回收），重注入不胖文件。
+
+坑：czx_* 与 humanoid01 骨名完全相同 → 检测必须加单位名亲和度，否则谁排在前面就认谁（aerovd≺agumon）。
+
 ## 9. 已知坑速查
 
 | 症状 | 根因 | 修法 |
