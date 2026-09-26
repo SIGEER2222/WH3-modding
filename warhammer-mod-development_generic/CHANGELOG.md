@@ -1,3 +1,10 @@
+## 2026-09-26 验收复审：离线直乘假验证器纠偏 + 工作室 crest 车道塌头修复
+
+1. **上轮验收截图被用户驳回成立**：亚古兽 run 中段头顶塌成锯齿、残片挂脸、嘴前凸红球。逐层解剖证明**资产无缺陷**——`tools/blender_pose_render.py`（世界 delta 约定，管线正统 QA 渲染器）渲 run f9/atk f31/idle f30 三视角+头特写全干净；真凶是工作室运行时 `rebindStrayWeights` 的 crest 车道按 `crestAbove=0.55` 绝对高度阈值抢 head 骨顶点（亚古兽 94 冠顶顶点被当"背帆"偷到休眠软链骨→塌头）。修复（model-studio importer.js）：crest 车道叠加 `detachAt` 顶点距分布空隙判据，连续颅壳不偷、只偷真游离簇。疗效：亚古兽全车道归零（rebind 全 0），工作室渲染与管线渲染逐帧一致。
+2. **假验证器教训（验收规范级）**：`W_skel_anim·IBM_glb` 直乘离线蒙皮必出假"帆"——GLB 绑定帧是 Blender 骨朝向约定、骨架 frame0 是 WH3 约定，逐骨 roll 差 90~180°。正确姿势 = `tools/blender_pose_render.py` delta 法（`desired = C@(A@B^-1)@C_inv @ matrix_local`）。`inject_rt_ws.py` 注入轨道已是世界空间 delta 换算（wsFixed:2），工作室回放与游戏一致。scratch/_skin_check2.py 及其 _agu_*_*.png 产出全部作废。
+3. **§9 坑表新增两条**：crest 车道误杀签名（`rebind.crest` 高计数 + byBone 落 head/skull = 拒收）；离线直乘蒙皮属假证据。矩阵回归全绿（唯一 charmander roll FAIL 为 lane 在飞 faceAudit 回归，18:40 矩阵已现、早于本改动）。
+4. **证据路径**：管线渲染 `E:\Code\WH3-modding\scratch\_preview\_pr3_{run_f9,atk_f31,idle_f30}_{front,side,top}.png` 与 `_head_run_f9_{front,side,persp}.png`；工作室截图存 Tabbit artifacts `task-ee7a54ab-ec4d-4e27-9be8-bfc7376fc432`（run 47% / atk 55% / idle 30% 三帧全净）。PROGRESS 记录 = model-studio commit 53ba10c。
+
 ## 2026-09-26 夜：下颚源骨 jmap 全库错配修复 + 运行时抢蒙病灶定案
 
 1. **J_* 下颚源骨 jmap 错配（25 单位，口腔"领带"病灶）**：dgm_pub_batch/digimon_batch 两批 jmap.json 把 `J_joe/J_ago/J_chin/J_mouth/J_kuti/J_kuci/J_jaw/J_joe_l/r/J_ago2/J_grey_chin/J_garuru_chin` 错映到 `head/eyebrow/eye_left/neck_0/spine_0/root`——下颚/口腔内衬顶点绑进躯干或眉骨，头部动画抬起时颚皮滞留、嘴缝撕开垂出暗红"领带"（亚古兽确诊）。全部改指本骨架 `jaw`/`jaw_0`；删 `*_world.glb`+`*_bound.glb` 清 phase_bind/rmv2/ui 标记重跑（world.glb 存在即跳权重重映射——换 jmap 必须删缓存）。25 单位 rmv2 全部重写。

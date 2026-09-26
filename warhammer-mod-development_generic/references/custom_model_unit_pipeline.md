@@ -350,6 +350,8 @@ python tools/inject_anims_glb.py x.glb --clips a.anim,b.anim --dry       # 只�
 | 待机/张嘴时下颚到胸口垂暗红"领带" | jmap 把下颚源骨（`J_joe/J_ago/J_chin/J_mouth/J_kuti/J_kuci/J_joe_l/r/J_ago2/J_grey_chin/J_garuru_chin`）错配到 head/eyebrow/spine_2/root——头抬起时颚部内衬滞留撕开 | jmap 改指该骨架 `jaw`/`jaw_0`；删 `*_world.glb`+`*_bound.glb` 清 phase_bind/rmv2 重跑（world.glb 存在即跳权重重映射）。验收信号：张嘴帧中线暗红垂带；顶点审计=喉部中线前方顶点主导骨非 jaw |
 | 奔跑/攻击时体侧甩出"门板"长条、爪尖滞留不动 | 工作室 importer 运行时 `rebindStrayWeights` steal 规则把 hand_* 爪尖顶点抢挂休眠 cape_*_0（亚古兽 71 顶点） | `STEAL_SRC_RE` 收窄到 arm/forearm/elbow（不含 hand/wrist）；验收=`modelReport.rebind.steal>0` 且 byBone 落 hand/wrist/weapon 即拒收 |
 | 自检 fail=0 但视觉明显不对 | 几何自检只测"不爆炸"，不测动画源/贴图方向 | 必做中段帧截图 + 对照 vanilla 导出基线（wh3_export_unit_glb） |
+| 工作室里头顶塌陷成锯齿碎块、深色残片挂脸 | 运行时 `rebindStrayWeights` crest 车道按绝对高度阈值（0.55m）抢 head 骨顶点——大头单位连续颅壳被误杀（亚古兽 94 顶点） | crest 车道须叠加 `detachAt` 顶点距空隙判据（importer.js）：连续分布不偷、只偷空隙外游离簇；验收=`rebind.crest` 高计数且 byBone 落 head/skull 即拒收 `[实测]` |
+| 自制离线蒙皮脚本渲出假"帆/塌陷"但管线渲染干净 | `W_anim·IBM` 直乘混用坐标约定：GLB 绑定帧=Blender 骨朝向、骨架 frame0=WH3 约定，逐骨 roll 差 90~180° | 离线验证一律走 `tools/blender_pose_render.py` 的 delta 法（`desired = C@(A@B^-1)@C_inv @ matrix_local`）；直乘结果不可作证据 `[实测]` |
 
 ## 10. 相关文档
 
