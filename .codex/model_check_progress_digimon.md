@@ -11,6 +11,7 @@ STATUS: DONE（104/104 结论清零：100 只 chr 原生激活 + 4 只 serpent �
 - ⚠ **animset 注册层整体缺失**：源码 `animations/database/battle/bin/` 为空，pack 内无 `animations/database/` 子树（无 bin 无 animpack）。当前 `land_units.man_animation` 全部指向 vanilla 族套件（hu1_empire_sword_and_shield×83 / wf1_dire_wolf×9 / sn1_sepulchral_stalker_halberd×5 / sp1_giant_spider×4 / bi1_eagle×3，2026-09-24 13:07 改动），czx_dgm_*_suffix 动画 key 仅被 battle_animations_table/culture 表引用——自定义套件资产（9021 clips + 104 骨架 + bins）目前是休眠层。
 - iter2 animpack 解剖结论（`scratch/model_check/digimon/animpack_audit.py`）：`scratch/zzz_czx_digimon_v2_animsets.animpack.broken` **格式完好**（104 条、无尾字节）、**内部套件名==stem==DB key**（czx_dgm_*_suffix，已是正确命名约定，非 vanilla donor 名）、bin 内引用 `animations/skeletons/czx_*.anim`+`reference_poses/` 正确；且与 `scratch/dgm_plus_pkm_src/animations/database/battle/bin/` 备份 **104/104 逐字节相同**。"broken" 名不符实——格式/命名都对，被弃的真实原因是**剪辑内容畸形**（L3 实测），9-24 拔除+改 vanilla man_animation 属止损。修好剪辑后直接把这 104 bin 回源/重打 animpack 即可，无需改名手术。
 - ⚠ **unit_set_to_unit_junctions 全空**（仅表头）：104 只无 unit_set 归属——自定义战斗选人界面分类页签可能不显示它们（units_custom_battle_permissions 已在，全派系行齐）。待确认影响。
+- ✅ **be_prop 轨道修复（2026-09-26 iter13）**：grafted 剪辑 `be_prop_*` 原全静态钉原点，已按 CA 惯例补写（`scratch/fix_beprop_tracks.py` 全动态 + `fix_beprop_tracks_dyn.py` 压缩剪辑重建）。映射 0/1→hand_right、2→hand_left、3→spine_2、4→root、5→hand_left；`L_prop=inv(W_animroot)⊗W_driver`（animroot 有 X180° 常量翻转）。全量 9496 剪辑 ok=8765/no-prop=731/other=0；799 个压缩剪辑（czx_meg/met/ple/sea/dorugo/omega0/shine0/veemo0/wargr0）重建为全动态。抽样 140 剪辑归一化 FK 逐帧零偏差、四元数半球连续、非 prop 通道保真（0 pos/0.003° rot）。**坑**：压缩编码解出非单位 quat（|q|=1.0011）会在 q·v·conj(q) 上按 |q|² 缩放——FK 前必须归一化。包已重建（533MB，+42MB 因 799 剪辑全动态化），部署挂 `scratch/deploy_digimon_when_free.sh` 等 WH3 退出。注意：轨道≠挂载，武器要显示仍需 VMD SLOT attach_point。
 - Warhammer3.exe 运行中 → L4 全跳过（「待游戏窗口」）。
 
 ## 单位台账
@@ -324,3 +325,143 @@ STATUS: DONE（104/104 结论清零：100 只 chr 原生激活 + 4 只 serpent �
   4. 羽骨全链带动画轨道（czx_bi/czx_ho 实测外层羽活动 2-3.4m），graft 保 feather 数据，bind fit 必须准。
   5. snake02 蛇系 tail_0..19 主链+侧链+发蛇 jaw，供 seadramon 族后续 graft 参考。
 - **遗留 TODO**：graft 补 be_prop 轨道生成 → 之后可把 imperialpm 剑改成 CA 式 weapon_1 attach_point（可换 variant、跟武器弧线）。
+
+## iter14（2026-09-26 上午续）注入 GLB 剪辑解体修复 + 全库批量落地
+
+- **病灶**：inject_rt 把重定向后 .anim 的局部 TRS 直接写进 GLB 节点轨道——.anim 局部值是 wh3 拟合骨架（czx_*）局部约定，GLB 节点是 Blender 导出骨轴系约定，直接套用到工作室预览即解体。
+- **修法**：scratch/fix_injected_anims.py 世界空间 delta 重定向——W_glb=ΔW_skel⊗W_glb_bind，再按 GLB 父子链分解回节点局部 TRS 重写轨道；每动画写 extras.wsFixed 幂等标记防二次换算；每骨补齐 rotation+translation 双 channel（wh3 原 clip 位移轨道稀疏，世界重定向后每骨都需位移）。
+- **批量**：无参跑=全部有 skel_*.json 的单位。**104/104 dgm GLB 全修完**（4-7 clip/只，joints 42-95）；ref_* 导出件（wh3_export_unit_glb 自带烘焙剪辑，本就正确）与无动画件（pkm_*/jibian）不受影响。
+- **tabbit 抽验**（127.0.0.1:57202 studio）：tentomon sp1_walk/attack 中帧网格连贯无解体、wargreymon hu1_sws_attack 站姿出招正常、stegadon hq01_attack（ref 对照组）原生剪辑正常。
+- **游戏侧**：zzz_czx_digimon_v3.pack（11:13 部署 491,581,042B）随 WMM 清单加载；11:32/11:40 两次启动撞 §10.40 loading-dismiss 竞态崩（+0x132c34c/+0x22c0f80 已知签名），11:43 第三次拉起存活。
+- **文档**：坑表已补 wsFixed 修法行（custom_model_unit_pipeline.md §9）。
+- **待办**：游戏内 tentomon 战斗动画目视验收（甲虫兽 czx_tent 骨架 + sp1 蛛系剪辑）。
+
+## iter15（2026-09-26 晚）与官方模型硬性差距清单（定量对比）
+
+基准：官方 `lzd_carnosaur_feral`（variants.pack 解出 RMV2 直读）+ ref_export GLB 集；我方 `czx_dgm_greymon`（v2 当前部署版）。渲染对照图 `scratch/_cmp_{greymon,kroxigor,bls}_front.png`。
+
+| 维度 | 我们 | 官方 | 判定 |
+|---|---|---|---|
+| LOD | **1 级** | **5 级**（10/30/120/180/10000m：19462/13635/8237/867/297 v） | ❌差距 |
+| lod0 网格 | 3,448v / 4,812tri | 19,462v / 30,472tri | ❌素材上限（Cyber Sleuth 拆包低模，非转换丢） |
+| 贴图 | base_colour 512² 真 + normal/specular/mask/material_map **全 16²占位**（104/104 全占位） | 2048² 全六件真图 + commontextures bloodmap/dither | ❌差距最大项 |
+| 蒙皮 | greymon 78% 单骨、22% 双骨；wargreymon 87% 单骨；biyomon 22% 单骨（接近官方） | 33% 四骨、47% 多骨 | ⚠bonemap 转移质量不齐，硬朗系偏刚性 |
+| 材质 | weighted4_character_alpha；faction tint 通道 0,0,0,0 全关 | weighted4_character；faction3_mask_channel 0,0,1,0 + 血渍参数 | ⚠小差距（alpha shader 选型+无 mask 阵营染色） |
+| wsmodel | 仅 lod0 一条 material | 每 LOD 独立材质，lod2+ 降 weighted2 | 派生差距（LOD 补齐自然带上） |
+| 挂点 | ~72 个 per-bone 占位 attach | 4 个语义挂点（animRoot/root/spine…） | ⚠冗余非缺陷，语义挂点体系未建 |
+| 骨架 | czx_greymo 72 骨 | raptor03b 83 骨 | ✅同量级 |
+| 动画量 | ~95 剪辑/只（9709 总） | 恐爪龙自身 ~79 + matched/subset/骑乘库 | ✅量持平；质=移植 vs 手工（L4 待验收） |
+| 顶点格式 | RMV2 v8 36B（带顶点色通道） | v7 32B weighted | ✅不亏 |
+| VMD | 单 body 槽 | 恐爪龙同样单 body 槽 | ✅怪物单位本就单槽 |
+| specular 回退 | v1 有 24 只真 `*s.dds`（如 chr326a01s 22KB），v2 全占位 | — | ⚠v2 相对 v1 小回退 |
+
+**结论**：差距 = 素材源上限（512²/低模）+ 表面工艺（无法线/高光/mask/LOD）+ 蒙皮偏硬 + prop 未分离。修得了的：占位图→真图（源有 ~24 张 s 图，其余可生成法线）、LOD 生成、prop attach_point 化。修不了的：要超官方观感只能换 manual_edit 式高模源（Sketchfab 34K v/4K PBR 线，密度已超官方但需逐只人工修权）。
+
+
+## iter16（2026-09-26 深夜）greymon 试点推进到"基本完善"
+
+对象：czx_dgm_greymon（chr326 供体骨架 czx_greymo）。产物落在源包内，原件备份在 scratch/greymon_hq/bak/。
+
+### 官方贴图通道布局解码（carnosaur 2048² 实测）
+- mask.dds (BC3)：仅 B 通道有数据 = faction3 tint 选区；无阵营用 commontextures/default_black.dds
+- material_map (BC7)：R=高光强度，G=光泽度，B=0，A=255
+- normal.dds (BC3)：DXT5nm 布局 A=X, G=Y（R=255,B=0）
+- 关键坑：官方 *_weighted4_alpha_off.xml.material 实际 shader 是 weighted4_character.xml.shader（非 alpha）——v2 全库错配成 weighted4_character_alpha
+- xml.material 无 specular 槽；RMV2 内嵌贴图表仍带 type11 specular 路径（legacy）
+
+### 已落地改动
+1. 真贴图组（scratch/gen_greymon_tex.py → scratch/_dgm_greymon_tex/ → texconv）：
+   - normal 512² 由 albedo 亮度微浮雕生成（strength 1.6，DXT5nm 编码，BC3）
+   - material_map 512² BC7：R=v1 chr326a01s.dds（128² 真高光图）亮度×200，G=0.55
+   - specular 512² BC7：v1 s 图升采样（v2 占位回退已补回）
+   - mask 512² BC3 全零；material XML mask 槽改 commontextures/default_black.dds（同官方）
+   - shader 从 weighted4_character_alpha 改 weighted4_character（base alpha 恒≈1.0 已验证）
+2. 真 5 级 LOD（scratch/gen_lods_blender.py，Blender Decimate collapse + delimit NORMAL/UV/SEAM）：
+   - ratio [0.7,0.42,0.18,0.09] → 2629/1801/967/613v（lod0=3448v 不动）
+   - 蒙皮权重随抽减自动保留（vgroups=72 全保留，权重和=1，maxbone=54<72 合法）
+   - lod 距离照搬恐爪龙 [10,30,120,180,10000]m
+3. 多 LOD RMV2 写入器（scratch/build_greymon_hq.py 内 write_rmv2_v8_lods）：
+   - 每 LOD 独立 model block + 独立 v/i buffer + 独立 bbox；lod header 字段照官方（q=2 仅 lod0）
+   - 全部 vtype4/36B（没仿官方 lod2+ 降 vtype3/weighted2——vtype3 打包格式未实现，安全起见全 weighted4）
+   - 新文件 444,726B（旧 161,464B）；parse_rmv2 回读 5 级计数正确
+4. wsmodel：5 条 material 全指向 weighted4_alpha_off（顶点格式匹配优先）
+5. 验收渲染（scratch/greymon_hq/）：
+   - prev_lod{1..4}_front/side/top：剪影逐级平滑退化但角/尾/爪俱在
+   - pose_lod2_f15.png / pose_lod4_f15.png（hu1_sws_attack_01 攻击帧）：蒙皮变形正常，无爆点/脱件
+   - rt_lod3：新 RMV2 二进制转回 GLB 渲染正常 = 写盘格式经 decode 验证
+
+### 部署状态
+- pack 已重打包（818,185,218B）；游戏运行中锁文件 → scratch/deploy_digimon_when_free.sh watcher 挂起（退出后自动 --deploy + sha256 校验，日志 scratch/deploy_digimon.log）
+- data\ 下并存 v2/v3/v4/v5 pack，playset 以 state.db 为准（部署后需复核）
+
+### 待办/后续
+- 游戏内实测：LOD 切换距离观感 + 攻击/行走/死亡剪辑 + 蒙皮
+- weighted2/vtype3 32B 编码器（远级降档，官方做法）
+- 蒙皮平滑化未动（78% 单骨刚性是 bonemap 移植上限）
+- 推广：把 gen_lods_blender + write_rmv2_v8_lods + tex 生成并进 convert_new_units.py 主管线后批量跑全库
+- 其余 103 只仍 16² 占位 + 单 LOD
+
+## iter16（2026-09-26 深夜）greymon 试点推进到"基本完善"
+
+对象：（chr326 供体骨架 czx_greymo）。产物全部落在源包内（bak 在 ）。
+
+### 官方贴图通道布局解码（carnosaur 2048² 实测）
+-  (BC3)：仅 **B 通道** 有数据 = faction3 tint 选区；无阵营用 
+-  (BC7)：**R=高光强度，G=光泽度**，B=0，A=255
+-  (BC3)：DXT5nm 布局 **A=X, G=Y**（R=255,B=0）
+- 关键坑：官方  实际 shader 是 （**非 alpha**）——v2 全库错配成 
+- xml.material 无 specular 槽；RMV2 内嵌贴图表仍带 type11 specular 路径（legacy）
+
+### 已落地改动
+1. **真贴图组**（ →  → texconv BC7/BC3）：
+   - normal 512² 由 albedo 亮度微浮雕生成（strength 1.6，DXT5nm 编码）
+   - material_map 512²：R=v1 （128² 真高光图）亮度×200，G=0.55
+   - specular 512²：v1 s 图升采样（v2 占位回退已补回）
+   - mask 512² 全零；material XML mask 槽改 （同官方）
+   - shader 从  → （base alpha 恒≈1.0 验证过）
+2. **真 5 级 LOD**（，Blender Decimate collapse + delimit{NORMAL,UV,SEAM}）：
+   - ratio [0.7,0.42,0.18,0.09] → 2629/1801/967/613v（lod0=3448v 不动）
+   - **蒙皮权重随抽减自动保留**（各 lod vgroups=72 全保留，权重和=1，maxbone=54<72 合法）
+   - lod 距离照搬恐爪龙 [10,30,120,180,10000]m
+3. **多 LOD RMV2 写入器**（ 内 ）：
+   - 每 LOD 独立 model block + 独立 v/i buffer + 独立 bbox；lod header 字段照官方（q=2 仅 lod0）
+   - 全部 vtype4/36B（**没有仿官方 lod2+ 降 vtype3/weighted2**——vtype3 打包格式未实现，先用安全全 weighted4；远级才几百顶点无损大局）
+   - 新文件 444,726B（旧 161,464B）；parse_rmv2 回读 5 级计数正确
+4. **wsmodel**：5 条 material 全部指向 （顶点格式匹配优先于官方 weighted2 降档）
+5. **验收渲染**（）：
+   - prev_lod{1..4}_front/side/top：剪影逐级平滑退化但角/尾/爪俱在（lod4 最低 613v 仍辨认得出暴龙兽）
+   - /（hu1_sws_attack_01 攻击帧）：蒙皮变形正常，无爆点/脱件/折角
+   - ：新 RMV2 二进制转回 GLB 渲染正常 = 写盘格式经 decode 验证
+
+### 部署状态
+- pack 已重打包（818MB，含新资产）；游戏运行中锁文件 → [2026-09-26 20:54:25] watcher start, waiting for Warhammer3.exe to exit... watcher 挂起（游戏退出后自动 --deploy + sha256 校验，日志 ）
+- 注意 data\ 下并存 v2/v3/v4/v5 pack，playset 以 state.db 为准（部署后需复核）
+
+### 待办/后续
+- 游戏内实测：LOD 切换距离观感 + 攻击/行走/死亡剪辑 + 阵营染色（mask 全零=无染色，符合设定）
+- **weighted2/vtype3 32B 编码器**（远级降档，官方做法）
+- 蒙皮平滑化未动（78% 单骨刚性是 bonemap 移植上限；要改需 Blender smooth weights + 逐关节验收）
+- 推广条件：把 gen_lods_blender + write_rmv2_v8_lods + tex 生成并进 `convert_new_units.py` 主管线，按"有 s 图/无 s 图"分两档跑全库
+- 其余 103 只依旧 16² 占位 + 单 LOD——本试点跑通后批量套模板
+
+### iter16 续：建模工作室自检通过（tabbit 8787）
+
+- 五级 GLB 已放入 `model-studio/models/`：`greymon_hq_lod0..4.glb`（lod0=bound.glb 副本，lod1-4=decimate 产物）
+- lod1：72 骨 / 17 自动映射 / rebind.steal=0 / jaw audit ok；idle、roar(t=0.6)、run(t=0.35) 截图均正常——吼叫张嘴、奔跑抬腿，无解体
+- lod4：516v 吼叫帧剪影完整、jaw graft 正常，steal=0
+- 证据图：tabbit artifacts `task-b5a60467…/studio_lod1_{idle,roar,run}.png`、`task-03626596…/lod4_roar.png`
+- 部署 watcher 已按用户要求撤掉（游戏内验证等用户目检后再走）
+
+### iter17：加鲁鲁兽原生剪辑 → .anim 入包路径（glb_src_to_anim 空间桥）
+
+- **转换器** ：GLB 原生 src_* 剪辑 → WH3 .anim v8 直转（同骨架无重定向）。核心空间桥：GLB 动画节点空间≠绑定空间（iter121 同病灶），设 ，则  精确成立；skel 中 parent<0 根骨取 。
+- **验证**：写读回环组合世界矩阵 vs  期望，5 条剪辑 × 42 骨 × 3 帧 maxWorldErr ≤0.0008（i16 四元数量化噪声级）。全 43 槽文件 parse OK、骨架名 czx_ga、42 骨。
+- **槽位映射**（39/43 换原生；）：
+  - attacks×7 ← atck_fa0/fb0/fc0/fd0 + shot_fa0 + jump_fa0/fa2
+  - combat_idles×6 ← prov/gurd×3/feel_fg0/fh0
+  - death×4 ← dmgx_fa1(仰面)/dmgl_fa0(击飞)/dmgx_fa0/fa2
+  - defends×2 ← dmgs_fa0/feel_fh0；locomotion×7 ← run/walk_fa0×2/walk_ba0/base_fb0/feel×3
+  - movement step_fwd/bwd ← walk_fa0/ba0（ba0 后退步归位正确）；porthole×2/refuses×2/stand×7 ← base/feel/eat/rest/getu
+  - 保留 vanilla 重定向：turn_left/right_90、step_left/right（无原生对应）
+- **钻地修复同步生效**：iter123 ground_clamp 已写入 bound.glb（atck_fc0/jump_fa1 逐帧地面吸附），本次转换用的是修复后数据——attack_03/jump_attack_02 落盘即贴地版。
+- **待办**：游戏内实测原生动作观感（跑/咬/倒）；其余 103 只同法批量（需各自 GLB 原生剪辑先注入）； 单次剪辑与  循环剪辑的引擎行为待实测。
