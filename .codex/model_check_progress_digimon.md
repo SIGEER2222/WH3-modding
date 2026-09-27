@@ -491,3 +491,37 @@ STATUS: DONE（104/104 结论清零：100 只 chr 原生激活 + 4 只 serpent �
 - **目标侧权重债清单**（自动图如实镜像出的绑定重建缺口，归 B8/B9 同类工单）：gatomon(head/jaw→eye, tail→upperleg, ear/whisker→shoulder_pad)、gabumon、taomon、growlmon(tail→upperleg, head→eyebrow)、shinegreymon(tail→upperleg)、zeedmillennium(g_head→eye)、aerovdramon、weregarurumon 部分； wing→feather/fin、armor→leg 等语义对匹配为误报不误修。
 - **矩阵**：全库 2544 clips 1747P/797W/0F（scratch/matrix_srcauto31.json），含新增 31 只零失败。
 - **累计**：82/104 只已带原生 src_*（51 jmap + 31 automap）；剩余 22 只：4 无 fbx/jmap、2 fbx v6100、16 有 jmap 无 fbx（多为 NxO/其他源单位）。
+
+### iter20：评分卡 v3.2 回归底座（skitter 双批六件销账后全量重排）
+
+- **输入**：fix_b8_residual（jesmonx 踝簇 t-split 334v/apocalymon 幻影尾链 1380v/kabuterimon 回植 1509v）+ fix_v31_batch 高承皮族零权回植（omegamonab 641v/chaosdramon 1551v/jibian 200v）+A8 garurumon TANGENT +A9 fujinmon 装饰骨归位。
+- **聚合升级**（scratch/pipeline/dgm_audit/score_card.py）：post 修复 headless 档三层覆盖（hl_tinkermon_corr/b8r/v31 post > fix_wave > 全库档）；SKIN_OVR 修复后实测承皮率×8；MTX_OVR lost_share 实测（omegamonab 91.3→8.7%）；B8 残域判序修正（部署级销项/LOST 足额回收先于残域字判定）；worst20 表加 E1/E2 池标注列。
+- **结果**：均值 v3.1 72.1→v3.2 72.5；worst5=jibian(56，B13+B4 扣 24 在账）/mastemon(56)/chaosdramon(58)/seadramon(59)/blitzgreymon(59)；六修件全出榜（kabu 53→71、apoc 49→66、omegab 52→69、jesmonx 46→62）。
+- **产物**：scratch/pipeline/dgm_audit/score_report_v3_2.md + score_card.json v3.2；LATEST/LEDGER 已同步。
+
+## iter123 复合骨架手术·gatomon 全链路打通（权重债修复首个成功案例）
+
+### 病灶定性
+hu1 人形骨架（72 骨）缺尾/耳/须等解剖骨，automap 只能照抄坏权重（尾肉挂 upperleg、头挂 eye）——判定为**目标侧骨架债**，非映射错。
+
+### 方案（tools/dgm_featbone.py，新增通用工具）
+1. 特征族审计（FAM_PATS）→ 无 tgt 对应骨的 src 解剖骨新建 feature bone（gatomon：tail_0..4、ear_l/r_0..1、whisker_l/r_0 共 11 根，命名按链序基→梢）
+2. 绑定姿态 （src IBM 逆变换直达 tgt 空间）；**静态 node.scale 承载 src 关节尺度约定（0.01）——丢了会让 IBM×100 放大顶点**
+3. 全量权重重建：NN 肉对肉（nn_med=0）取 src 权重经语义修正 map 翻译进 tgt
+4. 注入驱动：**逐骨桥 K_i = C_glb·B_i·rest_i⁻¹**（map /），注入器 （Ĝ 按 det(rest)/det(G) 归一化线性部分——dump 帧与 rest 尺度约定可差 100 倍）
+5. glTF 局部矩阵分解：轨道写 T·R，node.scale 静态吸收尺度；父级全矩阵逆（不再 Wq.T）
+
+### 关键数据事实（复用价值）
+- 同一模型多份源 GLB 的 IBM 尺度约定可不同（salzaar det=1e-6 vs pub_src det=1）→ **按 det(B)≈det(rest) 挑源文件**，选错则 G·λ 把顶点压塌
+- dump rest（1e-6）与 anim 帧（1e-12）尺度约定不一致 → 逐帧 det 比归一化
+- rest_i = T(+29.46y)·B_i（近似纯平移）——“姿态差”实为骨架原点偏移
+
+### 验证
+- 绑定帧恒等检验 err=0.0/3265 顶点
+- 工作室实拍：src_attack01 正面完整迪路兽（猫脸/大耳/紫爪红纹/张嘴 jaw 生效）；move 四肢+高卷尾（源动画尾尖位移 1.6 正确）；idle 直立
+- selfCheck：32 clips **0 FAIL**（whisker 映射规则补进 importer.js:700）
+- 证据：tabbit task-6d2e2a74 shots（attack01 正面、move×2、win、down、idle 侧/后、eat）
+
+### 遗留
+- whisker 细刺方向与尾附着视觉待微调； 投票在此案为 true（L/R 视觉正确）
+- 推广：64 只特征骨债清单按族推进（gabumon/growlmon/taomon/翼族/蛇形鳍族）
