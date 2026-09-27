@@ -479,3 +479,15 @@ STATUS: DONE（104/104 结论清零：100 只 chr 原生激活 + 4 只 serpent �
 - **验证**：先导亚古兽 6 帧 montage（idle/move/attack01/attack02/down/win）姿态全正；抽 3 科复核——偃月加鲁鲁（四足扑咬）、伽偻达（鸟翼随动）、战斗暴龙（双足回旋爪+倒地持盾）均 upright/贴地/变形正常，__errs 空。证据 tabbit task-71ece22c：agu_src_sheet / srcinj_{cresgarurumon,garudamon,wargreymon}。
 - **矩阵**：5 只试点 59P/33W/0F/92clip（scratch/matrix_srcinj5.json）；51 只全量矩阵见 matrix_srcinj51.json。
 - **待办**：31 只「有 fbx 无 jmap」需自动建映射（位置匹配源骨→目标骨）；16 只 jmap 无 fbx 需另找源；src_* → .anim 槽位批量（glb_src_to_anim 按族骨架）；钻地类逐帧吸附按需（garu ground_clamp 可复用）；.bak_srcanim 回滚点保留在 models/。
+
+### iter19：无 jmap 31 只自动建映射注入（dgm_automap 权重相关法）
+
+- **需求**：33 只「有 CS 动画 fbx、无 jmap.json」单位（早前盘点 31+2 边界）。绑定批次时 jmap 只给走 keep 模式的 67 只写过；其余靠 rig2 几何重建权重，没有源→目标骨表。
+- **方法**（tools/dgm_automap.py）：不猜骨名/位置，直接**蒙皮权重相关**——源 GLB 与 bound.glb 是同一块肉，把目标顶点 NN 匹配到源顶点（归一化空间），对每个源骨 s 求 argmax_t Σ_v w_s·w_t。姿态/骨原点差异免疫（flesh-to-flesh）。
+- **自检**：对账有真值 jmap 的 4 只——agumon 23/23、dorugamon 37/37、garudamon 41/42、mastemon 94/103、omegamon 31/34。定向自验证：源 GLB 朝向各异（实测 zup+/zup-/raw 三种并存），4 候选朝向取 NN 中位距最小者，nn_med 全 0.0（顶点同序同位）。
+- **结果**：33 只全建图（src 关节映射率 80~95%，tgt_used 11~30/72~95）；31 只注入成功各 10~13 条 src_*；2 只 FBX v6100 Blender 拒收（apocalymon chr328、omegamonm chr448）只建图未注入。
+- **注入链复用**：dgm_srcanim_inject.py 改读 dgm_srcanim/<u>/map.json（无则回退 jmap.json），Z-up 微缩 FBX 世界矩阵 C4·m·C4ᵀ 共轭照旧。
+- **抽验**：gatomon/metalgarurumon/seadramon/hououmon 各 4 帧 montage——钢狼站姿/蛇身盘地/凤凰飞扑成立；**gatomon 紫色巨刺**=目标侧权重债显影（J_tail03-05→upperleg_right 尾肉挂腿骨 + J_head→eye_left 头挂眼骨，与 rosemon B9 槽塌缩同族，自动图只是如实镜像）。metalgarurumon 红翼为原生导弹舱件随动正常。
+- **目标侧权重债清单**（自动图如实镜像出的绑定重建缺口，归 B8/B9 同类工单）：gatomon(head/jaw→eye, tail→upperleg, ear/whisker→shoulder_pad)、gabumon、taomon、growlmon(tail→upperleg, head→eyebrow)、shinegreymon(tail→upperleg)、zeedmillennium(g_head→eye)、aerovdramon、weregarurumon 部分； wing→feather/fin、armor→leg 等语义对匹配为误报不误修。
+- **矩阵**：全库 2544 clips 1747P/797W/0F（scratch/matrix_srcauto31.json），含新增 31 只零失败。
+- **累计**：82/104 只已带原生 src_*（51 jmap + 31 automap）；剩余 22 只：4 无 fbx/jmap、2 fbx v6100、16 有 jmap 无 fbx（多为 NxO/其他源单位）。

@@ -17,17 +17,25 @@ INJECT = os.path.join(ROOT, 'scratch', 'garu_qa', 'inject_src_anim.py')
 MODELS = 'E:/Code/model-studio/models'
 FPS = '30'  # CS clips authored on 30fps grid (same convention as nxo pilot)
 
-units = sys.argv[1:] or json.load(open(os.path.join(SA, 'units.json')))
+units = sys.argv[1:]
+if len(units) == 1 and units[0].endswith('.json'):
+    units = json.load(open(units[0]))
+if not units:
+    units = json.load(open(os.path.join(SA, 'units.json')))
 done, skip = [], []
 for u in units:
     src = os.path.join(SA, u, 'src_anims.json')
-    jp = os.path.join(ROOT, 'scratch', 'dgm_pub_batch', u, 'jmap.json')
+    jp = os.path.join(SA, u, 'map.json')          # auto map (dgm_automap)
+    if not os.path.exists(jp):
+        jp = os.path.join(ROOT, 'scratch', 'dgm_pub_batch', u, 'jmap.json')
     glb = os.path.join(MODELS, u + '_bound.glb')
     if not (os.path.exists(src) and os.path.exists(jp)
             and os.path.exists(glb)):
         skip.append(u)
         continue
     jmap = json.load(open(jp, encoding='utf-8'))
+    jmap = {k: v for k, v in jmap.items()
+            if not k.startswith('_root_')}
     srcd = json.load(open(src))
     # CS rigs are Z-up & tiny (~1/15): convert every world matrix to Y-up
     # target space via C4 @ m @ C4^T (rotation conjugation + position map)
