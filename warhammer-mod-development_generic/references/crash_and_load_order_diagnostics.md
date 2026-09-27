@@ -14,12 +14,18 @@
 
 **首查顺序（2026-09-25 固化，禁止跳步）**：
 
-0. `Get-WinEvent -FilterHashtable @{LogName='System'; Id=2004}`——与 dump 同秒命中即 **OOM** 定案（§10.10/10.19/10.21），不要去二分 pack；顺手查 `Select-String preferences.script.txt -Pattern 'minimise_memory_usage'` 是否被干净退出写回（§10.19）。
-1. `bad_mods_report.txt` 被本次启动刷新 → DB 校验路线（§二）。
+**入口命令**：`wh3diag.py triage [--hours 24]`——一条命令按下列顺序出全部门面证据（最近更新文件、dump 签名、script_log 阶段与 `[ui]` 点击、Event 2004、存活 WH3 进程、AppData 判据文件 mtime）。分项需要时再跑子命令。triage 还会把 recent/events 的 `--hours` 窗口自动扩到当前崩溃簇起点（>6h 静默分簇）；dump 行下挂 `==>` 内置签名判定（按录制时 build 的偏移匹配，大版本更新后漂移、未命中不排除同类根因）；第 5 节除 bad_mods/prefs 外另报：`gfx_texture_quality`/`gfx_unit_size`/`gfx_unit_quality`=3 的 OOM 危险档（minimise=true 不够，§10.19）、`modified.log` `Mod:` 数 vs `used_mods.txt` `mod` 数的**挂载进度差**（差异大=崩在 pack 挂载期 §10.31）、`logs/no_clean_exit` 留痕（无 dump 的非干净退出佐证）、`state.db` 比 `used_mods.txt` 新=**playset 在启动后被改过、清单失真**（§10.37）、`used_mods` 的 `add_working_directory` 逐目录验存在性+含 pack 的**工坊文件缺失盘点**（整批缺失=订阅被抹除 §10.39）。
+
+**要改播放集/跑 A-B 验证前先 `wh3diag.py collect`**——`used_mods.txt`、`WycccModManager/state.db`、`preferences.script.txt`、`modified.log`/`mp_log.txt` 都会被后续启动**原地覆盖**，先把 mutable 证据连同最近 script_log 冻结到 `scratch/crash_<ts>/`（含 dump 签名与 Event2004 manifest），否则归因时"当时的现场"已经没了。
+
+0. `wh3diag.py events`（内部即 `Get-WinEvent @{LogName='System'; Id=2004}`）——与 dump 同秒命中即 **OOM** 定案（§10.10/10.19/10.21），不要去二分 pack；顺手查 `preferences.script.txt` 的 `minimise_memory_usage` 是否被干净退出写回（§10.19）。
+1. `bad_mods_report.txt` 被本次启动刷新（triage 第 5 节看 mtime）→ DB 校验路线（§二）。
 2. 有新 `.mdmp` → 原生崩溃，读**内层**异常码并按 §三的签名表分流（§三）。
 3. 两者都无、进程起不来 → 启动层：`steam_api64.dll` 完整性（§10.17/10.24）、Steam 客户端是否在跑（stub 两段式 `+0x4926f0`，§10.26）。
 4. **vanilla/空 modlist 也崩** → 根因在 AppData 缓存或系统环境，不在 modlist：先 grep `battle_preferences`/`army_setups` 里的 mod key（§10.14），再怀疑注入层/驱动/引擎竞态（§10.16、§10.31 环境签名）。
-5. 排查全程先确认**无第二个会话在拉起游戏/部署 pack**——并发压测与半写 mmap 是已实锤的归因污染源（§10.12、§10.27）。
+5. 排查全程先确认**无第二个会话在拉起游戏/部署 pack**——`triage`/`events` 末尾会列存活 WH3 进程，`recent` 会暴露别的会话刚往 `data\` 部署的包（§10.12、§10.27、§10.37 并发污染实例）。
+6. `scriptlog` 满枚举仍崩 → 跑 `wh3diag.py scriptlog --ui`：script_log 尾部的 `[ui]` dump 是**崩溃时正在接收 click 的组件**，比 SCRIPT ERROR 风暴更接近死因（§10.37）；随后 `wh3diag.py which <组件宿主文件> --playset` 定播放集内谁遮蔽胜出。
+7. 嫌疑圈定先跑 `wh3diag.py recent --hours 24`——按 mtime 列最近更新过的 pack 与 AppData 文件，**最近更新优先查，禁止盲二分**；`mod` 行级 playset 内容反查用 `wh3diag.py grep`。
 
 ## 二、读 `bad_mods_report.txt`
 
@@ -65,8 +71,14 @@ BadMods
 | `+0x538a0a`（9.0 挂载完成后） | junction/引用悬空 key | 嫌疑包 DB 审计 §10.31/10.33 |
 | `+0x1a957e7` / `+0x4e5b30`（9.0，vanilla 同崩） | 环境级早期 init | 非内容问题 §10.31 |
 | `+0x4926f0`（stub 期，进程仅 1-4GB） | 启动 stub 空指针/Steam 握手失败 | Steam 客户端是否在跑 §10.26 |
+| `+0x1bb9418` 读 `null+0x1fc`（9.0 战役 UI 期） | uicomponent 事件分发空指针；本案=过期 twui 遮蔽的 `self.SimulateLClick` 回放 | `scriptlog --ui` 看最后 click 组件→`which --playset` 定遮蔽胜者 §10.37 |
+| `+0x257ce84` 读 `0x1d1`（9.0 读档期） | **定案：跨版本存档**——8.1.x 存档在 9.0 world-restore 期崩，mod 无关引擎级 | `saveinfo` 比对存档写入戳 vs exe；§10.38 |
+| `+0x247670a` 读 `0xa107`（9.0 读档期） | 同族变体（跨版本存档） | 同上 |
+| `+0x1413537` 读 `null+0xe0`（新开局 init ~1s）+ 伴随 WER `0xc0000409 @+0x113c0f1` fastfail | **工坊内容被整体抹除期的次生崩**——当次 `used_mods` 引用 89 个工坊目录全部不存在（Steam 订阅列表返回 0 → 客户端自删）；先验文件在盘再归因内容 | triage §5「工坊文件缺失」盘点 + workshop_log `Subscribed items changed. Number of items: 0` |
 | rip=堆地址、`param0=8`（DEP exec） | UAF 坏虚表调用 | 监听器级联竞态 §10.12a/10.13/10.36 |
 | `0xc000041d`（ntdll 回调） | fatal user callback | TSF/IME/overlay 交互 §10.11 |
+| `+0x26a93d6` 读 `null+0x18`（9.0，Campaign UICreated 瞬间） | UICreated 事件派发级联空指针——script_log 恰好断在 `event has occurred:: UICreated, environment is Campaign UI` 行，前导 `[ui]` 枚举停在 `search_panel`/`advice_interface` 组件；同清单竞态非必崩 | §10.42 |
+| `+0x133b734` 读 `0x0`（9.0，END_TURN 后 ~75s 回合处理窗） | 回合边界级联原生空指针；本案主嫌疑 = `FactionTurnStart` 回调内联跑 `character_list()`+CCO `SkillList` 调用 | §10.42 |
 
 ## 四、同名 DB 片段的遮蔽规则（实测）
 
@@ -504,6 +516,10 @@ pack 文件数在偏移 +16；索引从 +28 开始，每条 = `size(u32)` + `fla
 - **落库修法（不停 app 可生效）**：备份 `state.db` → `delete from playset_items where playset_id=? and mod_id in (...)` → 按 position 重排 → 同步删 `app_state` 里 `enabled_order:warhammer3` JSON 对应条目。后端 `storage.get_enabled_order` 每次新建 sqlite 连接读库，**不用重启 Mod Manager** 即按新列表生成 `wyccc_launch_mods.txt`；但 UI 展示可能为旧缓存，让用户重启 app 核对更稳。
 - **前端通过判据的坑（假存活）**：前端挂载完成后进程会停在"press any key"画面等输入——RSS ~1.18GB、CPU≈0 维持不动，看起来像卡死其实是正常待机。**判据 = 无新 dump 且 `modified.log` 挂载行数达到列表数**，不能只看进程存活；纯 Popen 拉起不按键会一直停在那里，属预期。要区分"假死"可用 wmic 查 CPU 增量 + RSS 是否持续增长。
 - **教训**：大版本更新后的"挂载期空指针"二分要按 mod_id 切 `enabled_order` 并依赖感知分组（先 `wh3diag.py meta <pack>` 查 rpfm_reserved 依赖）； scripted-battle autotest 的崩溃签名与前端挂载崩溃签名要分开记录，不能混用判据。
+- **2026-09-27 补证（前端战局同样不可达）**：`+0x1a957e7` 不限于 `game_startup_mode battle`——**前端→遭遇战(电脑)→开始战斗** 正常 UI 路径进战局 init 同样定死该址（`params=[0x0,0x20]`；纯 vanilla 空 modlist + 原版 battle_preferences 对照亦崩，D2026-09-27_T17-30-57）。该日该机上**战局 init 全面不可达**，任何"进战斗验证"类测试（anim/单位/脚本）一律无效——等环境恢复（Steam 在线+重启后首测 vanilla 战局）再补跑。
+- **同日前端挂载期新签名**：`+0x4e5b30 params=[0x0,0x3e8]`——真实 playset（113 mod 的 `wyccc_launch_mods.txt`）挂载期崩、未到主菜单；与 `+0x52a21a` 挂载签名同族。空 modlist 能到主菜单而 playset 不能 → 疑似在途重建包或离线态挂载问题，与战局崩溃是两件事，分开归因。
+- **前端 UI 自动化配方（替代 _click.ps1）**：WH3 UI 是 D3D 自绘、UIA 不可达；后台进程 `SetForegroundWindow` 会静默失败（须先 **AttachThreadInput 到前台线程 + SendInput 一次虚拟键 0 拿前台权**），然后 `SendInput` `MOUSEEVENTF_ABSOLUTE|MOVE|LDOWN|LUP` 绝对坐标点击即生效；PostMessage 到父窗或渲染子窗（类名 `Warscape`）均无效。可直接用 `scratch/anim_verify/fgclick.py`。**坑**：游戏不在前台时屏幕坐标点击会落到当前前台窗口（其他程序会被误点）——点击前必须先确认 SetForegroundWindow 返回值/截图确认。
+- **`battle_preferences` 可写**：`.singleplayer.battle_preferences` 为 `u16len+ascii` 字符串序列，两军各以阵营串分隔（army1 faction 串 ~offset116、army2 faction 串中点），单位条目格式 `unit_key:faction:0|1`（1=主将）。整表改写单位+阵营串即可把自定义战局军队预设成任意组合（本日已实演 帝国剑士×11+卡皇 vs 兽人小子×11+战将 并读入成功）。改动前务必备份。
 
 ### 10.32 Update 9.0 扩展包兼容补丁：版本升位 + 改名键 + 过期 twui（2026-09-25 晚）
 
@@ -572,3 +588,77 @@ pack 文件数在偏移 +16；索引从 +28 开始，每条 = `size(u32)` + `fla
 - **现场**：AI 回合处理中叛军 `PendingBattle` 自动结算 + 恶魔英雄批量 `CharacterCreated` + `wh2_main_trait_builder` 刷屏；同一回合在另一会话安全通过 → **非确定性竞态**，不是坏数据。
 - **嫌疑清单（未隔离）**：`sm0_recruit_defeated`（回合边界 `spawn_character`×5 + `create_force`×14 批量造英雄）、`wyc_choujiang1` 的 `check_char_valid` 对新生角色无防护直接调 `faction:subculture()`、`wh2_campaign_traits.lua`（no_lazy_trait 遮蔽版）的 `check_exclusion` 对 `faction:culture()` 零防护。
 - **排查方向**：给上述监听器条件/回调函数补"取不到派系/角色→早退"空防护（§10.13 v9 熔断模式可复用）；复现依赖特定回合级联，注意**不要杀用户手动拉起的 Warhammer3.exe**（曾因误杀玩家进程中断调查）。
+
+### 10.37 战役 UI 期定死 `+0x1bb9418`：`[ui]` dump 点击序列定位法 + twui `self.SimulateLClick` 回放根因（2026-09-25 晚，强关联定案）
+
+- **现象**：9.0 满 playset 进存档战役，加载完成后 ~60-90s（引擎时间）必崩 `0xc0000005 @ +0x1bb9418`，params=`[0x0, 0x1fc]`（读 `null+0x1fc`，uicomponent 对象空指针）。19:29/19:37/20:04 三连崩同签名同现场。补丁部署（20:12）后签名漂移：20:17/20:25/20:43 三连 `+0x257ce84`（读 `0x1d1`，无 click 无 SCRIPT ERROR=静默运行时崩）、20:38 一次 `+0x247670a`（读 `0xa107`）——待另行排查。
+- **判据——无配对 dump 的 script_log = 静默死亡**：20:02 会话 `script_log` 死在 loads=26（枚举中段，`crash=-`）但**没有对应 mdmp**——dump↔log 按 mtime 配对（崩溃瞬间 log 最后 flush ≈ dump 写入）须**双向互为最近**才成立，否则快速重开时无 dump 会话会被错配到隔壁会话的 dump（`triage` 已实现互近配对，±180s 窗口）。哑死常见于外部 kill 或未进 crash handler 的加载期死。
+- **新增取证面——`[ui]` dump**：`output_uicomponent_on_click` 启用后（启动日志出现 `*** output_uicomponent_on_click() called ***`），script_log 为**每次 click 事件分发**写一条组件档案：`uicomponent <id>` + `path from root: root > ...` + `position/state/visible/interactive`。**log 尾部最后一个 `[ui]` dump = 崩溃时正在处理的 click 组件**——比 SCRIPT ERROR 风暴更接近死因。跑 `wh3diag.py scriptlog --ui` 直接提取。
+- **判据——程序化点击风暴 ≠ 用户点击**：`visible: [false]` 且 `state: [selected_*]` 的组件收到 LClickUp（不可见组件无法被鼠标点中），同 tick 内连发多个 = `SimulateLClick`/引擎 UI 状态恢复回放/twui `context_function_id="self.SimulateLClick"` 链。**逐组件同名引用往往搜不到**——点者是遍历 `button_list` 子节点的循环点击或引擎回放缓存；要用 `wh3diag.py grep` 按内容搜 `SimulateLClick`，不要只搜组件名字符串。
+- **判据——SCRIPT ERROR 风暴多是受害者不是凶手**：`ComponentLClickUp` 条件函数在 UI 半建状态下调 `find_uicomponent` 抛 `get_ui_root() called but the ui has not been created yet` / `parent [false] is not a ui component`——被 xpcall 兜住刷屏但不致死；`attempt to index local 'x' (a boolean value)` 提示 `find_uicomponent` 在 9.0 可返回 `false` 而非 `nil`，条件里 `x ~= nil` 判空写法失效（须写 `x and x:Visible()` 之类短路判空）。
+- **本案现场与定案**：固定 5 连击 `button_predicted`（space_bar_options 公共秩序 filter）→ `apply_player`（settings_panel>camera_settings）→ `button_search`/`button_settlement`/`button_commodities`（search_panel 页签），全部死在 `panel_landmarks > button_list > button_commodities`（9.0 新增节点，无 mod 覆写）。点源 = `!!!!Chop_Mechanix_2_Rows_Fix_Overlap.pack` 的**过期 `hud_campaign.twui.xml` 遮蔽**（其内 `context_function_id="self.SimulateLClick"` 等自点击钩子）：`wh3diag which ... --playset` 显示播放集内该文件仅 Chop 提供（SFO/ui3 不在 playset），9-21 的旧版整 HUD 覆写在 9.0 树结构上回放点击 → 分发到失效组件即崩。20:12 部署 `czx_chop_90fix.pack`（playset pos 66 压过 Chop pos 67，vanilla v142 遮蔽还原）后，20:16/20:25 会话 click 风暴与 `+0x1bb9418` **同时消失**——强关联定案。**注意当时另一会话正往 data/ 部署包（20:12 时间戳即证据）——排障全程先跑 `wh3diag.py recent`/`events` 查并发污染**。
+- **时间换算**：script_log 的 `<Xs>` 是**会话启动后秒数**不是墙钟；script_log 文件名是 `script_log_<DDMMYY>_<HHMM>`（**DDMMYY 不是 YYMMDD**——`250926`=2026-09-25，按 YYMMDD 解会错一年）；`mp_log.txt` 时间是 **UTC**（本地 = UTC+8）。`used_mods.txt` 在**游戏根目录**（不在 AppData、不在 data/），条目分 `add_working_directory "<ws目录>"` 与 `mod "<名>.pack"` 两类——`mod` 行才是实际加载序，内容搜索要先把 ws 目录展开成 pack。
+- **判据——twui `version=` 相同 ≠ 内容未过期**：`version="N"` 是文件格式版本不是内容版本——9.0 变的是树结构（新节点），版本号可以相同而内容过期（Chop 遮蔽即 v142==vanilla v142）。`which --playset` 显示各提供者版本号并把**低于 vanilla 基线**的标 `[STALE]`；同版本时仍需内容 diff 判定过期。
+- **判据——签名时序画像**：`triage` §3 的会话墙钟（`HH:MM+dur s`）直接区分崩溃模式：本案 `+0x1bb9418` 会话活 ~107s（进战役+点击回放后崩）、`+0x257ce84` 死于 +16-59s（早期运行时）、哑死会话 +1s 即没——签名漂移+时长漂移=不同根因。
+- **工具**：`wh3diag.py scriptlog --ui`（逐日志列点击序列+错误跨度+最后 click 组件）、`wh3diag.py grep <正则>`（按内容搜包）、`wh3diag.py which <路径> --playset`（播放集内按加载序列出+标胜者+twui 版本对比 vanilla 基线）、`wh3diag.py collect`（A/B 前冻结 mutable 证据：used_mods/state.db/prefs/滚动日志会被后续启动原地覆盖）。
+
+### 10.38 读档 world-restore 定死 `+0x257ce84`：跨版本存档指纹判定（2026-09-25 深夜定案，[实测/需随版本复查]）
+
+- **现象**：9.0 exe 下 `campaign_load` 任一 8.1.x 存档 → 满枚举（loads=326）+ 全部 `Loading value` 打完后崩 `0xc0000005 @ +0x257ce84`（读 `0x1d1`，registers `rcx=0x1d1`/`rbx=0`，反汇编落点 `mov (%rcx),%rax; call *0x38(%rax)` = 对哨兵值做虚调用）；单次变体 `+0x247670a`（读 `0xa107`）同族。无 click 无 SCRIPT ERROR，死于 +44~69s。21:12/21:39/21:41/21:52 四连复现，**去掉监狱 mod 的对照组同签名同死点** → mod 无关。
+- **判据——存档写入版本指纹**：`.save` 元数据区嵌 `vX.Y.Z Build NNNNN (modded)` 与 `Patch_X_Y` 戳（写入时 build，非 mod 版本号）。`wh3diag.py saveinfo <名|stem>`（裸名/词干自动解析 save_games 最新匹配）打印戳集合并与 exe FileVersion 比对；triage §5 自动报"最新存档戳 vs exe"。本案全部 12 个存档只有 `8.1.0/8.1.1` 戳、exe=9.0.0.0 → **跨版本存档**。9.0 晨 07:05 更新前 00:58 写入的存档当晚全部读不回。
+- **判据——`Loading value` 数量画像**：序列化存档逐条打 `Loading value <key>`；**满战役存档 ~517 条 vs 新开局初始化 ~91 条**（全默认值 `-1/0`）——新战役也走同名打印，别误把新开局日志当成"小存档"。存档是压缩序列化，`grep` 明文搜不到 `save_named_value` 的 key；加载顺序以 script_log 打印为准，`pending_captures` 出现在尾部只是注册顺序靠后（字面序），不是因果。
+- **结论**：与 §10.31 遗留的 `+0x243ae98`（8.1.1 档 vanilla 同崩）同族——**8.1.x 存档在 9.0 不可恢复，引擎级、mod 无法修**；偏移随存档内容/构建漂移（同函数不同 param）。对应处置 = 起新战役（21:56 起 `game_startup_mode campaign wh3_main_combi` 新 nag 档可玩，mods 正常跑），不要为救老档动 playset。
+- **附带签名 `+0x22c0f80`（未解，时序敏感）**：新 nag 开局 intro/loading-dismiss 期读 `null+0x58` 崩（21:18/21:25/22:00/22:33/22:57 五次，modlist 326/249/240 项均复现）。**三个假设均被证伪**：①电影解码（`!!!!czx_nagintro_skip` 遮蔽后 overlay 不播仍崩）；②fast_end_turn 的 fleets 下拉点击（22:57 崩溃会话该 mod 未加载、零点击仍同签名崩——早前"日志尾卡 dropdown_fleets_speed"只是首帧自动化点击恰在崩点前的巧合）；③非 nag 特有——尚待非 nag 派系新开局对照。**存活对照**：22:49 会话同路径走通——movie 自然播完（201.4s `movie has ended`→202.5s overlay destroy）后进战役存活至 319s+；崩例全部死在 overlay `show` 动画启动瞬间或 dismiss 重入处。**疑似 intro movie overlay 生命周期与 `progress_on_loading_screen_dismissed` 重入的原生竞态**（9.0 引擎级），对策=多试几次让 intro 播完一次即落地存档；fleets 行点击仍按 §10.37 家族风险从 fast_end_turn 移除（非本签名根因）。**教训：日志尾「最后 click」是强嫌疑非铁证——须有"无该 mod 仍崩"的反证实验再定案**。
+- **噪音勿归因**：`@Xiang_Necessary_Integration.pack` 的 `camera_lock_diplomacy.lua:99` 在 UI 未建时调 `get_ui_root()`/`find_uicomponent` → 新开局 ~70.5s 瞬间 120 条 SCRIPT ERROR，被全局 guard 兜住非致命——工坊包 9.0 不适配，记录待其作者更新。
+
+### 10.39 Steam 工坊订阅清零：内容整体抹除期的次生崩溃（2026-09-26 早定案）
+
+- **现象**：同一早晨多种"不同签名"并存——`+0x1413537`（新开局 `campaign_scripted.lua` 首行后 ~1s 读 `null+0xe0`，伴随 WER `0xc0000409 @+0x113c0f1` fastfail）、07:44/07:47 两次 frontend 停在 `UICreated`、07:51 写完 `used_mods.txt` 后 `modified.log` 零 `Mod:` 行的静默退出（无 dump 无 WER 1000）。
+- **根因**：`Steam/logs/workshop_log.txt` 07:05:40 记录 `[AppID 1142710] Subscribed items changed. Number of items: 0`——**订阅列表查询返回空，客户端把空结果当权威**（前一行 `Item change feed returned Ignored`），随即对全部已装项执行 `removing unsubscribed item`；`workshop/content/1142710/` 只剩 1 个目录，`appworkshop_1142710.acf` 的 `WorkshopItemsInstalled` 清空。本地 `data\` pack 完好不受影响；Mod Manager 日志无任何 unsubscribe 调用（排除自家工具触发）。
+- **判据——挂载进度归零**：`modified.log` 整篇只有 `unknown file` 枚举、**零 `Mod:` 行** = 文件级缺失的直接证据（区别于"挂载期崩溃"：后者至少打到部分 Mod: 行）。
+- **定案动作**：`wh3diag.py triage` §5 新增「工坊文件缺失」盘点——逐目录验 `used_mods.txt` 的 `add_working_directory` 是否存在且含 `.pack`，缺失即报"先恢复订阅再归因 mod 内容"（当次实测 89/89 全缺）。`_SIG_HINTS` 补 `+0x1413537` 条目。
+- **处置**：`steamworks_bridge.subscribe_workshop_items(全部89个id)` 一键重订阅（返回 `subscribed:89 already_subscribed:0` 证实订阅是真丢、非本地文件幻觉），`perform_workshop_operation("force_update", workshop_ids=[...])` 批量回拉。重建清单留档 `scratch/resubscribe/playset_resubscribe.txt`（含原加载序）。
+- **次生风险——半加载存档**：07:23 会话在工坊包已全部被删的状态下成功开新战役并于 07:26 落盘 9.0 快速存档——该存档是在"缺 89 个工坊包"的初始化环境里生成的，战役初始刷出的 mod 内容（单位/建筑/机制）**已缺失并固化进存档**，订阅恢复后也不会回补。需要完整体验时应丢弃该档重开。
+- **教训**：①同一时段多种签名并存先查**环境级**原因（文件在不在盘上），再上 mod 内容二分——本条应排在 §一 首查顺序的 Event 2004 同级位置；②WER `0xc0000409`（BEX64/fastfail）伴随 `0xc0000005` 时以 AV 内层签名为主，fastfail 多是 crash handler 二次失败的外壳；③Steam 订阅清零会发生在游戏运行中——运行会话靠已映射文件幸存，下一次启动才暴露。
+
+### 10.40 loading-dismiss 级联内联 UI 工作 → UAF 写/读崩溃族（2026-09-26 强假设+一次存活反证）
+
+- **现象**：新 nag 战役进游戏必经 `custom_loading_screen` → `button_continue` → `LoadingScreenDismissed` 级联 → intro_movie overlay → **flyover 电影**（`wh3_camp_flyover_*`）。崩例统一死在 **dismiss 后 0~2s 的 intro 序列窗口**（日志尾 = N 对 dismiss 对行 + overlay `show`/`movie has ended`/`destroying` + `wh3_camp_flyover_*` 起步）。已录三签名同窗口：`+0x22c0f80`（读 null+0x58，`call [rax+0x58]` 空虚表调用 ×6）、`+0x22c8774`（`mov [rax+0x351],bl` 写释放页）、`+0x132c34c`（`mov [rdi+rcx*8],rax` 写非法数组基址，两次：0x4 与哨兵 0xa0000000a）。存活对照存在（22:49/07:23），故为**竞态非必崩**。
+- **级联语义**（lib_core.lua:2587-2684）：`progress_on_loading_screen_dismissed(cb)` 在开局时走 `force_wait` 分支（`is_campaign() and not is_game_running()`）→ 每调用注册一个 `LoadingScreenDismissed` 一次性监听器 → 事件触发时**逐个监听内联跑回调**（`loading_screen_is_currently_dismissing` 仅挡函数重入，不挡 UI 操作）。回调体里的 CreateComponent/SetImagePath/Resize 等原生写，与「加载屏 UI 树析构 + intro overlay `show` 动画初始化」并发 → 命中已释放节点 = 野写。
+- **本案回调盘点**：0851 会话 4 个待定回调：回调1=vanilla intro（`setup_campaign_intro_cutscene`→`start_intro_cutscene_on_loading_screen_dismissed`→内联 `movie_overlay:new+start`，日志 overlay 打印夹在 pair1/pair2 间可定位）；回调2-4=mod（zzz_czx_prison_default 的 `wyccc_prison_load_reconciliation`、PSW×2）。**PSW 两个回调只挂 `cm:real_callback(500-600ms)`=轻量；prison 经 `after_battle_sequence(name,cb)`（delay=0→`is_processing_battle` false→立即跑回调体）在级联里内联执行 `setup_ui()`（`CreateComponent`+`get_or_create_component`+`SetImagePath`+`Resize` 全原生写）——全场唯一在级联窗口做重 UI 工作的调用点**。
+- **判别式（找级联内联重活的 mod）**：`wh3diag.py grep "progress_on_loading_screen_dismissed" --scope all` 找出全部注册点 → 逐回调体判断是否**内联**做 UI/世界写操作；`cm:real_callback`/`cm:callback`/`after_battle_sequence(delay>0)` 推迟体 = 安全；裸跑 = 嫌疑。注意「某 mod 的 dismiss 回调里只调了别的函数」不代表轻——追到函数体（prison 的 `after_battle_sequence` 默认 delay=0 就是内联）。
+- **修复与验证**：`zzz_czx_prison_default`（playset pos90 遮蔽 wyccc_prison_system pos92，**靠前胜出**）的 `after_battle_sequence` 调用补 delay=0.5 → 回调体整体推迟出级联窗口。**09-26 午复测：同族仍崩**（11:33 `+0x132c34c` 写 0x4，死于 flyover 起步；11:40 `+0x22c0f80` 读 null+0x58，死于 overlay show）——0.5s 把重活推出了 dismiss 级联但正好落进 **overlay 析构+flyover 起步窗**（崩点散布在 dismiss 后 0~2s）。**状态=未封案**：级联内联重活是合理机制假说，但仅推迟 0.5s 不足以脱离整个 intro 序列窗口；PSW×2 的 `real_callback(500/600ms)` 与 fast_end_turn 的 dropdown 点击同样落在该窗。
+- **09-26 午二轮修复**：两崩日志尾最后 click 均为 `dropdown_heroes_speed`@234.6s（first_tick+0.5s 触发，恰在 dismiss 级联 ~237.5s 前）→ `czx_fast_end_turn.lua` 改为 `_apply_when_safe` 门控：`core:get_loading_screen()` 第二返回值非空 → 级联未完；root 子组件存在 `movie_overlay_` 前缀 → intro 播放中；`cm:is_intro_cutscene_playing()`/`cm:is_any_cutscene_running()` 任一真 → 不等；`cm:has_intro_cutscene_played()` 真 → 立即放行；标记缺失的本局靠 ~40s 起步宽限兜底。全部点击+`SetPrefAsBool` 移入门后。部署为 `zzz_czx_fast_end_turn2.pack`（pos87，`--deploy-name --replace` 运行中改名部署）；`!!!!czx_nagintro_skip.pack` 同日补回 playset pos111（0 字节遮蔽把 overlay 时长压到近零，缩窗口不封案）。**实测要点**：读档可重播 intro_movie（`intro_cutscene_has_played` 存档标记与 overlay 重播无必然关联）——判"安全"必须查 overlay/loading-screen 组件存在性，不能只看 done 标记。
+- **启动方式坑（必记）**：`Warhammer3.exe game_startup_mode campaign wh3_main_combi ; file.txt;` 与 `campaign_load <save> ; file.txt;` 形式直起时**不产 script_log、lua_mod_log 只剩 CA 自带测试脚本**——行为上等同无 mod 会话（09:38 实测"可玩 28min"实为 autotest 式裸跑，不能作为 fix 证据）。**真正带 mod 的路径 = 前端启动**（`Warhammer3.exe xxx.txt;` 单文件参数，或裸 exe 自动按 used_mods.txt 挂）→ 主菜单 → 新建战役；dump 内嵌命令行证实所有真实崩溃会话都是 `Warhammer3.exe wyccc_launch_mods.txt;` 单参数形态。
+- **判据——UAF 写签名特征**：`0xc0000005` params=`[0x1, addr]`（写）+ `addr` 为非空野地址（如 `0x30f9b0391`/`0xa0000000a`）+ 寄存器近址同页（`rax=0x30f9b0040`）= 写已释放对象；区别于读侧空指针族（params `[0x0, 0xNN]` 小偏移）。
+- **取证技巧**：①`PrintWindow` API 可抓被遮挡的游戏窗口画面不抢前台（`scratch/_capwin.ps1` 模板，PowerShell 需 `-TypeDefinition` 顶层声明 `RECT` 否则嵌套 struct 静默失败）；②script_log 落在**进程 cwd**——直接拉 exe（cwd=游戏目录）时日志在游戏根目录而非 AppData/logs，wh3diag `scriptlog`/`triage` 按 `game_root()` 已覆盖；③`game_startup_mode campaign wh3_main_combi` 直起新战役（默认最近派系），无需过前端菜单。
+- **vanilla A/B 定案（09-26 午）**：清空 `used_mods.txt`（备份 `.bak_wh3diag`）直起 exe → 主菜单无 `(modded)` → 同一路径新 nag 开局走完整 intro（movie overlay→flyover→回合 1 可操作态）**存活**。同族三签名（`+0x22c0f80`/`+0x22c8774`/`+0x132c34c`）确认 **mod 侧触发**、非纯引擎竞态。注意 vanilla 对照会话曾无声退出一次（无 dump 无 clean-exit 留痕）——对照本身也不是 100% 稳。
+- **集中门控实现（09-26 午后，`zzz_czx_global_lua_guard`）**：不再逐包改延迟——在 `!czx_global_lua_guard.lua` 里**包 `core_object.progress_on_loading_screen_dismissed`**：mod 源回调统一替换为「先等 intro 落定再执行」；`debug.getinfo(callback)` 源路径含 `wh_campaign_faction_start` 的 vanilla intro 驱动回调**必须放行**（延迟它则 intro 永不开始→flag 永不置位→死锁）；getinfo 失败同样放行（宁可不门控也不挂死）。`_intro_settled` 判据序：①`is_intro_cutscene_playing`/`is_any_cutscene_running`（纯引擎状态，级联窗口内不碰 UI 树）②前 6 次探测直接否（避开窗口期）③`get_loading_screen`/`movie_overlay_*` 根组件存在性 ④`has_intro_cutscene_played`（存档持久 flag）⑤全静默 12s 宽限（无 intro 战役 flag 永不置位）。探测走 `cm:real_callback`（1s，墙钟——`cm:callback` 在 loading/暂停期不走表会堆积）。`cm:real_callback` 内嵌于被推迟回调里的 mod（PSW×2 的 500/600ms、prison 的 after_battle_sequence）**随外层一并推迟出窗口**，无需单独改。**v1 部署后待实测**。
+- **配套**：`zzz_czx_auto_tools3` 的 `czx_horde_paging` first-tick 探测同机制——源码已带 `probe_when_safe`（同门控判据，`cm:callback` 2s 轮询、150 次上限），以 `--deploy-name zzz_czx_auto_tools3.pack --replace local:data:<旧id>` 部署保 playset 哈希不变。
+- **首轮实测通过（09-26 12:35 会话）**：`fast_end_turn2`+`nagintro_skip`（guard/auto_tools3 当时未部署）`campaign_load` 读 116926157 档——级联 141.2~147.5s 正常跑完、**全程无 movie_overlay 行**（0 字节遮蔽把 intro 播片压没了）、`applied (polls=2)` @149.2s 于级联结束后点才 armies/heroes 下拉、之后干净跑 93 分钟至手动退出（`UIDestroyed`+清回调收尾）。无 dump。该样本支持"窗口内 mod UI 写=触发器"假说；竞态非必崩，仍需多次读档样本封案。
+- **复发两连（14:34/14:56 dump）揭示第二逃逸通道——常驻 UI 监听器**：1452 会话 fet 门控全程未放行（无 applied marker），但 **`czx_overlay_default` 的 `ComponentLClickUp` 常驻监听器在 cascade+0.2s（200.2s）内联跑** `find_uicomponent`+`SetVisible`+`SimulateLClick` → 崩 225.3s flyover 起步。**监听器不经过 `progress_on_loading_screen_dismissed`，guard 的注册点门控对它无效**；且 condition 里跑 `find_uicomponent` 全树遍历本身就是窗口内原生读——命中半销毁节点即 UAF，**Lua 的 pcall/xpcall 兜不住原生崩溃**（guard 的 xpcall 包装只兜 Lua 层 error）。
+- **判别式补：**凡 condition/回调会碰 UI 树（find_uicomponent/get_ui_root/CurrentState/Visible/ChildCount）或写组件（SetVisible/SimulateLClick/CreateComponent/SetImagePath）的**常驻监听器**（广事件型：`ComponentLClickUp`/`PanelOpenedCampaign` 不带具体 id 前置过滤），在 intro 落定前必须短路；纯 `context.string == "按钮id"` 型触发器安全（窗口内没人点那些按钮）。已修：`czx_overlay_default`（auto_tools3）与 `czx_auto_skill_manage` 的广点击监听器加 `_settled` 模块级门闸（落定前 condition 直接 return false 不进树）。
+- **遗留**：vanilla intro 回调在级联内联 `mo:start()`（建 overlay+起 `show` 动画）是引擎侧不可控因子——§10.38 的 `+0x22c0f80` 是否同族待更多样本。
+- **09-26 午后三轮修复（v2 门控）**：`has_intro_cutscene_played` 被判**不可信**——nag 播片被 `!!!!czx_nagintro_skip` 遮蔽时该 flag 在 dismiss 级联末尾即置位（1429 会话 ~302s），而 flyover(315.5s) 与 how_they_play 面板链(320-321s) 尚未跑——三个拿它当"intro 完结"的门控全部提前放行（`czx_overlay_default` 301.9s 点击、`fast_end_turn` 303.8s 下拉双击、guard 攒的 polsd 回调可能在 ~319s 释放），叠加 hero_grants 首 tick 发出的 dilemma 在 320.5s `enable_event_panel_auto_open` 瞬间开面板 → 14:34 仍 +0x22c0f80。v2 统一改用**连续稳定判据**：`_hazards_clear`=无 is_intro_cutscene_playing+无 is_any_cutscene_running+无 loading screen 组件+无 `movie_overlay_*` 根组件；放行须 `polls>=MIN(15~20)` 且 `stable>=10` 连续全绿秒——彻底不看 done flag。改动面：`!czx_global_lua_guard.lua`（polsd 延迟器换判据+新增 `CZX_LUA_GUARD.defer_until_intro_settled(fn)` 公共 API+emit 加 print 兜底）、`czx_fast_end_turn.lua`、auto_tools3 `czx_overlay_default.lua`、hero_grants 抽卡改走 settle 门（spawn 调用另包 `disable_event_feed_events` 避免 agent 面板排队进窗口）。**验证**：1513/1525 两次 `campaign_load` 读档各自活过 dismiss+60~218s（崩点带 +0~19s 全避开），发放链 saber/saber_lord/chanliuzi/kerrigan/draw 全部 ok=true 且存进 15:21 存档，1525 幂等跳过正确。`game_startup_mode campaign wh3_main_combi` 直起实测**不产 script_log、240MB 静默退出**（autotest 裸跑，非 mod 会话）——新战役路径无法无头验证，须人工点前端。
+- **工具坑（09-26 实踩）**：`tools/build_pack.py` 的 `--deploy-name`/`--replace` 只影响部署参数，**不带 `--deploy` 时整包只构建不部署**——watcher 脚本漏写 `--deploy` 会导致"日志全绿、data\ 还是旧包"的假部署（09-26 午后 auto_tools3/sell4 各踩一次）。另：`--deploy` 对新文件名只追加 playset 尾部，不做原位替换——改名部署旧 entry 时务必带 `--replace <旧mod_id>`，否则旧条目靠前遮蔽新包（digimon v2/v3 实踩）。
+
+### 10.41 游戏 UI 自动化不得动用户其他程序的窗口（2026-09-26 用户报障定规）
+
+- **事件**：`scratch/wh3_click.py`、`real_click.py`、`minimize_others.py` 为让程序化点击落在游戏窗口上，曾对**其他**顶层窗口 `ShowWindow(h, 0)`（SW_HIDE=彻底隐藏，任务栏/Alt-Tab 均不可见，只能重启程序找回）或 SW_MINIMIZE，并 `taskkill` steamwebhelper/gameoverlay。用户侧表现为"有些程序窗口消失但进程还在"。三脚本已加禁跑警告，勿复用其思路。
+- **禁令**：窗口/进程操作只允许作用于 `Warhammer3.exe` 自身窗口。对其他程序禁止：`ShowWindow(SW_HIDE/SW_MINIMIZE)`、`SetWindowPos` 移出屏幕、改透明度/层级遮挡、`taskkill`。"让点击落上游戏"不能以藏掉/杀掉别的窗口为代价。
+- **允许手段**（遮挡场景照用）：`PrintWindow(hwnd, hdc, 2)` 可抓**被遮挡**的游戏窗口（D3D 全屏黑图限制见 §10.7，窗口化/无边框有效）；点击用 `PostMessageW`（wh3_ui.click 的坐标换算法，无需前台）；仅游戏窗口允许 `SetForegroundWindow`/`BringWindowToTop`；需要独占画面就把游戏窗口置顶/最大化，不藏别人。
+- 复查口径：**不能用 `Process.MainWindowHandle` 判定**——主窗口被 SW_HIDE 后该属性归 0，进程整体漏网（2026-09-26 曾因此漏报 Devin/Edge）。正确做法 = `EnumWindows` 枚举全部顶层窗口 + `!IsWindowVisible` + 尺寸/标题过滤（`scratch/_hidden_check.ps1`，`-Restore` 批量恢复）。另：EnumWindows 回调内的 `Write-Output` 会被调用处的 `| Out-Null` 吞掉，须先收集到列表再在回调外打印。
+
+### 10.42 UICreated 派发级联崩 `+0x26a93d6` + 回合边界崩 `+0x133b734`（2026-09-26 晚）
+
+- **UICreated 族**：当日 7 个会话日志**恰好断在 `event has occurred:: UICreated, environment is Campaign UI` 行**（崩于派发瞬间）；5 次产 dump 签名均为 `+0x26a93d6` 读 `null+0x18`。与 §10.40 的 loading-dismiss 族不同窗口——这是 Campaign UI 树建完、引擎派发 UICreated 的瞬间。崩例与存活例（60min+）用**逐字节相同清单** → 竞态非清单内容。前导 `[ui]` 枚举停在 `search_panel`/`advice_interface` 组件，与 §10.11 `0xc000041d`（fatal user callback，HUD 建 search_panel 含文本输入框触发 TSF/IME init + advice_interface 打开期）**位置重合**——IME/TSF 输入框初始化参与竞态的嫌疑延续。
+- **回合边界族**：`+0x133b734` 读 `0x0`（params=[0x0,0x0]）。mp_log（UTC）显示 `REPORT_START_OF_TURN_END` → 连续 update starvation（单次 50s）→ ~76s 后崩。当次会话相比上个稳定会话的唯一**回合边界新代码** = `czx_auto_skill_sweep`（auto_tools10 新增 FactionTurnStart 全角色遍历 + `cco("CcoCampaignCharacter").SkillList.At()` 原生调用）。**修法方向**：回合/事件派发回调里不做任何原生重活——用 `cm:real_callback(fn, ms, name)` 推迟出级联窗（同 §10.40 的"推迟体=安全"判据）；`cm:get_faction()` 结果须判 `f == false`（rebels 等返回布尔，§10.12a）。
+- **取证补充**：WMM `backups/used_mods-*.txt` 按启动轮次保存清单快照（文件名时间戳=被覆盖时刻，mtime=清单生成时刻=它服务的启动）——逐档 diff 可精确圈定"哪次启动引入哪项变更"，比猜 mtime 更硬。本例 203759（稳定 60min 会话的清单）→ 215831 → current 两级差分即锁定嫌疑集。
+- **清单卫生教训**：同名 mod 多版本文件并存于 playset（`tools10`+`auto_tools`、`unlock`+`unlock2`）不会"合并运行"——同内部路径靠前全遮蔽，晚者只剩独家文件生效（本次净效果 = 多跑一个调试脚本）；排查时先按内部路径判定实际生效集，勿按"都加载了"评估。
+
+### 10.43 preferences 分辨率被改：排查路径与现有脚本（2026-09-27 盘点，同日修正归因）
+
+- **肇事脚本（已拆）**：`scratch/_deploy_psw_on_exit.sh`（09-26 21:19 建的一次性 watcher）——等 `Warhammer3.exe` 退出后部署 psw 包 + **把 `x_res/y_res` sed 写死成 1920×1080 窗口化**，21:56 触发时把用户自己的 **2560×1440 全屏**设置顶掉（用户当日实锤）[已修正→同日二次确认：它不是"恢复方"而是覆盖用户设置的肇事方]。已删除该脚本的 sed 段、prefs 手动改回 `x_res 2560/y_res 1440/gfx_fullscreen true`（备份 `bak_2k_*`）。**教训：watcher/部署脚本禁止写死任何 gfx/res 键——要复位就整文件备份-恢复，不要猜用户设置。**
+- **把分辨率弄小的另一个机制**：`scratch/bisect_prefs.ps1`（09-22）二分 prefs 时把**截断子集**写进 `preferences.script.txt`——子集缺 `x_res/y_res` 时游戏按 CA 默认 1024×768 居中窗口（x_pos 604 / y_pos 227 = 1920×1080 桌面正中）启动，干净退出时写回。任何"杀进程/崩溃→prefs 截断或重生成"的路径同样落回默认值。
+- **排查口径**：问"谁改分辨率"先 `Select-String preferences.script.txt -Pattern '^(x_res|y_res|x_pos|y_pos|gfx_fullscreen)'` + 看 `scripts\` 目录 `*.bak*` 时间线 + 工作区 grep `x_res|y_res`；`wh3_click.py` 的 SetWindowPos 仅改 z-order（SWP_NOSIZE|SWP_NOMOVE），`_uia_resize*.ps1`/`_resize.ps1` 只动 AssetEditor 窗口，MOD 侧无写分辨率键的 `SetPref`（FET 的三条 gfx/内存写入已于 09-23 删除，见 §10.30）。
+- **预防**：二分/测试需要改 prefs 时先整文件备份、跑完恢复；kill 游戏可能导致 prefs 半写→下次启动重生成默认值；任何 watcher 不得改 gfx/res 键。

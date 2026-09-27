@@ -632,3 +632,51 @@ idle→stand;move→locomotion;attack01/02/special01/02→attacks;damage→react
 
 - .anim 骨名必须与 RMV2 内嵌骨架名严格一致（特征骨新名也在 RMV2 侧——RMV2 重建在「工作室完成」之后才做，故 src_*.anim 含特征骨轨道先于 RMV2 骨存在属正常，游戏读不到多余骨无碍？**待验证：.anim 引用 RMV2 不存在的骨名是否容忍**)。
 - docking 配对击杀不可拆对——确认组的 slots 引用双方文件，单边替换会断同步。
+
+## iter24（2026-09-27 午后）：评分卡 v3.4 全量复跑——skin/graft 维改 GLB 现行档直读（B 线阶段4底座棒）
+
+- **数据源升级**：`_live_probe.py` 直读现行 GLB（nzW=JOINTS_0 映射槽位≥0.05×全 primitives、内嵌 clip 实数、skin joints 数），`_live_skin.json` 按 mtime+size 缓存——keydrop/glb_audit/GRAFT_OVR 在重写浪潮下大面积过时，skin/graft 两维改以现行档为尊（OVR 仅兜底）。口径/权重未动。
+- **回归双态注记**：10 回归件三态并列（修后基线/浪潮回退/现行实测）入卡 `regress` 字段+报告专表——**现行态 7 件已回升**（rosemon 25/72、rosemonbm 27/72 回升至 B9 修后基线，OVR 重放/管线级自复于 15:4x 档；seadra 33/96、megasea 34/96、metalgarux 27/42、ikkaku 26/43、patamon 24/42 二次重写管线级回升），**3 件仍在账**（lalamon 8/72、metalseadramon 23/96、tentomon 40/74+clips 15→5 被 keepClips 实损）。
+- **B4 降 INFO**：批次22 T1 目检销嫌疑（头冠簇原生造型成立）→ jibian 扣 -24→-16（余 B13-15 部署裁决在账），jibian 让出 worst1→第 5。
+- **graft wave2 实证**：65/65 复跑后现行 clip 数自证（hu1 族 n_emb 73-75 → graft 100），graft 维批量化 43.x→98-100（ikkakumon/patamon/metalgarux/magnadramon 等 wf1/bi1 族）；非 graft 族 keepClips 裁剪如实计损（tentomon/kabuterimon graft 54）。
+- **结果**：worst5 = metalseadramon 60（B8 残域-15+skin24）/ chaosdramon 63（blend1.9/skin32）/ susanoomon 63（blend13/anim71.5）/ luminark 63（维缺 anim+blend0/graft33）/ jibian 64；v3.3 三修件（lucemonfm/ophanimon/omegamonas）全部出榜（64/66/67）；**均值 74.8（v3.3 活态）→75.2**（发布版口径 74.4→75.2=+0.8）。`score_report_v3_4.md`/`score_card.json` v3.4、`_v33_snapshot.json` 钉住差分基线。
+- **注意**：数据面在途（OVR 重放波进行中，rosemon 系在跑批途中已由 7→25 回升），本档为 15:4x 快照；`gen_ledger` 托管块透传正常。
+
+## iter25（2026-09-27 傍晚）：.anim 骨表容忍性验证——游戏侧被 9.0 环境堵死，引擎绑定模型经 AssetEditor 源码侧证
+
+### 任务
+
+验证 `.anim` 剪辑骨表引用目标骨架不存在的骨名是否被引擎容忍（②入包前置）。
+
+### 静态证据链（全部实测）
+
+1. **v1 包零先例**：chr 系 413/413 剪辑骨表与骨架**逐骨严格一致**——生成管线即按严格对齐产出，无容忍性证据。
+2. **v2 部署包同判**：9496/9496 剪辑骨表 = 目录映射骨架骨表逐骨一致；emp_sws1 系 bin 同时引用 `czx_<unit>/`（95 条）与共享 `humanoid01/`（166 条）——但 `czx_*` 骨架实测为 hu1 **同名克隆**（骨名集合全等），不构成错配先例。
+3. **内部 skeleton_name 字段不被用作绑定键**：`czx_dorug0.anim` 剪辑声明 `czx_dorug0` 而骨架文件内部声明 `czx_dorug`（截断态）已部署——引擎不校验该串；骨架归属来自 animset/bin 装配而非剪辑自报。
+4. **格式层**（anim_rw + AssetEditor 双证）：v8 剪辑存 TranslationMappings/RotationMappings 骨映射数组——`-1`=无轨、`>9999`=静态帧索引、余=动态轨列索引；映射数组按**剪辑骨序**索引轨道，骨名表的存在即为了对齐剪辑骨序与骨架骨序。
+5. **AssetEditor 源码（AnimationSampler.InterpolateFrame）**：剪辑→骨架按**位置索引**绑定，`Math.Min(skeletonBoneCount, animBoneCount)` 截断——**尾端多余骨被忽略、缺骨留绑定姿态；骨表中部插入/缺失则后续全列错位**。编辑器复刻引擎采样语义，是「按位绑定」模型的强佐证。
+
+### 游戏侧实验（三轮，全部被环境崩拦）
+
+| 轮 | 配置 | 结果 |
+|---|---|---|
+| 1 | 前端→自定义战局（补丁 prefs：帝国剑士×11+卡皇 vs 兽人小子×11+战将）+4 影子探针剪辑 | 崩 `+0x1a957e7` `params=[0x0,0x20]`（D2026-09-27_T17-06-58） |
+| 2 | 同上但撤探针+空 modlist（对照） | 崩 同址 `+0x1a957e7`（T17-12-18） |
+| 3 | 原版 prefs + 空 modlist 巴托尼亚内战（纯 vanilla 双无探针对照） | 崩 同址 `+0x1a957e7`（T17-30-57） |
+
+另：真实 playset（`wyccc_launch_mods.txt`，113 mod 含 `!!!!wyccc_runtime_options`）前端挂载期崩 `+0x4e5b30 params=[0x0,0x3e8]`（T17-14-06、T17-17-28）——挂载期另一签名，疑与在途 digimon 包重建或 Steam 离线态相关。
+
+**判读**：纯 vanilla 对照组同样崩于 `+0x1a957e7` → 本机 9.0 环境**任何战局 init 均不可达**（含前端路径），与 crash 文档「每一次进战斗都崩」历史段吻合。探针从未活到剪辑加载点，游戏侧容忍性**未证伪也未证实**。
+
+### 意外收获（可复用）
+
+- **battle_preferences 二进制补丁器已通**：u16len 字符串序列，army2 阵营串为分界点；已实演将巴托尼亚军全量改写为 帝国剑士×11+卡皇 / 兽人小子×11+战将 并被游戏正确读入军队设置页。测试后已恢复原版备份。
+- **UI 自动化链打通**：`scratch/anim_verify/fgclick.py`——AttachThreadInput+keybd(0x00) 拿前台权 → SetForegroundWindow → SendInput 绝对坐标点击。此前前台失败的根因=后台进程无前台权（非坐标错）；渲染子窗类名 `Warscape`（PostMessage 无效应走前台+SendInput）。
+- 注意：游戏后台时屏幕坐标点击会落到前台其他窗口（本例误点了 Tabbit 的 Studio QA 剪辑列表，选了 src_attack01——无文件损伤，但再测须先确认游戏已前台）。
+
+### 结论与管线规则（收紧落地）
+
+- **规则（不变，按最强假设执行）**：src_*→.anim 转码时**剪辑骨表 = 目标骨架骨表逐字克隆**（同名+同序+同数）。源轨道按骨名重映射到骨架位序；骨架没有的源骨轨道→丢弃并记 report.dropped；骨架有而源没有的骨→映射=-1（rest 保持）。此写法在「按位绑定」与「按名绑定」两种引擎模型下均安全。
+- **高危已知形态**：骨表中**部**插入骨→后续骨全列错位（两种模型下都炸）——转码器必须永远按骨架序全表重写，禁止「追加+尾部对齐」的偷懒写法。
+- **遗留**：游戏内实测待环境恢复后补跑（恢复条件：Steam 在线 + 战局 init 不再 `+0x1a957e7`；探针剪辑与影子部署脚本保留于 `scratch/anim_tolerance/` 与 `scratch/_shadow_park/`）。
+- 直接战局模式 `game_startup_mode battle` 确认在 9.0 彻底废弃（签名同上）；可行测试路径=**前端→遭遇战（电脑）→开始战斗**（UI 三跳已实通至战局 init 崩溃点之前）。
