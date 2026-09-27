@@ -454,14 +454,28 @@ STATUS: DONE（104/104 结论清零：100 只 chr 原生激活 + 4 只 serpent �
 
 ### iter17：加鲁鲁兽原生剪辑 → .anim 入包路径（glb_src_to_anim 空间桥）
 
-- **转换器** ：GLB 原生 src_* 剪辑 → WH3 .anim v8 直转（同骨架无重定向）。核心空间桥：GLB 动画节点空间≠绑定空间（iter121 同病灶），设 ，则  精确成立；skel 中 parent<0 根骨取 。
-- **验证**：写读回环组合世界矩阵 vs  期望，5 条剪辑 × 42 骨 × 3 帧 maxWorldErr ≤0.0008（i16 四元数量化噪声级）。全 43 槽文件 parse OK、骨架名 czx_ga、42 骨。
-- **槽位映射**（39/43 换原生；）：
+- **转换器** tools/glb_src_to_anim.py：GLB 原生 src_* 剪辑 → WH3 .anim v8 直转（同骨架无重定向）。核心空间桥：GLB 动画节点空间≠绑定空间（model-studio iter121 同病灶），设 D_i = IBM_i·M(worldFrame0_i)，则 animLocal_i = inv(D_par)·L_node_i·D_i 精确成立；skel 中 parent<0 根骨取 animLocal = nodeWorld·D。
+- **验证**：写读回环组合世界矩阵 vs nodeWorld·D 期望，5 条剪辑 × 42 骨 × 3 帧 maxWorldErr ≤0.0008（i16 四元数量化噪声级）。全 43 槽文件 parse OK、骨架名 czx_ga、42 骨。
+- **槽位映射**（39/43 换原生；清单 scratch/garu_qa/native_slotmap.json）：
   - attacks×7 ← atck_fa0/fb0/fc0/fd0 + shot_fa0 + jump_fa0/fa2
   - combat_idles×6 ← prov/gurd×3/feel_fg0/fh0
   - death×4 ← dmgx_fa1(仰面)/dmgl_fa0(击飞)/dmgx_fa0/fa2
   - defends×2 ← dmgs_fa0/feel_fh0；locomotion×7 ← run/walk_fa0×2/walk_ba0/base_fb0/feel×3
   - movement step_fwd/bwd ← walk_fa0/ba0（ba0 后退步归位正确）；porthole×2/refuses×2/stand×7 ← base/feel/eat/rest/getu
   - 保留 vanilla 重定向：turn_left/right_90、step_left/right（无原生对应）
-- **钻地修复同步生效**：iter123 ground_clamp 已写入 bound.glb（atck_fc0/jump_fa1 逐帧地面吸附），本次转换用的是修复后数据——attack_03/jump_attack_02 落盘即贴地版。
-- **待办**：游戏内实测原生动作观感（跑/咬/倒）；其余 103 只同法批量（需各自 GLB 原生剪辑先注入）； 单次剪辑与  循环剪辑的引擎行为待实测。
+- **钻地修复同步生效**：iter123 ground_clamp 已写入 bound.glb（atck_fc0/jump_fa1 逐帧地面吸附），本次转换用的是修复后数据——attack_03(=atck_fc0) 落盘即贴地版；jump_fa1 修复后暂未入槽（jump_attack_02 用的是 jump_fa2 落地段）。
+- **待办**：游戏内实测原生动作观感（跑/咬/倒）；其余 103 只同法批量（需各自 GLB 原生剪辑先注入）；_un 单次剪辑与 _ul 循环剪辑的引擎行为待实测。
+- **工作室复核**（用户明令验收在 model-studio 不进游戏）：12 槽代表帧 montage 目检全过——run 蹬地/walk/step_bwd/attack_01 扑咬/attack_03 贴地俯冲/shot/×2 combat_idle/death 仰倒+击飞/eat/rest，无解体穿地；证据 E:\Code\model-studio\scratch\_viz\garu_slotmap_sheet.png（tabbit task-0977c839 shot-872d92b6，__errs 空）。
+
+### iter18：51 只数码兽 CS 原生剪辑批量注入（dgm_srcanim 流水线）
+
+- **范围**：104 只 bound.glb 中筛出「有 jmap.json + 有 CS With Animations.fbx + 有 models/ glb」= **51 只**；其余缺口：31 只有 fbx 无 jmap（绑定未走权重迁移）、16 只有 jmap 无对应 fbx、4 只皆无。
+- **工具链**（tools/ 新增）：
+  - tools/dgm_dump_anims.py：Blender 批量——manifest 循环逐个 FBX 导入、滤非骨架 action、去 _N LOD 重名、>600f 跳过；导出 rest 世界矩阵 + 逐帧 pose 世界矩阵 + scene fps。
+  - tools/dgm_srcanim_manifest.py：按 report.json 的 chrNNN 反查 dgm_pub_src FBX，产出 51 项 manifest。
+  - tools/dgm_srcanim_inject.py：jmap + _root_src/_root_tgt（首选 J_center→root，omegamonas 落到 J_grey_head）拼注入 map，调 garu_qa/inject_src_anim.py，原地回写 models/<u>_bound.glb（先存 .bak_srcanim）。
+- **关键坑——CS 源骨架是 Z-up 且 ~1/15 微缩**（与 NxO d043 不同）：FBX dump 的 rest span z>>y。注入前先做坐标变换：每帧世界矩阵 C4·m·C4ᵀ（C=标准 zup→yup：(x,z,-y)），否则旋转 delta 全绕错轴。每单元按 rest span 自动判向（span.z > 2·span.y）。亚古兽修正前注入的废案已回滚重灌。
+- **产出**：51 只 × 各 11~13 条 src_* 剪辑（attack01/02、damage、down、eat、getup、glad、guard、idle、move、special01、win）共 554 条动作入库 models/，donor hu1_sws 剪辑原样保留。导出 JSON 存 scratch/dgm_srcanim/<u>/（gitignore 内，~524MB 可再生成）。
+- **验证**：先导亚古兽 6 帧 montage（idle/move/attack01/attack02/down/win）姿态全正；抽 3 科复核——偃月加鲁鲁（四足扑咬）、伽偻达（鸟翼随动）、战斗暴龙（双足回旋爪+倒地持盾）均 upright/贴地/变形正常，__errs 空。证据 tabbit task-71ece22c：agu_src_sheet / srcinj_{cresgarurumon,garudamon,wargreymon}。
+- **矩阵**：5 只试点 59P/33W/0F/92clip（scratch/matrix_srcinj5.json）；51 只全量矩阵见 matrix_srcinj51.json。
+- **待办**：31 只「有 fbx 无 jmap」需自动建映射（位置匹配源骨→目标骨）；16 只 jmap 无 fbx 需另找源；src_* → .anim 槽位批量（glb_src_to_anim 按族骨架）；钻地类逐帧吸附按需（garu ground_clamp 可复用）；.bak_srcanim 回滚点保留在 models/。
