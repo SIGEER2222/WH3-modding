@@ -525,3 +525,33 @@ hu1 人形骨架（72 骨）缺尾/耳/须等解剖骨，automap 只能照抄坏
 ### 遗留
 - whisker 细刺方向与尾附着视觉待微调； 投票在此案为 true（L/R 视觉正确）
 - 推广：64 只特征骨债清单按族推进（gabumon/growlmon/taomon/翼族/蛇形鳍族）
+
+## iter21（2026-09-27 午）：评分卡 v3.3 全量重排（B 线回归底座棒）
+
+- 输入消化：v32 worst5 权重批 755v（seadramon 101v/mastemon 490v/blitzgreymon 164v 承皮实测 SKIN_OVR）+ flags4 骨架不匹配×3（venusaur/bulbasaur/charizard 入 FIXED、`_hl_flags4.json` post 档覆盖 anim、`glb_audit_batch1` mtime 升序并入 ga）+ C10 嫁接两波（wave1 22件×30=7→37 / wave2 48件×55，GRAFT_OVR 从 `graft_hu1_wave1_matrix`/`wave2_result` 读 total_anims）+ B14-P1（chaos/blitz 复测 43.5/39.0% MTX_OVR；mastemon matOrderFix 补刀 71.6→28.4%）。
+- 判例接入：seadramon B8 残域「交错节覆盖自洽」加入 _CLOSURE_RE 销项（-15）；B15 定性（jibian/mastemon blend 销账不扣分、blitzgreymon A 档增补 LOW 不入扣）；E1_POOL 升收口口径=转正35+jibian边缘。
+- 结果：142 卡均值 72.5→**74.4**；worst5=jibian(56,B13+B4)/lucemonfm(60)/ophanimon(60)/omegamonas(61)/metalseadramon(62,B8+C7)；修件全出榜（seadramon 59→75、mastemon 56→67、chaosdramon 58→63、blitzgreymon 59→62）；60+件 graft 77.8→100 批量+4。
+- 陷阱：`score_card.json` 被 v3.3 首轮覆盖致增量表塌 1 行——解法=`_tmp_v32.py` 逆向重演（关 v3.3 全部新增点）产 `_v32_snapshot.json` 钉住基线，prev 优先读快照（同 `_v3_snapshot` 先例）；auto_fixed 加 `matOrderFix未落地` 反词防误标。
+- 产物：`score_report_v3_3.md` / `score_card.json` v3.3 / `score_card.md` 存根 / LEDGER 尾部快照 v3.3 / `_v32_snapshot.json` / `_tmp_v32.py`（基线重演副本）。
+
+## iter22（2026-09-27）批产物"权重塌缩"事故排查 + 注入器 delta 化重构
+
+### 事故定性
+- 审计报 79/84 只 JOINTS_0 全塌缩到 animroot → **实为读函数 bug**：dgm_bindcheck.acc() 把 JOINTS_0（uint16 索引）当成归一化权重 /65535 → 全读成 0。加 acc_norm() 分离：JOINTS/POSITION 用原始读，仅 WEIGHTS 走归一化。
+- 修正后真实结果：**103/104 权重分布健康**（仅 gallantmonx 244v 全挂 hand_left=武器刚体件，合法）；84/84 绑定帧恒等 max=0.0000 真实成立。
+- **教训**：一切「全塌缩/全满分」式审计先自查读路径再信。
+
+### 注入器三处修复（scratch/garu_qa/inject_src_anim.py）
+1. **删 K 桥绝对变换**（W=K·G 把 dump 尺度噪声原样放大；塌缩组帧 det=3e-8 且平移/线性不同尺度约定，数学上无解）→ featbone 与普通骨统一走 **rotation-delta**：dq=rot(G)·rot(rest)^-1，rot_of 列归一化天然免疫一切尺度约定。
+2. **尺度感知 FK**：Wf 存完整世界矩阵 wq·S_self，父子位置组合用全线性块（旧版 Wq@lp 在 0.01-scale 特征骨链下丢尺度）。正常骨 s=1 输出逐位不变。
+3. **根骨位移双探针修复**：hs 从 |rest_root_pos|（塌缩组 ~0.001→ratio 爆炸 250x）改为 max|rest 全骨位|/si_r（真单位骨架展幅）；dp 锚定**剪辑首帧**真单位位置（dump rest 与 anim 场景原点可有恒定偏移，海龙差 8 真单位→贴地修复）。
+- 死代码 _K 保留在 map.json（注入器 pop 后未用，无害）。
+
+### 批跑结果
+- featbone_rerun4.log：81/82 OK（ophanimonfm 仍被 nn_med 0.086 门控）；bindcheck3.log 84/84 max=0.0000。
+- 工作室复检（tabbit task-fc2c6fd7/7c1c72b4）：九尾狐 src_move 九尾全展✓（原：模型离屏消失）；海龙 attack/move 贴地盘绕鳍翼附体✓（原：满屏刀片/悬空）；迪路兽/亚古/天女兽/莫斯提兽回归全过，__errs 空。
+- 证据图：model-studio/scratch/_viz/v4_*、v3_kyubimon_*、rerun2_*。
+
+### 遗留
+- 全库矩阵回归跑批中（151 只 3 片）。
+- ophanimonfm 需人工源对齐；mastemon 地面黑片=资产自带阴影片（非手术产物）。

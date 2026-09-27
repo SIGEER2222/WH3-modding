@@ -467,6 +467,11 @@ def run(unit, dry=False):
     for i, nm in enumerate(tnames):
         if nm in jcol:
             W_new[low, jcol[nm]] += tW[low, i]
+    if os.environ.get('FB_DEBUG'):
+        print('  DBG jcol', len(jcol), 'mapHits',
+              sum(1 for s, t in new_map.items() if s in sname_i and t in jcol),
+              'W_new rowsum med', float(np.median(W_new.sum(1))),
+              'low', int(low.sum()), 'tpos', len(tpos))
     W_new /= np.maximum(W_new.sum(1, keepdims=True), 1e-9)
 
     # ---- rewrite JOINTS_0/WEIGHTS_0 per skinned prim (same order as
@@ -484,6 +489,12 @@ def run(unit, dry=False):
                 continue
             nv = am.acc(g, binb0, at['POSITION']).shape[0]
             Wp = W_new[off_v:off_v + nv]
+            if os.environ.get('FB_DEBUG'):
+                print('  DBG prim nv', nv, 'off_v', off_v,
+                      'Wp rowsum med', float(np.median(Wp.sum(1))),
+                      'colmax', int(Wp.max(1).max()) if nv else 0,
+                      'argmax hist', np.bincount(
+                          Wp.argmax(1), minlength=len(jcol))[:12].tolist())
             off_v += nv
             top = np.argsort(-Wp, axis=1)[:, :4]
             J = np.zeros((nv, 4), np.uint16)
@@ -492,6 +503,10 @@ def run(unit, dry=False):
             for k in range(4):
                 J[:, k] = lcol[top[:, k]]
                 Wq[:, k] = Wp[ar, top[:, k]]
+            if os.environ.get('FB_DEBUG'):
+                print('  DBG lcol[:12]', lcol[:12].tolist(),
+                      'top[:4]', top[:4].tolist(),
+                      'J[:4]', J[:4].tolist())
             Wq /= np.maximum(Wq.sum(1, keepdims=True), 1e-9)
             at['JOINTS_0'] = acc_write(g, binb, J, 5123, 'VEC4')
             at['WEIGHTS_0'] = acc_write(g, binb, Wq, 5126, 'VEC4')
