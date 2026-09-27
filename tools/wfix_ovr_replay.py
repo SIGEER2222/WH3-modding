@@ -54,13 +54,24 @@ def load_ovr(unit):
     return None, None
 
 
-def apply_jmap_ovr(map_dict, ovr):
+def apply_jmap_ovr(map_dict, ovr, tset=None, skipped=None):
     """合并全部 jmap_ovr 条目进 map；返回 (新map, 被覆写键列表)。
-    写器侧 new_map 回写时须对被覆写键做防回灌剔除（见 strip_ovr_keys）。"""
+    写器侧 new_map 回写时须对被覆写键做防回灌剔除（见 strip_ovr_keys）。
+    guard.requires_target_bones 守卫（批次24 翼槽契约档）：调用方传
+    tset=现行骨架骨名集时，补丁声明的目标槽不全存在于骨架 → 整 patch
+    跳过（on_missing=skip_map_merge）并记 skipped——防早熟激活：缺槽
+    骨架上 weightmap miss 会把翼簇静默钉到骨0，比坍缩更劣。
+    tset=None（featbone 等可自建骨的 lane）不启用守卫。"""
     out = dict(map_dict or {})
     keys = []
     for p in (ovr or {}).get('patches', []):
         if p.get('kind') != 'jmap_ovr':
+            continue
+        req = (p.get('guard') or {}).get('requires_target_bones')
+        if req and tset is not None and not set(req) <= tset:
+            if skipped is not None:
+                skipped.append({'missing': sorted(set(req) - set(tset)),
+                                'note': p.get('note', '')[:80]})
             continue
         for k, v in (p.get('map') or {}).items():
             out[k] = v

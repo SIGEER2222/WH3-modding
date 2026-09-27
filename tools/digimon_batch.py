@@ -35,6 +35,7 @@ TOOLS = ROOT / "tools"
 
 sys.path.insert(0, str(TOOLS))
 from rmv2_convert import read_accessor  # noqa: E402
+from digimon_model_templates import template_for_record, template_id_for_record  # noqa: E402
 
 # ------------------------------------------------------------- GLB helpers
 
@@ -149,6 +150,8 @@ GLB_OVERRIDE = {
     "czx_dgm_rosemon": "蔷薇兽_chr057.glb",
     "czx_dgm_rosemonbm": "蔷薇兽_chr779.glb",
     "czx_dgm_metalgarurumon": "钢铁加鲁鲁_chr135.glb",
+    # 2026-09-27: NxO 版替换 chr012——源模有真颌骨(J_tooth 铰链)+口腔内壁
+    "czx_dgm_garurumon": "garurumon_nxo_d043.glb",
     # 2026-09 batch triage (renders in scratch/digimon_batch/_cands):
     # these picks had exploded/lying/empty meshes in Blender; replaced with
     # the candidate that renders a coherent upright model.
@@ -171,6 +174,9 @@ GLB_OVERRIDE = {
     "czx_dgm_weregarurumon": "兽人加鲁鲁兽_chr140.glb",
     "czx_dgm_zeedmillennium": "最终千年兽_chr230 with animations.glb",
     "czx_dgm_aerovdramon": "天翔v龙兽_chr400 with animations.glb",
+    # public chr359_2_89x_Fix lands at h=0.19 — genuinely a small digimon,
+    # not a broken export; force-select it so `sane` doesn't veto
+    "czx_dgm_lilimon": "花仙兽_chr359_2_89x_Fix.glb",
 }
 
 # external base-colour PNG for GLBs that ship no embedded texture
@@ -179,6 +185,12 @@ TEX_OVERRIDE = {
                        / "textures" / "Lillymon.png",
     "czx_dgm_veemon": ROOT / "scratch" / "salzaar_digimon" / "extracted"
                       / "textures" / "chr114a01.png",
+    # public Links chr303/chr304 only convert cleanly from binary FBX, which
+    # leaves textures unlinked — use the PNGs shipped next to the model
+    "czx_dgm_tentomon": ROOT / "scratch" / "dgm_pub_src" / "ex" / "324499"
+                        / "Tentomon" / "chr303a01.png",
+    "czx_dgm_kabuterimon": ROOT / "scratch" / "dgm_pub_src" / "ex" / "324504"
+                           / "Kabuterimon" / "chr304a01.png",
 }
 
 # roster cn -> index digimon name when they differ
@@ -439,7 +451,8 @@ def split_side(name):
     """Return (side 'l'/'r'/'', core). Side is only real when the remaining
     core still looks like a limb word (protects J_center/J_root)."""
     n = name.lower()
-    m = re.match(r"^(bip\d+)\s+([lr])\s+(.+)$", n)          # Bip001 L Thigh
+    m = re.match(r"^(bip\d+)[_\s]+([lr])[_\s]+(.+)$", n)  # Bip001 L Thigh /
+                                                        # Bip001_L_Thigh
     if m:
         return m.group(2), m.group(3)
     m = re.match(r"^j_([lr])_?([a-z].*)$", n)              # J_Lude / J_L_ude
@@ -1123,10 +1136,12 @@ def topo_biped_landmarks(joints, parents, bbox):
         slots["foot"][s] = (b[1] if len(b) > 2 else b[0],
                             joints[b[1] if len(b) > 2 else b[0]])
         slots["toe"][s] = (b[0], joints[b[0]])
-    # arms: remaining leaves with big |x| in upper body
+    # arms: remaining leaves with big |x| in upper body (0.15 floor tuned on
+    # ~2m models; scale it down for small rigs or their shoulder chains get
+    # dropped — fujinmon at h=1.0 lands at |x|~0.12)
     arm_leaves = [c for c in chains
                   if c not in legs and joints[c[0]][1] > gy
-                  and abs(joints[c[0]][0]) > 0.15]
+                  and abs(joints[c[0]][0]) > min(0.15, 0.1 * H)]
     for s in ("l", "r"):
         cs = [c for c in arm_leaves if (joints[c[0]][0] > 0) == (s == "l")]
         if not cs:
@@ -1234,6 +1249,16 @@ def biped_landmarks(slots):
             la = lerp(ua, ha, 0.55)
         if ha is None and ua and la:
             ha = [la[0] + (la[0] - ua[0]), la[1] - abs(la[1] - ua[1]), la[2]]
+        if ha is None and ua:
+            # rigs whose arm chain ends at the upperarm bone (NC Bip001_L_*
+            # rigs like fujinmon have no forearm/hand joints): extend the
+            # shoulder->upperarm direction so downstream bones still get
+            # sane anchors
+            d = ([ua[i] - cl[i] for i in range(3)] if cl else
+                 [ua[0] or 0.2, 0.0, 0.0])
+            ha = [ua[i] + 0.4 * d[i] for i in range(3)]
+            la = lerp(ua, ha, 0.55)
+            probs.append(f"synth hand {side}")
 
         if ul is None and fo:
             ul = lerp(pelvis, fo, 0.35)
@@ -1291,7 +1316,8 @@ def scan(units):
                             and info.get("nj", 0) > 0)
         if not f:
             rep[key] = {"status": "noglb", "cn": cn, "form": form,
-                        "family": fam}
+                        "family": fam,
+                        "template_id": template_id_for_record({"family": fam})}
             print(f"{key:34s} NO GLB ({cn})")
             continue
         joints, parents, (lo, hi), nimg, nv = glb_scene(GLB_DIR / f)
@@ -1306,6 +1332,10 @@ def scan(units):
                "bbox": [lo, hi], "images": nimg, "verts": nv,
                "mesh_h": round(hi[1] - lo[1], 3),
                "mesh_len": round(hi[2] - lo[2], 3)}
+        template = template_for_record(rec)
+        rec["template_id"] = template_id_for_record(rec)
+        rec["template_motion_policy"] = template.get("motion_policy", {})
+        rec["template_environment"] = template.get("environment", {})
         slots, per = classify_joints(joints, parents)
         rec["slots"] = {k: {s: v[0] for s, v in d.items()}
                         for k, d in slots.items()}
@@ -1330,10 +1360,13 @@ def scan(units):
                     not p.startswith("synth") and p != "no neck"
                     for p in probs):
                 # topology fallback for J_jointNN-style generic rigs
-                lm2, probs2 = topo_biped_landmarks(joints, parents,
-                                                   (lo, hi))
-                if len(lm2) > len(lm):
-                    lm, probs = lm2, probs2
+                try:
+                    lm2, probs2 = topo_biped_landmarks(joints, parents,
+                                                       (lo, hi))
+                    if len(lm2) > len(lm):
+                        lm, probs = lm2, probs2
+                except Exception as e:
+                    probs = probs + [f"topo fail: {e}"]
             rec["landmarks"] = lm
             rec["problems"] = probs
             fatal = [p for p in probs
@@ -1476,6 +1509,15 @@ def _remap_prim_weights(js, buf, jmap, bone_names):
             jj = gb.read_accessor(js, buf, at["JOINTS_0"]).astype(np.int64)
             ww = gb.read_accessor(js, buf, at["WEIGHTS_0"]).astype(np.float32)
             jj = lut[np.clip(jj, 0, len(lut) - 1)]
+            # strip any remapped weight that lands on animroot (helper
+            # joints: J_wep/J_ankle/Ef_*/chr###/GRP_*): verts pinned to the
+            # origin stretch into streaks whenever the body moves. Rows that
+            # lose all weight fall back to blender_rig2 auto-bind.
+            _ar = bidx.get("animroot", -1)
+            if _ar >= 0:
+                ww[jj == _ar] = 0.0
+                _s = ww.sum(1, keepdims=True)
+                ww = np.divide(ww, _s, out=np.zeros_like(ww), where=_s > 0)
             # merge duplicate target bones inside a vert's 4 slots
             for v in range(len(jj)):
                 seen = {}
@@ -1567,7 +1609,12 @@ def phase_bind(units):
                 bone_names = [b["name"] for b in skel["bones"]]
                 # ---- wfix.ovr 钩子：jmap_ovr 先于权重移植合并
                 if _ovr:
-                    jmap, _ovk = _wovr.apply_jmap_ovr(jmap, _ovr)
+                    _jsk = []
+                    jmap, _ovk = _wovr.apply_jmap_ovr(
+                        jmap, _ovr, tset=set(bone_names), skipped=_jsk)
+                    for _s in _jsk:
+                        print(f"{key:34s} jmap_ovr guard-skip "
+                              f"miss={len(_s['missing'])} {_s['note']}")
                 weights = _remap_prim_weights(
                     _js, _bb, jmap, bone_names)
                 # ---- wfix.ovr 钩子：谓词补丁在骨名空间重放 + nzJ 守卫
@@ -1630,7 +1677,7 @@ def phase_bind(units):
             env["RIG_EXCLUDE_BUILTIN"] = (
                 r"prop|cape|skirt|belt|cloth|flag|tabard|fx_|icon|camera"
                 r"|weapon|shield|quiver|scabbard|attach|slot|mount|platform"
-                r"|banner|be_prop")
+                r"|banner|be_prop|animroot")
         cmd = [BLENDER, "-b", "-P", str(TOOLS / "blender_rig2.py"), "--",
                str(ud / f"skel_{rec['skel']}.json"),
                str(world_glb), str(out), "nofit",
@@ -1888,7 +1935,7 @@ def phase_db(units):
     for fam, ks in byfam.items():
         res = fam_res(fam)
         cmd = [sys.executable, str(TOOLS / "gen_digimon_db.py"),
-               "--units", ",".join(ks)]
+               "--units", ",".join(ks), "--mod", MOD.name]
         if res["entity"]:
             cmd += ["--entity", res["entity"]]
         if res["weapon"]:
@@ -2073,13 +2120,27 @@ def main():
     ap.add_argument("--mod", default="zzz_czx_digimon",
                     help="mod source dir under mod_files/ to write into "
                          "(default zzz_czx_digimon). Needs ROSTER.tsv.")
+    ap.add_argument("--glb-dir", default="",
+                    help="alternate GLB source dir (needs index.json "
+                         "with file/digimon entries)")
+    ap.add_argument("--work", default="",
+                    help="alternate state dir (default "
+                         "scratch/digimon_batch)")
     args = ap.parse_args()
 
-    global MOD, ROSTER, PORTED
+    global MOD, ROSTER, PORTED, GLB_DIR, WORK
     if args.mod != "zzz_czx_digimon":
         MOD = ROOT / "mod_files" / args.mod
         ROSTER = MOD / "ROSTER.tsv"
         PORTED = MOD / "PORTED.tsv"
+    if args.glb_dir:
+        GLB_DIR = Path(args.glb_dir)
+        if not GLB_DIR.is_absolute():
+            GLB_DIR = ROOT / GLB_DIR
+    if args.work:
+        WORK = Path(args.work)
+        if not WORK.is_absolute():
+            WORK = ROOT / WORK
 
     roster = load_roster()
     want = set(args.units.split(",")) if args.units else None

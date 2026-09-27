@@ -27,6 +27,12 @@ BATCH = os.path.join(ROOT, 'scratch', 'dgm_pub_batch')
 MODELS = 'E:/Code/model-studio/models'
 SRC_GLB_DIRS = [os.path.join(ROOT, 'scratch', 'dgm_pub_src', 'glb'),
                 os.path.join(ROOT, 'scratch', 'salzaar_digimon', 'glb')]
+# 批次24 翼槽族实锤另导出源（rep['glb'] 记名件骨架无声明源关节；alt 件
+# 与 jmap 键零差集，nn_med 实测过门槛）：magnamon 0.0248 / gallantmon
+# hlqsszhl_atk 0.0822 未过门槛——gallantmon 暂不挂 alt 防劣选
+SRC_GLB_ALT = {
+    'czx_dgm_magnamon': '金甲龙兽_jjls_2.glb',
+}
 
 spec = importlib.util.spec_from_file_location(
     'am', os.path.join(ROOT, 'tools', 'dgm_automap.py'))
@@ -175,51 +181,80 @@ def run(unit, dry=False):
             np.array(rest_src[n])[:3, :3])) > 1e-12 else np.nan
         for n in rest_src])
     rd = np.nan_to_num(rd, nan=1.0)
-    sp = None
-    gs = bs = None
-    best = np.inf
+    # ---- wfix.ovr 预载：src 候选排序需声明源关节覆盖率（批次24 翼槽族——
+    #      rep['glb'] 记名与实际绑定源可能不同件：magnamon 实绑 jjls_2、
+    #      ophanimonfm 实绑 salzaar 目录同名件，皆已实锤）
+    ovr_pre, ovr_path_pre = (wovr.load_ovr(unit)
+                             if wovr is not None else (None, None))
+    ovr_src = set()
+    for _p in (ovr_pre or {}).get('patches', []):
+        if _p.get('kind') == 'jmap_ovr':
+            ovr_src.update((_p.get('map') or {}).keys())
+    fnames = dict.fromkeys(
+        [glb_name] + ([SRC_GLB_ALT[unit]] if unit in SRC_GLB_ALT else []))
+    cands = []
     for d in SRC_GLB_DIRS:
-        p = os.path.join(d, glb_name)
-        if not os.path.exists(p):
-            continue
-        gg, bb = am.read_glb(p)
-        det_ok = []
-        for sk in gg.get('skins', []):
-            ibm = am.acc(gg, bb, sk['inverseBindMatrices']).reshape(-1, 4, 4)
-            for k_, j in enumerate(sk['joints']):
-                nm = gg['nodes'][j].get('name')
-                if nm in rest_src and abs(np.linalg.det(
-                        np.array(rest_src[nm])[:3, :3])) > 1e-12:
-                    det_ok.append(np.linalg.det(ibm[k_]))
-        if not det_ok:
-            continue
-        score = abs(np.log10(max(np.median(det_ok), 1e-30)
-                         / max(rd, 1e-30)))
-        if score < best:
-            best, sp, gs, bs = score, p, gg, bb
-    if sp is None:
+        for fn in fnames:
+            if not fn:
+                continue
+            p = os.path.join(d, fn)
+            if not os.path.exists(p):
+                continue
+            gg, bb = am.read_glb(p)
+            det_ok = []
+            for sk in gg.get('skins', []):
+                ibm = am.acc(gg, bb, sk['inverseBindMatrices']).reshape(-1, 4, 4)
+                for k_, j in enumerate(sk['joints']):
+                    nm = gg['nodes'][j].get('name')
+                    if nm in rest_src and abs(np.linalg.det(
+                            np.array(rest_src[nm])[:3, :3])) > 1e-12:
+                        det_ok.append(np.linalg.det(ibm[k_]))
+            if not det_ok:
+                continue
+            score = abs(np.log10(max(np.median(det_ok), 1e-30)
+                             / max(rd, 1e-30)))
+            sjn = {gg['nodes'][j].get('name')
+                   for sk in gg.get('skins', []) for j in sk['joints']}
+            cands.append((len(ovr_src & sjn), score, p, gg, bb))
+    # OVR 声明源关节覆盖率优先（坍缩族真源常是另导出件），同覆盖取 det 最贴合
+    cands.sort(key=lambda c: (-c[0], c[1]))
+    if not cands:
         return {'skip': 'no src glb'}
     g, binb0 = am.read_glb(bp)
     tnames, tpos, tW = am.skin_data(g, binb0)
-    snames, spos, sW = am.skin_data(gs, bs)
-    if tpos is None or spos is None:
+    if tpos is None:
         return {'skip': 'missing skin'}
-    binb = bytearray(binb0)
-
     tn = am.normalize_v(tpos)
-    o_name, o_med, sn = am.best_orient(tn, spos)
-    if o_med > 0.05:
+    sp = gs = bs = snames = spos = sW = None
+    o_med = np.inf
+    for _cov, _sc, p, gg, bb in cands:
+        sn_, sp_, sW_ = am.skin_data(gg, bb)
+        if sp_ is None:
+            continue
+        o_name, o_med, sn = am.best_orient(tn, sp_)
+        if o_med <= 0.05:
+            sp, gs, bs = p, gg, bb
+            snames, spos, sW = sn_, sp_, sW_
+            break
+    if sp is None:
         return {'skip': f'nn_med {o_med:.3f} too large'}
+    binb = bytearray(binb0)
     _, src_nn = am.nn_median(tn, sn)
     nn_dist = np.sqrt(((tn - sn[src_nn]) ** 2).sum(1))
 
     old_map = json.load(open(mp, encoding='utf-8'))
     # ---- wfix.ovr 钩子①：jmap_ovr 先于 new_map 构建合并（B9 型语义槽纠正）
-    ovr, ovr_path, ovr_keys = (None, None, [])
+    ovr, ovr_path, ovr_keys = ovr_pre, ovr_path_pre, []
+    ovr_named = {}
     if wovr is not None:
-        ovr, ovr_path = wovr.load_ovr(unit)
         if ovr:
+            # tset=None：本 lane 可自建骨，guard 不拦；契约槽名留底供
+            # pending 建骨直通（声明名=创建名，翼槽族批次24）
             old_map, ovr_keys = wovr.apply_jmap_ovr(old_map, ovr)
+            for _p in ovr.get('patches', []):
+                if _p.get('kind') == 'jmap_ovr' and \
+                        ( _p.get('guard') or {}).get('requires_target_bones'):
+                    ovr_named.update(_p.get('map') or {})
     # ---- wfix.ovr rest_scale_fix：节点层归一（骨名→node scale→1 + 子树
     #      全后代 T 烘焙吸收；rest 世界位逐点不动守卫内建）——IBM 逆补偿
     #      在 skin 扩写处执行（W'_N 由 tWmat 按修后节点图算）
@@ -336,6 +371,14 @@ def run(unit, dry=False):
 
     pending = []
     for s in snames:
+        decl = ovr_named.get(s)
+        if decl is not None:
+            # OVR 契约槽优先于 fam 门控（J_wingL* / J_wingroot* 等命名
+            # 不走 FAM_PATS——fam=None 永不 pending 即翼槽坍缩根因之一）：
+            # 目标名已在骨架=幂等锁定（new_map 已含），否则建骨
+            if decl not in tset and s in s_ib:
+                pending.append(s)
+            continue
         f = fam(s or '')
         if not f or s not in s_ib:
             continue
@@ -363,11 +406,17 @@ def run(unit, dry=False):
                 break
             p = spar.get(p)
         return d
-    for s in sorted(pending, key=lambda x: (fam(x), eff_side(side_of(x)),
+    ovr_named_used = []
+    for s in sorted(pending, key=lambda x: (fam(x) or '', eff_side(side_of(x)),
                                             chain_depth(x))):
         f = fam(s)
         sd = eff_side(side_of(s))
-        nm = new_name(f, sd)
+        decl = ovr_named.get(s)
+        if decl and decl not in tset and decl not in new_bones.values():
+            nm = decl                     # OVR 契约槽名直通（批次24 翼槽）
+            ovr_named_used.append(s)
+        else:
+            nm = new_name(f, sd)
         new_bones[s] = nm
         new_map[s] = nm
         created.append((s, nm, f))
@@ -604,6 +653,11 @@ def run(unit, dry=False):
               'mirrored': bool(mirrored),
               'new_bones': {s: new_bones[s] for s in order},
               'n_new': n_new, 'fixed_map': fixed,
+              'ovr_slots': {'declared': len(ovr_named),
+                            'used': len(ovr_named_used),
+                            'missing': sorted(
+                                v for k, v in ovr_named.items()
+                                if v not in tset)} if ovr_named else None,
               'anchor_fallback': anchor_fallback,
               'remapped_fam': remapped_fam,
               'lowmass_verts': int(low.sum()),
