@@ -589,3 +589,46 @@ hu1 人形骨架（72 骨）缺尾/耳/须等解剖骨，automap 只能照抄坏
 - 截图:v4_seadramon_src_move/attack01、v4_kyubimon_src_move、v4_mastemon_src_attack01、v5_magnamon_idle/atk（Tabbit artifacts task-994ef408/task-292f7089）
 - selfCheck:magnamon 0 fail/38 clips;angemon/mastemon/togemon 0 fail 0 coverage issue
 - 绑定帧检验日志 84 max=0.0000
+
+
+## 规划：② src_* → .anim 批量入包（2026-09-27，待用户拍板后开工）
+
+### 现状
+
+- src_* 原生剪辑（NNO dump→bound.glb 注入）仅存在于 model-studio 验证环境，游戏读不到。
+- 游戏侧已就绪链路：tools/anim_rw.py(.anim v8 全量读写，zstd 可选压缩）、tools/pack_animsets.py(loose bin → animpack 裸表=数码 v1 同构）、bin 为可解析字符串引用表（slot → animations/battle/czx_骨架/武器组/动作组/剪辑.anim)。
+- 现 bin 槽位填的是 hu1_sws_*/chr 嫁接内容（.anim 文件名沿用 donor 槽位名）。
+- garurumon 试点已走通过 src→.anim→槽位 全流程（39/43 槽位）。
+
+### 槽位对比盘点（scratch/dgm_srcanim/slot_compare.json）
+
+- 104 只全量对比：bin 键带 donor 后缀（czx_dgm_<u>_<emp_sws1|wf1_wolf|bi1_eagl|sp1_spid|sn1_serp>)，须先剥后缀再与 bound.glb 名对齐。
+- **75 只核心组全覆盖**：stand/locomotion/attacks/reactions/knockdown/defends/celebrate/combat_idles 有 src_* 可填。
+- **7 只部分**：birdramon/biyomon/heraklekabuterimon/hououmon/megakabuterimon 缺 deaths(src 无死亡剪辑，src_down 实为 KO 倒地可顶）；magnadramon 缺 move;garurumon 为异名源（src_a0_atck_* 38 条赛博侦探命名，需独立映射表）。
+- **22 只零 src***:alphamon/omegamon 系×4/imperialdm/susanoomon/vritramon 等，属 ③ 边缘清单，保持 chr/donor 不动。
+- **源词表**(81 只标准集~11 条）:idle/move/attack01/02/damage/down/getup/guard/eat/win/special01(+18 只 glad,+13 只 special02)。
+- **bin 组无 src 对应**（必须留 donor):docking（配对击杀，同步对不可拆）、porthole、jumps_falls、missile_actions、shield_up、face/hands、transitions、refuses、resurrect/rebirth、serpent subset 的 deaths 扩展位等。
+
+### 语义映射表（草）
+
+idle→stand;move→locomotion;attack01/02/special01/02→attacks;damage→reactions;down→knockdown+deaths 兜底;getup→knockdown 起身;guard→defends;win/glad→celebrate;eat→combat_idles。garurumon 异名源单独表：a0_walk→locomotion、a0_atck_*→attacks、a0_dmg*→reactions、a0_gurd_*→defends、a0_jump→jumps、a0_getu→knockdown 起身、a0_base→stand。
+
+### 执行计划（混合替换：src_* 填得上的组全换，无对应留 donor）
+
+1. **骨架表冻结快照**：每 unit 从术毕 bound.glb 导出 skel json（骨名/层级/IBM)，落 animations/skeletons/czx_骨架 所需描述——注意同一 donor 族下不同 unit 骨数已分化（复合骨架），skel 表须逐 unit 生成，不能按族复用旧表。
+2. **src_* → .anim 转码**：bound.glb 读剪辑轨道 → 烘 30fps 逐帧 → anim_rw v8 写盘（复用 garurumon 转码器）。输出名建议保留源名 src_attack01.anim 式（不再套 donor 名），bin 引用同步改。
+3. **bin 槽位重写**：解析各 unit bin → 核心组内 src 覆盖组替换路径为 src_*.anim；deaths 用 src_down；非核心组原样保留；locomotion 若槽位要多档速（walk/run/charge）复用同一 src_move（与 chr 嫁接期惯例一致）。
+4. **reference_poses**:animations/skeletons/reference_poses/czx_骨架.anim 需与新骨架（含特征骨）一致——特征骨在 refpose 里取 rest。
+5. **落盘+打包**:mod_files 写入 → pack_animsets 重打 animpack → build_pack（注意：当前「建模工作室完成前禁止打包进游戏」铁律生效中——产物停在 mod_files/animpack 层，pack 部署等用户放行）。
+6. **验收**：模型 studio 侧逐项已验；入包后验收= bin 引用零缺失（audit_dangling_refs)+ .anim 回读校验（anim_rw round-trip)+ 抽样反解 .anim 与 GLB 轨道逐帧比对（be_prop 修复期已有同型工具）。
+
+### 前置决策（待用户拍板）
+
+- 已建议按上述混合策略执行；用户先看盘点后定。
+- locomotion 多档速是否全部复用 src_move（或仅填 walk 档、run/charge 留 donor)。
+- 22 只零 src 单元是否本轮顺手补源（归 ③ 边缘任务）。
+
+### 风险点
+
+- .anim 骨名必须与 RMV2 内嵌骨架名严格一致（特征骨新名也在 RMV2 侧——RMV2 重建在「工作室完成」之后才做，故 src_*.anim 含特征骨轨道先于 RMV2 骨存在属正常，游戏读不到多余骨无碍？**待验证：.anim 引用 RMV2 不存在的骨名是否容忍**)。
+- docking 配对击杀不可拆对——确认组的 slots 引用双方文件，单边替换会断同步。
