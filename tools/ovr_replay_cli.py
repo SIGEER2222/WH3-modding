@@ -56,6 +56,70 @@ def load_ovr_flex(unit):
     return ovr, p
 
 
+def _descendant_factors(g, norm_scale):
+    """归一节点 idx→s 展开为 后代 idx→吸收因子（各归一 proper 祖先的 s 连乘，
+    与 apply_rest_scale_fix 的全后代 T 吸收语义对齐）。"""
+    par = {}
+    nodes = g.get('nodes', [])
+    for i, n in enumerate(nodes):
+        for c in n.get('children', []):
+            par[c] = i
+    fac = {}
+    for i in range(len(nodes)):
+        f, j = 1.0, par.get(i)
+        while j is not None:
+            f *= norm_scale.get(j, 1.0)
+            j = par.get(j)
+        if abs(f - 1.0) > 1e-6:
+            fac[i] = f
+    return fac
+
+
+def rescale_scaled_space_tracks(g, binb, binb0, norm_scale):
+    """rest_scale_fix 动画期收尾：归一节点的后代若带 translation 轨道，
+    轨道值按旧缩放空间写时（median|τ|≈|t_new|/f），归一后会按 1/f 飞出——
+    逐轨道量纲判定：median|τ| 更接近 |t_new|（单位约定）→ 不动；
+    更接近 |t_new|/f（缩放约定）→ 输出采样器 ×f 写新 accessor 并重定向
+    （原 accessor 不改；同 accessor 复用同一判定保持一致）。"""
+    fac = _descendant_factors(g, norm_scale)
+    if not fac:
+        return []
+    import math
+    seen = {}
+    done = []
+    for an in g.get('animations', []):
+        for ch in an.get('channels', []):
+            t = ch.get('target', {})
+            if t.get('path') != 'translation':
+                continue
+            ni = t.get('node')
+            f = fac.get(ni)
+            if f is None:
+                continue
+            smp = an['samplers'][ch['sampler']]
+            ai = smp.get('output')
+            if ai not in seen:
+                arr = np.asarray(am.acc(g, binb0, ai), np.float64)
+                tn = float(np.linalg.norm(
+                    g['nodes'][ni].get('translation', [0, 0, 0])))
+                m = float(np.median(np.linalg.norm(
+                    arr.reshape(len(arr), -1), axis=1)))
+                new_ai = None
+                if tn > 1e-6 and m > 1e-9 and \
+                        abs(math.log(m * f / tn)) < abs(math.log(m / tn)):
+                    new_ai = acc_write(g, binb, (arr * f).astype(np.float32),
+                                       5126, 'VEC3')
+                seen[ai] = new_ai
+                done.append({'clip': an.get('name'),
+                             'node': g['nodes'][ni].get('name'),
+                             'median': round(m, 4), 't_new': round(tn, 4),
+                             'factor': round(f, 5),
+                             'rescaled': new_ai is not None})
+            if seen[ai] is not None:
+                smp['output'] = seen[ai]
+    return done
+
+
 def replay_glb(glb_path, unit, dry=False):
     rep = {'glb': glb_path, 'unit': unit}
     ovr, ovr_path = load_ovr_flex(unit)
@@ -68,6 +132,18 @@ def replay_glb(glb_path, unit, dry=False):
     dirty = False
 
     # ── 1) rest_scale_fix：节点层归一（先于权重层——操作域正交）
+    # 先抓归一节点现行 scale（apply 后即被置 1——轨道收尾要用修复前值）
+    norm_scale = {}
+    name_i = {n.get('name'): i for i, n in enumerate(g.get('nodes', []))}
+    for p in (ovr or {}).get('patches', []):
+        if p.get('kind') != 'rest_scale_fix':
+            continue
+        for ent in p.get('nodes', []):
+            ni = name_i.get(ent.get('name'))
+            if ni is not None:
+                s = np.asarray(g['nodes'][ni].get('scale') or [1, 1, 1],
+                               float)
+                norm_scale[ni] = float(np.abs(s).max())
     rs = wovr.apply_rest_scale_fix(g, ovr)
     rep['rest_scale_fix'] = rs
     _, wmat = wovr._world_idx(g)
@@ -81,6 +157,13 @@ def replay_glb(glb_path, unit, dry=False):
                     ibm_over.setdefault(si, {})[ji] = np.linalg.inv(
                         wmat(jn))
         dirty = dirty or bool(ibm_over)
+
+    # ── 1.5) 动画位移轨道空间约定收尾（rest_scale_fix 配套——
+    #      rest 吸收只改节点，剪辑里缩放空间写的 T 轨道不动会按 1/s 飞出）
+    if rs and rs.get('fixed'):
+        tr = rescale_scaled_space_tracks(g, binb, binb0, norm_scale)
+        rep['anim_trans_rescale'] = tr
+        dirty = dirty or any(r['rescaled'] for r in tr)
 
     # ── 2) 权重补丁（jmap_ovr/rest_scale_fix 以外的 kind/pred/mode）
     wpatch = [p for p in ovr.get('patches', [])
