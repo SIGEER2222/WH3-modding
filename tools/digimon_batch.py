@@ -1538,6 +1538,7 @@ def phase_bind(units):
                             [p["nrm"][:, 0], p["nrm"][:, 2],
                              -p["nrm"][:, 1]], 1)
             weights = bone_names = None
+            _ovr = _ovr_p = _orep = None
             if jmap_p.exists():
                 # carry source artist weights (remapped to target bones) as a
                 # synthetic skin so blender_rig2 'keep' mode preserves them
@@ -1545,8 +1546,61 @@ def phase_bind(units):
                 skel = json.loads(
                     (ud / f"skel_{rec['skel']}.json").read_text())
                 bone_names = [b["name"] for b in skel["bones"]]
+                # ---- wfix.ovr 钩子：jmap_ovr 先于权重移植合并
+                try:
+                    import wfix_ovr_replay as _wovr
+                    _ovr, _ovr_p = _wovr.load_ovr(key)
+                except Exception:
+                    pass
+                if _ovr:
+                    jmap, _ovk = _wovr.apply_jmap_ovr(jmap, _ovr)
                 weights = _remap_prim_weights(
                     _js, _bb, jmap, bone_names)
+                # ---- wfix.ovr 钩子：谓词补丁在骨名空间重放 + nzJ 守卫
+                if _ovr and weights is not None:
+                    _bpos = {}
+                    _wp = skel.get("world_pos_frame0") or []
+                    for _bi, _b in enumerate(skel["bones"]):
+                        if _bi < len(_wp):
+                            _bpos[_b["name"]] = np.array(_wp[_bi])
+                    _orep = {"path": _ovr_p, "prims": []}
+                    _pid = []  # per-node prim 下标（rigid_prim 语义键，
+                    for _n in _js.get("nodes", []):        #  与
+                        if "mesh" not in _n:               #  _remap_prim_weights
+                            continue                     #  同序）
+                        for _pi2 in range(len(_js["meshes"]
+                                              [_n["mesh"]]
+                                              .get("primitives", []))):
+                            _pid.append(_pi2)
+                    for _pi, _pw in enumerate(weights):
+                        if _pw is None:
+                            continue
+                        _jj, _ww = _pw
+                        _W = _wovr.slots_to_dense(
+                            _jj, _ww, len(bone_names))
+                        _W0 = _W.copy()
+                        _pr = _wovr.apply_patches(
+                            _W, bone_names,
+                            np.asarray(prims[_pi]["pos"]), _bpos, _ovr,
+                            prim_id=np.full(len(_W), _pid[_pi], np.int32))
+                        _pr["guard"] = _wovr.weight_guard(
+                            bone_names, _W0, bone_names, _W,
+                            dom_exclude={'animroot'})
+                        weights[_pi] = _wovr.dense_to_slots(_W)
+                        _orep["prims"].append(_pr)
+                    _orep["applied"] = sum(x.get("applied", 0)
+                                         for x in _orep["prims"])
+                    _orep["WEIGHT_FIX_RISK"] = any(
+                        x["guard"]["risk"] for x in _orep["prims"])
+                    try:
+                        (ud / "wfix_replay.json").write_text(
+                            json.dumps(_orep, ensure_ascii=False, indent=1),
+                            encoding="utf-8")
+                    except Exception:
+                        pass
+                    print(f"{key:34s} wfix.ovr replay "
+                          f"applied={_orep['applied']} "
+                          f"risk={_orep['WEIGHT_FIX_RISK']}")
             prims = [prims[i] for i in keep_idx]
             if weights is not None:
                 weights = [weights[i] for i in keep_idx]
@@ -1585,6 +1639,13 @@ def phase_bind(units):
                     _mx = _hi if _mx is None else np.maximum(_mx, _hi)
             if _mx is not None:
                 rec["mesh_h"] = round(float(_mx[1] - _mn[1]), 3)
+            if _ovr and weights is not None:
+                rec["wfix_ovr"] = {"applied": _orep["applied"],
+                                   "risk": bool(_orep["WEIGHT_FIX_RISK"]),
+                                   "stale": sorted({s for x in
+                                                    _orep["prims"]
+                                                    for s in
+                                                    x.get("stale", [])})}
             rec["phase_bind"] = "done"
             save_report(rep, {key})
         print(f"{key:32s} bind {'ok' if ok else 'FAIL (see bind_log.txt)'}")
