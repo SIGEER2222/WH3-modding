@@ -220,6 +220,13 @@ def run(unit, dry=False):
         ovr, ovr_path = wovr.load_ovr(unit)
         if ovr:
             old_map, ovr_keys = wovr.apply_jmap_ovr(old_map, ovr)
+    # ---- wfix.ovr rest_scale_fix：节点层归一（骨名→node scale→1 + 子树
+    #      全后代 T 烘焙吸收；rest 世界位逐点不动守卫内建）——IBM 逆补偿
+    #      在 skin 扩写处执行（W'_N 由 tWmat 按修后节点图算）
+    rs_rep = wovr.apply_rest_scale_fix(g, ovr) \
+        if (ovr and wovr is not None) else None
+    # 归一节点 + 其子树全部节点的世界阵线性部都变 → IBM 全要重算
+    rs_fixed = set(rs_rep['ibm_redo']) if rs_rep else set()
     spar_idx = parents_of(gs)
     spar = {gs['nodes'][i].get('name'): gs['nodes'][p].get('name')
             for i, p in spar_idx.items()}
@@ -478,11 +485,19 @@ def run(unit, dry=False):
         if n_new else np.zeros((0, 4, 4))
     for sk in g.get('skins', []):
         sk['joints'].extend(tnode_name[nm] for nm in new_names)
-        if n_new:
-            old = am.acc(g, binb, sk['inverseBindMatrices'])
-            al = np.vstack([old.reshape(-1, 16),
-                            np.transpose(ibm_new, (0, 2, 1))
-                            .reshape(-1, 16)]).astype(np.float32)
+        if n_new or rs_fixed:
+            old = np.asarray(
+                am.acc(g, binb, sk['inverseBindMatrices']),
+                np.float32).reshape(-1, 16).copy()
+            if rs_fixed:   # rest_scale_fix IBM 逆补偿（仅被归一关节，
+                for ji in range(len(old)):       #  其余层级不动）
+                    nm = g['nodes'][sk['joints'][ji]].get('name')
+                    if nm in rs_fixed:
+                        old[ji] = np.linalg.inv(
+                            tWmat(tnode_name[nm])).T.reshape(16)
+            al = np.vstack([old, np.transpose(ibm_new, (0, 2, 1))
+                            .reshape(-1, 16)]).astype(np.float32) \
+                if n_new else old
             sk['inverseBindMatrices'] = acc_write(g, binb, al, 5126, 'MAT4')
 
     # ---- rebuild weights in union joint-name space
@@ -600,9 +615,14 @@ def run(unit, dry=False):
               'lowmass_verts': int(low.sum()),
               'rest_file': rest_file,
               'n_K': len(kmap)}
+    if rs_rep is not None and (rs_rep['fixed'] or rs_rep['missing']):
+        report['rest_scale_fix'] = rs_rep
+        if rs_rep['rest_world_viol'] or rs_rep['missing']:
+            report.setdefault('WEIGHT_FIX_RISK', True)
     if ovr_rep is not None:  # wfix.ovr 重放记账 + 修权守卫告警
         report['wfix_ovr'] = ovr_rep
-        report['WEIGHT_FIX_RISK'] = ovr_rep['guard']['risk']
+        report['WEIGHT_FIX_RISK'] = ovr_rep['guard']['risk'] or \
+            bool(rs_rep and (rs_rep['rest_world_viol'] or rs_rep['missing']))
         for pi in ovr_rep.get('stale', []):
             report.setdefault('ovr_stale', []).append(pi)
     if dry:

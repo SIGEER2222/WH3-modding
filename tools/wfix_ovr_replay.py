@@ -15,6 +15,9 @@ kind 分派：
   reassign_pred   —— 谓词命中行按 mode 改写（top4 量化之前）
   residual_graft  —— 残域骨回植：∃b∈bones 且 d(v,bpos[b]) < ratio*d(v,bpos[dom])
                      的行主导槽改挂该 b
+  rest_scale_fix  —— 节点层（非权重）：骨名列 node.scale 归一 + 直系子
+                     translation×scale_old 烘焙吸收 + 调用方对归一关节
+                     重写 IBM=inv(W')；守卫=rest 世界位逐点 ε 不变
 
 谓词只走几何/骨名语义（禁用顶点索引）；谓词或 mode 不支持时打 stale/
 unsupported 告警进 report，绝不静默误改。
@@ -341,6 +344,117 @@ def _residual_graft(p, rows, W, names, ctx):
     return moved, None
 
 
+# ── rest_scale_fix（节点层 kind——不动 W，调用方在权重重放前/后均可）───
+def _node_local(n):
+    """glTF node → 4x4 局部阵（T·R·S；matrix 字段优先）。"""
+    if 'matrix' in n:
+        return np.array(n['matrix'], float).reshape(4, 4).T
+    t = n.get('translation', [0, 0, 0])
+    x, y, z, w = n.get('rotation', [0, 0, 0, 1])
+    s = n.get('scale', [1, 1, 1])
+    R = np.array([[1 - 2 * (y * y + z * z), 2 * (x * y - z * w),
+                   2 * (x * z + y * w)],
+                  [2 * (x * y + z * w), 1 - 2 * (x * x + z * z),
+                   2 * (y * z - x * w)],
+                  [2 * (x * z - y * w), 2 * (y * z + x * w),
+                   1 - 2 * (x * x + y * y)]])
+    m = np.eye(4)
+    m[:3, :3] = R * np.asarray(s, float)[None, :]
+    m[:3, 3] = t
+    return m
+
+
+def _world_idx(g):
+    """→ (par, wmat) 全节点世界阵（父链记忆化）。"""
+    nodes = g.get('nodes', [])
+    par = {}
+    for i, n in enumerate(nodes):
+        for c in n.get('children', []):
+            par[c] = i
+    wc = {}
+
+    def wmat(i):
+        if i not in wc:
+            wc[i] = _node_local(nodes[i]) if par.get(i) is None \
+                else wmat(par[i]) @ _node_local(nodes[i])
+        return wc[i]
+
+    for i in range(len(nodes)):
+        wmat(i)
+    return par, wmat
+
+
+def apply_rest_scale_fix(g, ovr, eps=1e-4):
+    """kind=rest_scale_fix 节点层重放：档列 node scale→[1,1,1]，子树全部
+    后代 translation 分量乘 scale_old 吸收（设计档写作"直系子"实测只保子代
+    世界位、孙代断链漂移——全后代吸收才满足 rest_world_unchanged 守卫；
+    均匀 s 严格恒等，非均匀+子旋转残留剪切可忽略，语料全均匀），拓扑序
+    父先归一使嵌套污染逐代累积正确。
+    返回 rep{fixed[],missing[],ibm_redo[](归一节点+其子树全部节点名,
+    世界阵线性部均变须重算 IBM=inv(W')),rest_world_max_dv,viol[]}。"""
+    rep = {'fixed': [], 'missing': [], 'ibm_redo': [], 'scale_drift': [],
+           'rest_world_max_dv': 0.0, 'rest_world_viol': []}
+    patches = [p for p in (ovr or {}).get('patches', [])
+               if p.get('kind') == 'rest_scale_fix']
+    if not patches:
+        return rep
+    nodes = g.get('nodes', [])
+    name_i = {n.get('name'): i for i, n in enumerate(nodes)}
+    par, wmat = _world_idx(g)
+    pre = {i: wmat(i)[:3, 3].copy() for i in range(len(nodes))}
+    todo = []
+    for p in patches:
+        for ent in p.get('nodes', []):
+            nm = ent.get('name')
+            i = name_i.get(nm)
+            if i is None:
+                rep['missing'].append(nm)
+                continue
+            if 'matrix' in nodes[i]:
+                rep['missing'].append(nm + ' (matrix form)')
+                continue
+            # 吸收因子取节点当前真实 scale（天然幂等：已归一则≈1 恒等）；
+            # 档 scale_old 仅作审计——偏差>1% 记 scale_drift
+            cur = np.asarray(nodes[i].get('scale') or [1, 1, 1], float)
+            rec = np.asarray(ent.get('scale_old') or cur, float)
+            if np.abs(cur - rec).max() > 0.01 * np.abs(rec).max():
+                rep['scale_drift'].append(
+                    {'name': nm, 'scale_old': rec.tolist(),
+                     'scale_now': cur.tolist()})
+            todo.append((i, cur))
+    depth = {}
+
+    def dep(i):
+        if i not in depth:
+            depth[i] = 0 if par.get(i) is None else dep(par[i]) + 1
+        return depth[i]
+
+    redo = set()
+    for i, sold in sorted(todo, key=lambda t: dep(t[0])):
+        n = nodes[i]
+        n['scale'] = [1.0, 1.0, 1.0]
+        rep['fixed'].append(n.get('name'))
+        redo.add(n.get('name'))
+        stack = list(n.get('children', []))
+        while stack:
+            c = stack.pop()
+            cn = nodes[c]
+            if 'matrix' not in cn:
+                t = np.asarray(cn.get('translation', [0, 0, 0]), float)
+                cn['translation'] = (t * sold).tolist()
+            redo.add(cn.get('name'))
+            stack += cn.get('children', [])
+    rep['ibm_redo'] = sorted(redo)
+    # rest 位不动守卫：修后世界位逐点对拍
+    _, wmat2 = _world_idx(g)
+    for i, p0 in pre.items():
+        dv = float(np.abs(wmat2(i)[:3, 3] - p0).max())
+        rep['rest_world_max_dv'] = max(rep['rest_world_max_dv'], dv)
+        if dv > eps:
+            rep['rest_world_viol'].append(nodes[i].get('name'))
+    return rep
+
+
 def apply_patches(W, names, pos, bpos, ovr, prim_id=None):
     """重放 OVR 补丁到权重矩阵 W（联合骨名空间，names=列名序）。
     prim_id=每顶点 prim 下标（per-node，rigid_prim 用）。hits=0 记 stale，
@@ -355,6 +469,10 @@ def apply_patches(W, names, pos, bpos, ovr, prim_id=None):
         ent = {'i': i, 'kind': kind, 'note': p.get('note', '')[:80]}
         if kind == 'jmap_ovr':
             ent['skipped'] = 'merged at map stage'  # 已在 map 阶段消费
+            rep['patches'].append(ent)
+            continue
+        if kind == 'rest_scale_fix':
+            ent['skipped'] = 'node-level: rest_scale stage'  # 节点层已消费
             rep['patches'].append(ent)
             continue
         az += p.get('assert_zero') or []

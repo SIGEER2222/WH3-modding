@@ -1539,6 +1539,25 @@ def phase_bind(units):
                              -p["nrm"][:, 1]], 1)
             weights = bone_names = None
             _ovr = _ovr_p = _orep = None
+            # ---- wfix.ovr 装载（jmap 无关——rest_scale_fix 是节点层补丁）
+            try:
+                import wfix_ovr_replay as _wovr
+                _ovr, _ovr_p = _wovr.load_ovr(key)
+            except Exception:
+                pass
+            if _ovr:
+                # rest_scale_fix：sjs/源 _js 双侧节点层归一（bind 输出骨架由
+                # skel json 重建本无 scale 面，此处防源层污染带入 + 记账）
+                _rs = _wovr.apply_rest_scale_fix(sjs, _ovr)
+                _rs2 = _wovr.apply_rest_scale_fix(_js, _ovr)
+                _orep = {"path": _ovr_p,
+                         "rest_scale": {"sjs": _rs, "src": _rs2},
+                         "prims": []}
+                if _rs["fixed"] or _rs2["fixed"] or _rs["missing"]:
+                    print(f"{key:34s} rest_scale_fix "
+                          f"sjs={len(_rs['fixed'])} src={len(_rs2['fixed'])} "
+                          f"miss={len(_rs['missing'])} "
+                          f"maxdv={_rs['rest_world_max_dv']:.2e}")
             if jmap_p.exists():
                 # carry source artist weights (remapped to target bones) as a
                 # synthetic skin so blender_rig2 'keep' mode preserves them
@@ -1547,11 +1566,6 @@ def phase_bind(units):
                     (ud / f"skel_{rec['skel']}.json").read_text())
                 bone_names = [b["name"] for b in skel["bones"]]
                 # ---- wfix.ovr 钩子：jmap_ovr 先于权重移植合并
-                try:
-                    import wfix_ovr_replay as _wovr
-                    _ovr, _ovr_p = _wovr.load_ovr(key)
-                except Exception:
-                    pass
                 if _ovr:
                     jmap, _ovk = _wovr.apply_jmap_ovr(jmap, _ovr)
                 weights = _remap_prim_weights(
@@ -1563,7 +1577,7 @@ def phase_bind(units):
                     for _bi, _b in enumerate(skel["bones"]):
                         if _bi < len(_wp):
                             _bpos[_b["name"]] = np.array(_wp[_bi])
-                    _orep = {"path": _ovr_p, "prims": []}
+                    _orep = _orep or {"path": _ovr_p, "prims": []}
                     _pid = []  # per-node prim 下标（rigid_prim 语义键，
                     for _n in _js.get("nodes", []):        #  与
                         if "mesh" not in _n:               #  _remap_prim_weights
@@ -1592,15 +1606,16 @@ def phase_bind(units):
                                          for x in _orep["prims"])
                     _orep["WEIGHT_FIX_RISK"] = any(
                         x["guard"]["risk"] for x in _orep["prims"])
-                    try:
-                        (ud / "wfix_replay.json").write_text(
-                            json.dumps(_orep, ensure_ascii=False, indent=1),
-                            encoding="utf-8")
-                    except Exception:
-                        pass
                     print(f"{key:34s} wfix.ovr replay "
                           f"applied={_orep['applied']} "
                           f"risk={_orep['WEIGHT_FIX_RISK']}")
+            if _orep is not None:   # 重放记账落盘（jmap 有无皆然）
+                try:
+                    (ud / "wfix_replay.json").write_text(
+                        json.dumps(_orep, ensure_ascii=False, indent=1),
+                        encoding="utf-8")
+                except Exception:
+                    pass
             prims = [prims[i] for i in keep_idx]
             if weights is not None:
                 weights = [weights[i] for i in keep_idx]
