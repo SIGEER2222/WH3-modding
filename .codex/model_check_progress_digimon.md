@@ -555,3 +555,37 @@ hu1 人形骨架（72 骨）缺尾/耳/须等解剖骨，automap 只能照抄坏
 ### 遗留
 - 全库矩阵回归跑批中（151 只 3 片）。
 - ophanimonfm 需人工源对齐；mastemon 地面黑片=资产自带阴影片（非手术产物）。
+
+## iter23（2026-09-27 午后）：阶段 0 归因棒——回归件补证 + 台账健康扫（B 线）
+
+- **三方对照基线**（`scratch/pipeline/dgm_audit/regress_baseline_20260927.md` + `_regress_census.json`/`_regress_headless.json`/`_regress_share.py`/`_tmp_nzw.py`）：10 回归件「现行 vs backup_pre_fix vs 修复后期望」逐骨普查——**管线内修复（源→bound）存活，离线 GLB 补丁全灭**：jaw_0/neck_0/head_0/breast_0/wing_4 等在档；B9 xfer OVR（rosemon/bm/lalamon）与 B8 残域离线补权（tail/fin/spine_2 深节）被重写浪潮回退病灶态。承皮率（任意槽占比）全 100% 非判别指标——用 nzW/主导骨集中度（metalseadramon top3 44→63%、ikkakumon 43→69%）。
+- **headless --only 10 件**：DSL 99P/55W/0F——rosemon 系塌缩态仍全绿=刚性伪绿盲区实证（回归验收须叠权重普查）；glb 侧 35F=src_* donor 剪辑层既有签名。新缺口：sn01×3+ikkakumon 报 COVERAGE_REGRESSION（扩编 wing_4/5/breast_0 有承皮未映射，gate30 同族在途）。
+- **台账健康扫**：有疑 38 逐件分因→翻回已查 6（carnosaur/kabuterimon/omegamonab/seraphimon/shinegreymon/magnamon，gen_ledger OVERRIDES 修正+注记）+边界 2（jesmonx 面检 tab/growlmon hair_0 COVERAGE）+真挂起 30；台账 104/38→**110/32**。
+- **并发修正**：gen_ledger.py 加 `<!-- score_card:begin/end -->` 托管块透传（根治每次重生成抹快照）；fix_v33_gaps 三件入 SKIN_OVR+FIXED（ophanimon 28→37/omegamonas 32→40 实测 nzW；lucemonfm 28 持平=dom 转正型修复）。
+- **风险坐实**：C10 wave2 graft 二次回滚——`glb_audit_batch1`（14:33）lucemonfm/ophanimon 内嵌仅 18 条（7 graft+11 src）=55 条已打掉；GRAFT_OVR 对 wave2 件记 62 clips 偏高，待扩编 lane 静默后 `graft_hu1_wave2.py --force-all` 复跑同步。score_card.json 活态漂 74.4→74.8（报告随跑随刷，v3.3 正式口径以 lane 静默后定稿为准）。
+
+
+## iter: 特征骨手术批跑 + 尺度桥修复 + 矩阵一轮（2026-09-27 续）
+
+### 本轮完成
+- 81/82 单元完成「还原.bak_srcanim → featbone 手术(补特征骨+权重重建) → src_*重灌」三段式批跑；ophanimonfm 被 nn_med=0.086 门控拦截（待人工 profile）
+- dgm_bindcheck 读函数修复：JOINTS_0 按整型原值读（此前误除 65535 造成"79 只权重塌缩"假象）；真审计 103/104 正常（gallantmonx 刚体武器件除外合法）
+- 绑定帧恒等检验全库 84 只 max=0.0000
+- 注入器废弃 K 绝对桥，改 scale-免疫 delta 旋转 + 全矩阵父级 FK + 根骨剪辑首帧锚定（修 seadramon 悬浮/kyubimon 飞出）
+- dgm_featbone 新骨 rest 平移改主导顶点簇质心兜底（修 magnamon rest 骨架 ~100 单位爆炸 → src_idle/attack 视觉+selfCheck 0 fail）；顺带修 binb0/binb 混用崩溃（ovr 钩子②）
+- coverage_debt.json 入账 66 模型/557 特征骨 → COVERAGE_REGRESSION 清零（抽验 angemon/mastemon/togemon 全过）
+
+### 矩阵一轮结果（151 模型, 2358 DSL + 3054 GLB clips）
+- DSL fail=15：magnaangemon×9 + veemonex×5（翼/披风随 donor 翻滚扫地 flyOut~2.5，画面连贯属已知权衡）+ vanilla_dragon01b×1（原版既有）
+- GLB fail=99：主要在 magnamon（rest 爆骨架已修→复测 0 fail）、metalseadramon/megaseadramon/wargrowlmon（frozenAux/pillar，巨型体 4%H 阈值偏紧 + 翼骨孤儿）
+- jibian FACE_GRAFT_SIDE 为其他 lane 已知项
+
+### 新发现债务
+- 解剖孤儿骨（map 有映射但 dump 无数据→无动画轨道）:gallantmon 56、magnamon 31、rosemonbm 8、togemon 4、machinedramon/metalseadramon/seadramon 各 2 → 需重导源动画或收 DSL 兜底
+- metalseadramon wing_2/3 目标原有骨无 src 对应 → src_* 中冻结；待补「有权重无驱动」兜底策略
+- ophanimonfm 仍卡 nn_med 门控
+
+### 证据
+- 截图:v4_seadramon_src_move/attack01、v4_kyubimon_src_move、v4_mastemon_src_attack01、v5_magnamon_idle/atk（Tabbit artifacts task-994ef408/task-292f7089）
+- selfCheck:magnamon 0 fail/38 clips;angemon/mastemon/togemon 0 fail 0 coverage issue
+- 绑定帧检验日志 84 max=0.0000

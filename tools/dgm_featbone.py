@@ -33,6 +33,11 @@ spec = importlib.util.spec_from_file_location(
 am = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(am)
 
+try:  # OVR 补丁档重放层（缺失时钩子静默不启——不阻塞写器主线）
+    import wfix_ovr_replay as wovr
+except Exception:
+    wovr = None
+
 FAM_PATS = [(r'tail|hippo|shippo', 'tail'), (r'ear|mimi', 'ear'),
             (r'whisker|hige', 'whisker'), (r'wing|tuba|hane', 'wing'),
             (r'horn|tuno|angle', 'horn'), (r'fin|hire', 'fin'),
@@ -209,6 +214,12 @@ def run(unit, dry=False):
     nn_dist = np.sqrt(((tn - sn[src_nn]) ** 2).sum(1))
 
     old_map = json.load(open(mp, encoding='utf-8'))
+    # ---- wfix.ovr 钩子①：jmap_ovr 先于 new_map 构建合并（B9 型语义槽纠正）
+    ovr, ovr_path, ovr_keys = (None, None, [])
+    if wovr is not None:
+        ovr, ovr_path = wovr.load_ovr(unit)
+        if ovr:
+            old_map, ovr_keys = wovr.apply_jmap_ovr(old_map, ovr)
     spar_idx = parents_of(gs)
     spar = {gs['nodes'][i].get('name'): gs['nodes'][p].get('name')
             for i, p in spar_idx.items()}
@@ -414,6 +425,22 @@ def run(unit, dry=False):
             p = spar.get(p)
         return 'root' if 'root' in tset else 'animroot'
 
+    # anchor = weighted centroid of each new bone's dominant verts in tgt
+    # space — immune to src-file scale conventions (C_glb@B translation can
+    # land ~10x off when no IBM-scale-matching source exists, cf magnamon)
+    anchor = {}
+    sname_i0 = {nm2: i for i, nm2 in enumerate(snames)}
+    for s in new_bones:
+        ci = sname_i0.get(s)
+        if ci is None:
+            continue
+        wcol = sW[src_nn, ci]
+        tot = float(wcol.sum())
+        if tot > 1e-6:
+            anchor[s] = (wcol @ tpos) / tot
+    tp_ext = float(np.abs(tpos).max()) or 1.0
+    anchor_fallback = []
+
     node_world = {}
     for s in order:
         nm = new_bones[s]
@@ -423,6 +450,13 @@ def run(unit, dry=False):
             return {'fail': f'no parent node {par_nm}'}
         parW = tWmat(pi)
         W = tgt_bind(s)             # exact src bind world in tgt space
+        a = anchor.get(s)
+        if a is None or abs(W[:3, 3]).max() > 3 * tp_ext:
+            if a is None:
+                anchor_fallback.append(s)
+                a = np.zeros(3)
+            W = W.copy()
+            W[:3, 3] = a
         L = np.linalg.inv(parW) @ W
         sc = np.linalg.norm(L[:3, :3], axis=0)
         q = mat_quat(L[:3, :3] / np.maximum(sc, 1e-9))
@@ -473,6 +507,39 @@ def run(unit, dry=False):
               'W_new rowsum med', float(np.median(W_new.sum(1))),
               'low', int(low.sum()), 'tpos', len(tpos))
     W_new /= np.maximum(W_new.sum(1, keepdims=True), 1e-9)
+
+    # ---- wfix.ovr 钩子②：谓词补丁在联合空间 W_new 上重放（low 兜底后、
+    #      top4 量化/回写前——此时语义空间已并集化，dom 判别有效）+ nzJ 守卫
+    ovr_rep = None
+    if ovr and wovr is not None:
+        names_new = list(jcol)
+        bpos = {}  # 骨 rest 世界位 = inv(IBM) 平移列（谓词几何判别用）
+        for sk in g.get('skins', []):
+            # skins were already extended above — accessor lives in binb
+            ibm = am.acc(g, binb, sk['inverseBindMatrices'])
+            ibm = np.asarray(ibm).reshape(-1, 4, 4)
+            for ji, jn in enumerate(sk['joints']):
+                nm = g['nodes'][jn].get('name')
+                if nm not in bpos:
+                    bpos[nm] = np.linalg.inv(ibm[ji])[:3, 3]
+        prim_id = np.full(len(tpos), -1, np.int32)  # per-node prim 下标
+        off = 0                                    # （rigid_prim 语义键）
+        for ni2, n2 in enumerate(g['nodes']):
+            if 'mesh' not in n2 or 'skin' not in n2:
+                continue
+            for pi2, p2 in enumerate(
+                    g['meshes'][n2['mesh']].get('primitives', [])):
+                at2 = p2.get('attributes', {})
+                if 'JOINTS_0' not in at2 or 'WEIGHTS_0' not in at2:
+                    continue
+                nv2 = am.acc(g, binb0, at2['POSITION']).shape[0]
+                prim_id[off:off + nv2] = pi2
+                off += nv2
+        ovr_rep = wovr.apply_patches(W_new, names_new, tpos, bpos, ovr,
+                                   prim_id=prim_id)
+        ovr_rep['path'] = ovr_path
+        ovr_rep['guard'] = wovr.weight_guard(tnames, tW, names_new, W_new,
+                                             dom_exclude={'animroot'})
 
     # ---- rewrite JOINTS_0/WEIGHTS_0 per skinned prim (same order as
     #      skin_data concatenation)
@@ -528,10 +595,16 @@ def run(unit, dry=False):
               'mirrored': bool(mirrored),
               'new_bones': {s: new_bones[s] for s in order},
               'n_new': n_new, 'fixed_map': fixed,
+              'anchor_fallback': anchor_fallback,
               'remapped_fam': remapped_fam,
               'lowmass_verts': int(low.sum()),
               'rest_file': rest_file,
               'n_K': len(kmap)}
+    if ovr_rep is not None:  # wfix.ovr 重放记账 + 修权守卫告警
+        report['wfix_ovr'] = ovr_rep
+        report['WEIGHT_FIX_RISK'] = ovr_rep['guard']['risk']
+        for pi in ovr_rep.get('stale', []):
+            report.setdefault('ovr_stale', []).append(pi)
     if dry:
         return report
 
@@ -547,6 +620,9 @@ def run(unit, dry=False):
         struct.pack('<I', len(jout)) + b'JSON' + jout + \
         struct.pack('<I', len(bout)) + b'BIN\x00' + bout
     open(bp, 'wb').write(out)
+    # OVR 覆写键防回灌——覆写值不烤进生成物 map.json，重放层每次重做
+    if wovr is not None and ovr_keys:
+        new_map = wovr.strip_ovr_keys(new_map, ovr_keys)
     json.dump(new_map, open(mp, 'w'), indent=1)
     json.dump(report,
               open(os.path.join(SA, unit, 'featbone_report.json'), 'w'),
