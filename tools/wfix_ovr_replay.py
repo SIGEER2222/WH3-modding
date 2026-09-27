@@ -344,6 +344,25 @@ def _residual_graft(p, rows, W, names, ctx):
     return moved, None
 
 
+def bind_positions(g, binb, acc_read):
+    """各 skin 关节 bind 世界位 = inv(IBM) 平移列（谓词几何判别用）。
+    glTF MAT4 accessor 列主序存储——reshape(-1,4,4) 得到 Mᵀ，必须转置
+    回行主序再取逆；漏转置时 inv(Mᵀ)[:3,3]=逆阵第 3 行≈原点（全零），
+    d/pos/top 类几何谓词全部锚到原点——lacy 验收 wiped-6 根因即此。"""
+    bpos = {}
+    for sk in g.get('skins', []):
+        if 'inverseBindMatrices' not in sk:
+            continue
+        ibm = np.asarray(acc_read(g, binb, sk['inverseBindMatrices']),
+                         np.float64).reshape(-1, 4, 4)
+        ibm = np.transpose(ibm, (0, 2, 1))   # 列主序存储 → 行主序数学阵
+        for ji, jn in enumerate(sk['joints']):
+            nm = g['nodes'][jn].get('name')
+            if nm not in bpos:
+                bpos[nm] = np.linalg.inv(ibm[ji])[:3, 3]
+    return bpos
+
+
 # ── rest_scale_fix（节点层 kind——不动 W，调用方在权重重放前/后均可）───
 def _node_local(n):
     """glTF node → 4x4 局部阵（T·R·S；matrix 字段优先）。"""

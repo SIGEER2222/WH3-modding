@@ -528,15 +528,9 @@ def run(unit, dry=False):
     ovr_rep = None
     if ovr and wovr is not None:
         names_new = list(jcol)
-        bpos = {}  # 骨 rest 世界位 = inv(IBM) 平移列（谓词几何判别用）
-        for sk in g.get('skins', []):
-            # skins were already extended above — accessor lives in binb
-            ibm = am.acc(g, binb, sk['inverseBindMatrices'])
-            ibm = np.asarray(ibm).reshape(-1, 4, 4)
-            for ji, jn in enumerate(sk['joints']):
-                nm = g['nodes'][jn].get('name')
-                if nm not in bpos:
-                    bpos[nm] = np.linalg.inv(ibm[ji])[:3, 3]
+        # 骨 bind 世界位 = inv(IBM) 平移列（am.acc 返回列主序字节——
+        # reshape 得 Mᵀ 须转置回正；漏转置恒锚原点=lacy wiped-6 根因）
+        bpos = wovr.bind_positions(g, binb, am.acc)
         prim_id = np.full(len(tpos), -1, np.int32)  # per-node prim 下标
         off = 0                                    # （rigid_prim 语义键）
         for ni2, n2 in enumerate(g['nodes']):
