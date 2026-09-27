@@ -138,8 +138,16 @@ def decode_verts(raw, count, vsize, vtype=4):
         nrm_b = a[:, 12:16].astype(np.float32)
         uv = a[:, 16:20].copy().view('<f2').reshape(count, 2).astype(np.float32)
     elif vsize == 32:        # v7 weighted: 两种布局
-        pos = a[:, 0:12].copy().view('<f4').reshape(count, 3)
-        if np.isfinite(pos).all() and np.abs(pos).max() < 1000:
+        # 判别依据改用 u8 权重和≈255（f16 字节按 f32 读常常是有限小值，
+        # pos 有限性不可信——necrarch 坑过：bi 越界 255 + pos 全乱）
+        bw_f32 = a[:, 16:20].astype(np.int32).sum(1)   # f32布局的权重位
+        bw_f16 = a[:, 12:16].astype(np.int32).sum(1)   # f16布局的权重位
+        pos32 = a[:, 0:12].copy().view('<f4').reshape(count, 3)
+        pos32_ok = np.isfinite(pos32).all() and np.abs(pos32).max() < 1000
+        ok32 = pos32_ok and \
+            np.abs(bw_f32 - 255).mean() < np.abs(bw_f16 - 255).mean()
+        if ok32:
+            pos = a[:, 0:12].copy().view('<f4').reshape(count, 3)
             bi = a[:, 12:16].copy(); bw = a[:, 16:20].copy()
             nrm_b = a[:, 20:24].astype(np.float32)
             uv = a[:, 24:28].copy().view('<f2').reshape(count, 2).astype(np.float32)
@@ -245,6 +253,9 @@ class Glb:
 
 # ------------------------------------------------------------------ textures
 
+TEX_MAX = 512          # 嵌入 PNG 最大边长（参考用途，省体积）
+
+
 def dds_to_png(dds_bytes, stem, workdir):
     """texconv.exe -> PNG bytes；失败返回 None。"""
     workdir = Path(workdir)
@@ -253,7 +264,8 @@ def dds_to_png(dds_bytes, stem, workdir):
     src.write_bytes(dds_bytes)
     try:
         r = subprocess.run(
-            [str(TEXCONV), '-ft', 'PNG', '-y', '-o', str(workdir), str(src)],
+            [str(TEXCONV), '-ft', 'PNG', '-w', str(TEX_MAX), '-h',
+             str(TEX_MAX), '-y', '-o', str(workdir), str(src)],
             capture_output=True, timeout=120)
         png = workdir / (stem + '.png')
         if png.exists() and png.stat().st_size > 100:
@@ -390,7 +402,23 @@ def export_unit(target, out_dir, clips=None, lod=0, no_tex=False,
     sk_file = files_dir / sk_iname.replace('/', '__')
     if not sk_file.exists():
         sk_file.write_bytes(sk_payload)
-    skel = parse_anim(sk_file)
+    try:
+        skel = parse_anim(sk_file)
+    except Exception:
+        # v6/v7 骨架 .anim（如 humanoid11b）：用 clip 解析器取 frame0 当 bind pose
+        cd = parse_anim_clip(sk_file)
+        part = cd['parts'][0]
+        if part['frames']:
+            pos, quat = resolve_locals(cd, 0, 0)
+        else:
+            st = part['static_frame']
+            pos = [st['transforms'][m - 10000] if m >= 10000
+                   else [0.0] * 3 for m in part['trans_map']]
+            quat = [st['quaternions'][m - 10000] if m >= 10000
+                    else [0.0, 0.0, 0.0, 1.0] for m in part['rot_map']]
+        skel = {'bones': cd['bones'], 'skeleton_name': cd['skeleton_name'],
+                'frames': [{'positions': pos, 'quaternions': quat}]}
+        print('skeleton via clip fallback v%d' % cd['version'])
     bones = skel['bones']
     wp, wq = world_transforms(skel, 0)      # frame0 = bind pose
 
@@ -429,8 +457,24 @@ def export_unit(target, out_dir, clips=None, lod=0, no_tex=False,
                                          out_dir / 'tex')
                         if png:
                             png_key = png
-                    except Exception as exc:
-                        print('tex miss', base, exc)
+                    except Exception:
+                        # 老单位材质常引用不存在的 *_diffuse.dds 路径，
+                        # 按文件名在整个索引里兜底
+                        try:
+                            fn = Path(base).name.casefold()
+                            hits = [(p2, e2) for n2, lst in pack_index().items()
+                                    if n2.endswith('/' + fn) and n2.endswith('.dds')
+                                    for p2, e2 in lst]
+                            if hits:
+                                dds = read_pack_payload(*hits[0])
+                                png = dds_to_png(dds, Path(base).stem,
+                                                 out_dir / 'tex')
+                                if png:
+                                    png_key = png
+                            else:
+                                print('tex miss', base)
+                        except Exception as exc:
+                            print('tex miss', base, exc)
             img_cache[base] = png_key
             mesh_tex.append(png_key)
     else:
