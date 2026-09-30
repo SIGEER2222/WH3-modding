@@ -5,6 +5,7 @@
 !/mod_files/
 /mod_files/*
 !/mod_files/czx_chop_90fix/
+!/mod_files/czx_first_tick_guard/
 !/mod_files/czx_ia_90fix/
 !/mod_files/czx_saf_90fix/
 !/mod_files/czx_summon_lord_pool/

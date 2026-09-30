@@ -1,0 +1,26 @@
+czx_first_tick_guard — first-tick 回调隔离补丁（诊断+修复二合一）
+
+根因（2026-10-01 已定位，script_log_011026_0633）：
+wh3_confid_get.pack 遮蔽原版 script/campaign/wh2_dlc09_books_of_nagash_effects.lua，
+其重写版不定义 bon_effects 全局。wh_start.lua:212 `bon_effects:add_listeners()`
+在新战役 first-tick shared 列表中段（start_game_all_factions 的 Tomb Kings 段之后）
+对 nil 解引用抛错；vanilla call_each 无错误隔离 -> 其后全部 mod 回调被跳过，
+且该未捕获错误不写 script_log（无 SCRIPT ERROR）。受害回调：wyc_choujiang 抽奖
+按钮、wyccc_starting_characters 开局英雄、czx_summon_lord_pool 领主池、
+wyccc_base_incident_queue、psw_guard 等——全部静默丢失。
+旧播放集能跑是因为 pj_formations CNs.pack 的 pj_error_wrapping.lua 对每个回调套
+xpcall（旧日志里 BIG FAT SCRIPT ERROR bon_effects nil 就是它兜住的），当前
+播放集不含 pj_formations -> 裸跑必炸。
+注意：这不是 SAF 的 force_declare_war 问题——SAF 的报错被它自己的 pcall 接住，
+不中断链表（92.0s 报错后 sp_new 继续跑完 Cap2 end）。
+
+包含三层修复：
+1. !czx_first_tick_guard.lua：monkey-patch campaign_manager.process_first_tick_callbacks
+   与 ui_created，每个回调单独 xpcall 隔离；失败打印 [czx_ft_guard] 列表名/序号/
+   来源文件（debug.getinfo short_src:linedefined）与堆栈，其余回调继续。
+   从此任何 mod first-tick 出错不再连环拖死后续回调。
+2. zz_czx_bon_effects_restore.lua：加载期补回被 confid 删掉的 bon_effects 全局
+   （原版表 + add_listeners；监听器名加 czx_ 前缀，不顶替 confid 已在用的
+   VolkmarBooksOfNagashZeal 等同名监听器）。直接消掉 wh_start:212 的断点。
+3. zzz_czx_choujiang_button_fix.lua：兜底——加载屏关闭后检查 button_group_management
+   下 choujiang 组件，缺失则补建（get_or_create_component 幂等），最多重试 30 次 x 2s。

@@ -15260,7 +15260,7 @@
 			allowhorizontalresize="false"
 			allowverticalresize="false"
 			docking="Bottom Right"
-			dock_offset="-64.00,-80.00"
+			dock_offset="-180.00,-190.00"
 			component_anchor_point="1.00,1.00"
 			tooltipslocalised="true"
 			uniqueguid="5077447E-1839-4015-93959DFDDE764293"
@@ -15332,12 +15332,11 @@
 					uniqueguid="288FA480-2832-45A9-9BEA63AB70CB8F87"/>
 			</states>
 			<LayoutEngine
-				type="RadialList"
-				starting_angle="3.64773798"
-				arc="3.490659"
-				spacing="0.715584993"
-				radius="95"
-				clockwise="true"/>
+				type="List"
+				itemsperrow="5"
+				reverse_order="false"
+				vertical_alignment="Bottom"
+				horizontal_alignment="Left"/>
 		</button_group_management>
 		<button_group_settlement
 			this="11D24E7A-0030-4C11-914DA88366B76682"
