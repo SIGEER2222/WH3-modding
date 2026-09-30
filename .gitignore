@@ -6,6 +6,7 @@
 /mod_files/*
 !/mod_files/czx_chop_90fix/
 !/mod_files/czx_ia_90fix/
+!/mod_files/czx_summon_lord_pool/
 !/mod_files/dgm_megas/
 !/mod_files/zzz_czx_ancillary_sell/
 !/mod_files/zzz_czx_fast_end_turn/

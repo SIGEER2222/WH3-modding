@@ -1,0 +1,1 @@
+英灵召唤领主招募池补丁Lin_Summon_Servant.pack恢复旧版领主行为：9/30 工坊更新把英灵召唤从 spawn_character_to_pool("general") 重写为 create_agent（dignitary/wizard/champion 事务官），10 个 lin_all_* 从者全部只能以英雄身份入场。本补丁在 campaign first tick 把全部 10 个从者以 general 注入每个人类派系的领主招募池（saved_value 幂等，每战役一次，旧档读档也会补放），并补回新版删掉的名字表（names_name_789930001-010）。原版抽奖/召唤事务官功能不受影响，领主版与英雄版可同时存在。排在 Lin_Summon_Servant.pack 之后。
