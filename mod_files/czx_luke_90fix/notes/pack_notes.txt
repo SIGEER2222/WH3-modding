@@ -1,1 +1,0 @@
-9.0 兼容补丁：Luke_King_of_Knight_hero_WH3.pack 的部分 DB 表仍为旧版布局，已按当前原版版本重编码并同路径遮蔽：battle_vortexs_tables, land_units_to_unit_abilites_junctions_tables。需排在目标 pack 之前。

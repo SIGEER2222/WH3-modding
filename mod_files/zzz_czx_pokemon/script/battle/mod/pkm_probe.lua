@@ -1,1 +1,0 @@
-out("PKM_PROBE_BATTLE_LOADED")

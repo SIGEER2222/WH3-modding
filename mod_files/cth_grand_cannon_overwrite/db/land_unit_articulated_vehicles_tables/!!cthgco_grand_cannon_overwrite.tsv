@@ -1,3 +1,0 @@
-key	ammo_caisson_entity	ammo_caisson_destruction	ammo_caisson_model	ammo_caisson_destroyed_model	articulated_entity	head_offset	engine_articulation_node_index	draughts_articulation_node_index	is_train
-#land_unit_articulated_vehicles_tables;6;db/land_unit_articulated_vehicles_tables/!!cthgco_grand_cannon_overwrite									
-cthgco_cth_art_grand_cannon_articulation_fast		vmp_black_coach_01			cthgco_cth_art_grand_cannon_articulation_fast	1.8000	2	0	false

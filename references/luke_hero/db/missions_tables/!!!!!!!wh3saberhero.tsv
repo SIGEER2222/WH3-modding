@@ -1,4 +1,0 @@
-﻿key	mission_type	localised_title	localised_description	ui_image	ui_icon	generate	prioritised	event_category	set_piece_battle	location_x	location_y	quest_mission	quest_mission_final	trigger_radius	quest_character	sticky_by_default	localised_mission_completed_text	can_be_manually_cancelled
-#missions_tables;0;db/missions_tables/!!!!!!!wh3saberhero																		
-saber_missions	MOVE_TO_REGION	saber_missions	saber_missions	emp/generic	rom_event_mission.png	false	true	Quest		0	0	false	false	0.0		true	Success! You have achieved one of your goals.	false
-saber_missions_chaos	MOVE_TO_REGION	saber_missions_chaos	saber_missions_chaos	emp/generic	rom_event_mission.png	false	true	Quest		0	0	false	false	0.0		true	Success! You have achieved one of your goals.	false

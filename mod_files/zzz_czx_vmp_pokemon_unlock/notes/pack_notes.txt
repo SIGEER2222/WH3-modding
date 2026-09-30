@@ -1,1 +1,0 @@
-可选 Pokemon 战役解锁补丁：仅为 Vampire Counts 的一级死灵法师建筑增加 Pokemon 招募入口，不接入 AI 随机军池。启用前请确认机器内存余量。

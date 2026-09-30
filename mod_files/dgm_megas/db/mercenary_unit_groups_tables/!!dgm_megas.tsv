@@ -1,0 +1,26 @@
+chance_to_replenish	key	max_count	unit_record	use_partial_replenishment	max_replenish_per_turn	ui_order
+#mercenary_unit_groups_tables;3;db/mercenary_unit_groups_tables/!!dgm_megas
+100.0	dgm_chr359_lillymon	1	dgm_chr359_lillymon	true	0.34	0
+100.0	dgm_chr027_blackwargreymon	1	dgm_chr027_blackwargreymon	true	0.34	0
+100.0	dgm_chr105_gallantmon_cm	1	dgm_chr105_gallantmon_cm	true	0.34	0
+100.0	dgm_chr329_ancientgreymon	1	dgm_chr329_ancientgreymon	true	0.34	0
+100.0	dgm_chr331_ancientgarurumon	1	dgm_chr331_ancientgarurumon	true	0.34	0
+100.0	dgm_chr013_gallantmon	1	dgm_chr013_gallantmon	true	0.34	0
+100.0	dgm_chr749_mr_jesmon_alt	1	dgm_chr749_mr_jesmon_alt	true	0.34	0
+100.0	dgm_chr019_dorugoramon	1	dgm_chr019_dorugoramon	true	0.34	0
+100.0	dgm_chr213_slayerdramon	1	dgm_chr213_slayerdramon	true	0.34	0
+100.0	dgm_chr350_examon	1	dgm_chr350_examon	true	0.34	0
+100.0	dgm_chr215_examon_alt	1	dgm_chr215_examon_alt	true	0.34	0
+100.0	dgm_chr036_barbamon	1	dgm_chr036_barbamon	true	0.34	0
+100.0	dgm_chr600_venommyotismon	1	dgm_chr600_venommyotismon	true	0.34	0
+100.0	dgm_chr675_magnagarurumon	1	dgm_chr675_magnagarurumon	true	0.34	0
+100.0	dgm_chr678_magnagarurumon_sv	1	dgm_chr678_magnagarurumon_sv	true	0.34	0
+100.0	dgm_chr733_dianamon	1	dgm_chr733_dianamon	true	0.34	0
+100.0	dgm_chr734_craniamon	1	dgm_chr734_craniamon	true	0.34	0
+100.0	dgm_chr737_justimon	1	dgm_chr737_justimon	true	0.34	0
+100.0	dgm_chr738_dynasmon	1	dgm_chr738_dynasmon	true	0.34	0
+100.0	dgm_chr740_ravemon	1	dgm_chr740_ravemon	true	0.34	0
+100.0	dgm_chr742_lotosmon	1	dgm_chr742_lotosmon	true	0.34	0
+100.0	dgm_chr766_alphamon_alt	1	dgm_chr766_alphamon_alt	true	0.34	0
+100.0	dgm_chr773_valkyrimon	1	dgm_chr773_valkyrimon	true	0.34	0
+100.0	dgm_chr118_chaosmon	1	dgm_chr118_chaosmon	true	0.34	0

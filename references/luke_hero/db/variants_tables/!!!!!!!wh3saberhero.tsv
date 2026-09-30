@@ -1,6 +1,0 @@
-﻿variant_name	tech_folder	variant_filename	low_poly_filename	mount_scale	scale	scale_variation	super_low_poly_filename
-#variants_tables;6;db/variants_tables/!!!!!!!wh3saberhero							
-saber		saber01		1.0	1.0499999523162842	0.0	
-saber01		saber01		1.0	1.0499999523162842	0.0	
-saber02		saber02		1.0	1.0499999523162842	0.0	
-saber_knight		saber_knight	hu1\brt\brt_grail_knights\low_poly\brt_grail_knights_lowlod	1.0	1.0	0.05000000074505806	hu1\imposter\humanoid_imposter

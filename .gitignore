@@ -1,44 +1,36 @@
-# User-maintained art source assets.
-assets/
+# Version control scope: only mod sources enabled in playset "20261001"
+# (WycccModManager current playset, verified 2026-10-01).
+# Everything else in this workspace stays on disk but is untracked.
+/*
+!/mod_files/
+/mod_files/*
+!/mod_files/czx_chop_90fix/
+!/mod_files/czx_ia_90fix/
+!/mod_files/dgm_megas/
+!/mod_files/zzz_czx_ancillary_sell/
+!/mod_files/zzz_czx_fast_end_turn/
+!/mod_files/zzz_czx_prison_default/
+!/mod_files/zzz_czx_swarm_units/
+!/mod_files/zzz_psw_merged/
+!/.gitignore
+!/.gitattributes
 
-# User-maintained Blender manual-editing workspace (.blend binaries, large).
-manual_edit/
-
-# Read-only reference data and local tools.
-bilingual/
-gamedata/
-rpfm*/
-tools/AssetEditor/
-
-# Local junction/symlink to the wyccc mod manager repo
-# (no trailing slash: it is a junction/symlink, not a real directory).
-wyccc-warhammer-mod-manager
-
-# WorkBuddy local session state + project memory (contains hardlinks that
-# alias .codex/project_context.md and AGENTS.md; keep out of version control).
-.workbuddy/
-
-# Generated packaging and release outputs.
-mod_output/
-workshop_release/
-
-# Temporary / experimental scratch space.
-# Put one-off scripts, dumps, screenshots, and unrelated local changes here.
-# Files in this directory are intentionally not tracked.
-scratch/
-__pycache__/
-*.pack.bak
-
-# Tools-only output / downloaded / binary / test / intermediate directories.
-# Any tools/_<name>/ directory is a non-tracked working dir by convention.
-tools/_*/
-tools/qtrme/
+# Large binary resources are not versioned (bulky / non-diffable).
+*.dds
+*.rigid_model_v2
+*.wsmodel
+*.anim
+*.animpack
+*.bone_inv_trans_mats
 *.glb
-
-# Root-level hygiene backstop: temp/junk must live under scratch/, not the
-# repo root. These patterns keep `git status` clean if something is still
-# created at the top level by mistake.
-/_tmp_*
-/_preview/
-/_work_*/
-mod_files/czx_battle_tactical_commander/czx_battle_tactical_commander/
+*.pack
+*.pack.bak
+*.wem
+*.wav
+*.ogg
+*.mp3
+*.flac
+*.ca_vp8
+*.ivf
+*.bnk
+__pycache__/

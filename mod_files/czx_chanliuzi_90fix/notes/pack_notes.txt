@@ -1,1 +1,0 @@
-9.0 兼容补丁：!!!zt_chanliuzi.pack 的部分 DB 表仍为旧版布局，已按当前原版版本重编码并同路径遮蔽：agent_subtypes_tables, battle_entities_tables, battle_vortexs_tables, campaign_character_art_sets_tables, land_units_tables, land_units_to_unit_abilites_junctions_tables, special_ability_groups_to_units_junctions_tables。需排在目标 pack 之前。

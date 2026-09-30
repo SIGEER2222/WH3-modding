@@ -1,0 +1,26 @@
+ability	land_unit	culture
+#land_units_to_unit_abilites_junctions_tables;1;db/land_units_to_unit_abilites_junctions_tables/!!dgm_megas
+dgm_chr359_skill	dgm_chr359_lillymon	*
+dgm_chr027_skill	dgm_chr027_blackwargreymon	*
+dgm_chr105_skill	dgm_chr105_gallantmon_cm	*
+dgm_chr329_skill	dgm_chr329_ancientgreymon	*
+dgm_chr331_skill	dgm_chr331_ancientgarurumon	*
+dgm_chr013_skill	dgm_chr013_gallantmon	*
+dgm_chr749_mr_skill	dgm_chr749_mr_jesmon_alt	*
+dgm_chr019_skill	dgm_chr019_dorugoramon	*
+dgm_chr213_skill	dgm_chr213_slayerdramon	*
+dgm_chr350_skill	dgm_chr350_examon	*
+dgm_chr215_skill	dgm_chr215_examon_alt	*
+dgm_chr036_skill	dgm_chr036_barbamon	*
+dgm_chr600_skill	dgm_chr600_venommyotismon	*
+dgm_chr675_skill	dgm_chr675_magnagarurumon	*
+dgm_chr678_skill	dgm_chr678_magnagarurumon_sv	*
+dgm_chr733_skill	dgm_chr733_dianamon	*
+dgm_chr734_skill	dgm_chr734_craniamon	*
+dgm_chr737_skill	dgm_chr737_justimon	*
+dgm_chr738_skill	dgm_chr738_dynasmon	*
+dgm_chr740_skill	dgm_chr740_ravemon	*
+dgm_chr742_skill	dgm_chr742_lotosmon	*
+dgm_chr766_skill	dgm_chr766_alphamon_alt	*
+dgm_chr773_skill	dgm_chr773_valkyrimon	*
+dgm_chr118_skill	dgm_chr118_chaosmon	*

@@ -1,0 +1,26 @@
+faction	unit	name	variant	unit_card
+#unit_variants_tables;5;db/unit_variants_tables/!!dgm_megas
+	dgm_chr359_lillymon	dgm_chr359	dgm_chr359	dgm_chr359
+	dgm_chr027_blackwargreymon	dgm_chr027	dgm_chr027	dgm_chr027
+	dgm_chr105_gallantmon_cm	dgm_chr105	dgm_chr105	dgm_chr105
+	dgm_chr329_ancientgreymon	dgm_chr329	dgm_chr329	dgm_chr329
+	dgm_chr331_ancientgarurumon	dgm_chr331	dgm_chr331	dgm_chr331
+	dgm_chr013_gallantmon	dgm_chr013	dgm_chr013	dgm_chr013
+	dgm_chr749_mr_jesmon_alt	dgm_chr749_mr	dgm_chr749_mr	dgm_chr749_mr
+	dgm_chr019_dorugoramon	dgm_chr019	dgm_chr019	dgm_chr019
+	dgm_chr213_slayerdramon	dgm_chr213	dgm_chr213	dgm_chr213
+	dgm_chr350_examon	dgm_chr350	dgm_chr350	dgm_chr350
+	dgm_chr215_examon_alt	dgm_chr215	dgm_chr215	dgm_chr215
+	dgm_chr036_barbamon	dgm_chr036	dgm_chr036	dgm_chr036
+	dgm_chr600_venommyotismon	dgm_chr600	dgm_chr600	dgm_chr600
+	dgm_chr675_magnagarurumon	dgm_chr675	dgm_chr675	dgm_chr675
+	dgm_chr678_magnagarurumon_sv	dgm_chr678	dgm_chr678	dgm_chr678
+	dgm_chr733_dianamon	dgm_chr733	dgm_chr733	dgm_chr733
+	dgm_chr734_craniamon	dgm_chr734	dgm_chr734	dgm_chr734
+	dgm_chr737_justimon	dgm_chr737	dgm_chr737	dgm_chr737
+	dgm_chr738_dynasmon	dgm_chr738	dgm_chr738	dgm_chr738
+	dgm_chr740_ravemon	dgm_chr740	dgm_chr740	dgm_chr740
+	dgm_chr742_lotosmon	dgm_chr742	dgm_chr742	dgm_chr742
+	dgm_chr766_alphamon_alt	dgm_chr766	dgm_chr766	dgm_chr766
+	dgm_chr773_valkyrimon	dgm_chr773	dgm_chr773	dgm_chr773
+	dgm_chr118_chaosmon	dgm_chr118	dgm_chr118	dgm_chr118

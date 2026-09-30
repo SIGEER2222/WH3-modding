@@ -1,4 +1,0 @@
-﻿character_level	character_name	forename	magic_lore	num_men	surname	unit_type	agent_type	agent_subtype	portrait	character_model	skillset	male
-#battle_set_piece_armies_characters_tables;8;db/battle_set_piece_armies_characters_tables/!!!!!!!wh3saberhero												
-1	saber	114514191		100	651241916	saber	champion	saber	ui/portraits/portholes/wh_main_brt_bretonnia/saber	1145998		false
-1	saber_01	114514191		100	651241916	saber_1	champion	saber	ui/portraits/portholes/wh_main_brt_bretonnia/saber	1145998		false

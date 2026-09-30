@@ -1,0 +1,26 @@
+unit_caste	unit_category	unit_class	unit_record	unit_set	exclude
+#unit_set_to_unit_junctions_tables;1;db/unit_set_to_unit_junctions_tables/!!dgm_megas
+			dgm_chr359_lillymon	dgm_digimon_all	false
+			dgm_chr027_blackwargreymon	dgm_digimon_all	false
+			dgm_chr105_gallantmon_cm	dgm_digimon_all	false
+			dgm_chr329_ancientgreymon	dgm_digimon_all	false
+			dgm_chr331_ancientgarurumon	dgm_digimon_all	false
+			dgm_chr013_gallantmon	dgm_digimon_all	false
+			dgm_chr749_mr_jesmon_alt	dgm_digimon_all	false
+			dgm_chr019_dorugoramon	dgm_digimon_all	false
+			dgm_chr213_slayerdramon	dgm_digimon_all	false
+			dgm_chr350_examon	dgm_digimon_all	false
+			dgm_chr215_examon_alt	dgm_digimon_all	false
+			dgm_chr036_barbamon	dgm_digimon_all	false
+			dgm_chr600_venommyotismon	dgm_digimon_all	false
+			dgm_chr675_magnagarurumon	dgm_digimon_all	false
+			dgm_chr678_magnagarurumon_sv	dgm_digimon_all	false
+			dgm_chr733_dianamon	dgm_digimon_all	false
+			dgm_chr734_craniamon	dgm_digimon_all	false
+			dgm_chr737_justimon	dgm_digimon_all	false
+			dgm_chr738_dynasmon	dgm_digimon_all	false
+			dgm_chr740_ravemon	dgm_digimon_all	false
+			dgm_chr742_lotosmon	dgm_digimon_all	false
+			dgm_chr766_alphamon_alt	dgm_digimon_all	false
+			dgm_chr773_valkyrimon	dgm_digimon_all	false
+			dgm_chr118_chaosmon	dgm_digimon_all	false

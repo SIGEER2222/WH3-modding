@@ -1,0 +1,26 @@
+key	precursor	default_projectile	audio_type	use_secondary_ammo_pool	hide_secondary_range_ammo_statistics_ui
+#missile_weapons_tables;12;db/missile_weapons_tables/!!dgm_megas
+dgm_chr359_shot	false	dgm_chr359_shot		false	false
+dgm_chr027_shot	false	dgm_chr027_shot		false	false
+dgm_chr105_shot	false	dgm_chr105_shot		false	false
+dgm_chr329_shot	false	dgm_chr329_shot		false	false
+dgm_chr331_shot	false	dgm_chr331_shot		false	false
+dgm_chr013_shot	false	dgm_chr013_shot		false	false
+dgm_chr749_mr_shot	false	dgm_chr749_mr_shot		false	false
+dgm_chr019_shot	false	dgm_chr019_shot		false	false
+dgm_chr213_shot	false	dgm_chr213_shot		false	false
+dgm_chr350_shot	false	dgm_chr350_shot		false	false
+dgm_chr215_shot	false	dgm_chr215_shot		false	false
+dgm_chr036_shot	false	dgm_chr036_shot		false	false
+dgm_chr600_shot	false	dgm_chr600_shot		false	false
+dgm_chr675_shot	false	dgm_chr675_shot		false	false
+dgm_chr678_shot	false	dgm_chr678_shot		false	false
+dgm_chr733_shot	false	dgm_chr733_shot		false	false
+dgm_chr734_shot	false	dgm_chr734_shot		false	false
+dgm_chr737_shot	false	dgm_chr737_shot		false	false
+dgm_chr738_shot	false	dgm_chr738_shot		false	false
+dgm_chr740_shot	false	dgm_chr740_shot		false	false
+dgm_chr742_shot	false	dgm_chr742_shot		false	false
+dgm_chr766_shot	false	dgm_chr766_shot		false	false
+dgm_chr773_shot	false	dgm_chr773_shot		false	false
+dgm_chr118_shot	false	dgm_chr118_shot		false	false

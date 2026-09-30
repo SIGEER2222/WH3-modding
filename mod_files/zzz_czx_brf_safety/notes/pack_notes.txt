@@ -1,8 +1,0 @@
-招募筛选栏安全补丁：同路径遮蔽 !better_recruitment_ui.pack 的 better_recruit_filter.lua。
-
-原版在 PanelOpenedCampaign/ComponentLClickUp 派发内联做全树遍历 + CreateComponent/SetVisible；组件在 lock_ui 级联窗内被拆除时反复触发原生空指针崩（+0x22c0f80/+0x112e6a6 族，2026-09-28 晚 2052/2125 两会话崩前最后日志均为其内联建 12 个筛选按钮）。
-
-修补：派发回调只做 Lua 侧判断，树操作一律 cm:callback 推迟出派发窗；进树前复查 ui_locked 与 units_panel 仍开；持锁有限重试（8×0.5s），面板已关即放弃。筛选点击（toggle_group/tier_filter）同样推迟 0.1s 出点击派发窗。
-
-注意：本包必须排在 !better_recruitment_ui.pack 之前（同路径文件遮蔽靠前胜出）；dependencies.txt 仅记录关系，不能当排序手段。
-2026-09-29 追加：ui/campaign ui/!!!units_panel.twui.xml 现为**原版 v142 布局内容**（从 ui3.pack 提取），同路径遮蔽工坊包自带的 742KB 旧版整拷贝。工坊布局是过气原版底本 + 手工重构（缺 79 个原版组件：dlc29_emp_rituals_panel_docker、tab_infernal_legions、dy_vmp_province_corpses、template_recruitment_entry 改名 template_recuitment_entry 等），recruitment_options 子树结构差异大；塞特拉档战后解锁→开合招募面板窗口 +0x22c8774 写型 UAF 四次复发，全部桩证 mod 写者干净后，该 stale 布局是崩窗组件内唯一未排除的结构性差异。筛选栏由 lua 动态 CreateComponent 进 recruitment_options，不依赖布局文件，功能不受影响；损失仅为 mod 的版面调整（mercenary frame/2 行等视觉项）。

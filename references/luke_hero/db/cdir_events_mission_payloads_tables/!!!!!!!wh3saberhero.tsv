@@ -1,4 +1,0 @@
-﻿id	mission_key	payload_key	status_key	value	target_key
-#cdir_events_mission_payloads_tables;2;db/cdir_events_mission_payloads_tables/!!!!!!!wh3saberhero					
-522024667	saber_missions	EFFECT_BUNDLE	SUCCESS	KEY[saber_join];DURATION[0];GLOBAL	default
-322598632	saber_missions_chaos	EFFECT_BUNDLE	SUCCESS	KEY[saber_join];DURATION[0];GLOBAL	default

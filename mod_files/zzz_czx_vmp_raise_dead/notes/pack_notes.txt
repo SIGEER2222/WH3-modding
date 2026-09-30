@@ -1,1 +1,0 @@
-Vampire Counts 死者苏生池补丁：把虫群/数码兽/宝可梦的初级单位放进 wh3_dlc29_vmp_raise_dead_faction 与 wh3_dlc29_vmp_raise_dead_province 两个 raise_dead 池（9.0 改名后真实键；旧 wh_main_vmp_*_pool 已不存在），开局召唤面板即可见到（跳虫×2，其余初级×1）；高阶单位（雷兽级/进化型/飞龙/德哈卡）初始 0、max_count 999999 随战斗痕迹补员。须配合 zzz_czx_vmp_unit_unlock / zzz_czx_vmp_pokemon_unlock 的派系与军组许可使用；数码兽行需 zzz_czx_digimon_v2 本体加载才生效。

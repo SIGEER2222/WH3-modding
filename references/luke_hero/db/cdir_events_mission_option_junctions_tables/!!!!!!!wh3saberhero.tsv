@@ -1,7 +1,0 @@
-﻿id	mission_key	option_key	value	target
-#cdir_events_mission_option_junctions_tables;2;db/cdir_events_mission_option_junctions_tables/!!!!!!!wh3saberhero				
-3120632	saber_missions_chaos	GEN_TARGET_REGION		default
-31202666	saber_missions_chaos	GEN_CND_REGION	wh3_main_chaos_region_marienburg	default
-666021834	saber_missions_chaos	VAR_MISSION_LENGTH_INFINITE		default
-31266835	saber_missions_chaos	VAR_FOLLOWUP_CHANCE	100	default
-31202166	saber_missions_chaos	VAR_CHANCE	100	default

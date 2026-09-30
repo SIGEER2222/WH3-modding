@@ -1,0 +1,4 @@
+Digimon dgm_megas (upstream dgm build) — standalone digimon units.
+Converted from C:\Users\22448\Downloads\dgm_megas.pack (RPFM TSV-source export).
+Namespace dgm_* / chrXXX; independent of zzz_czx_digimon_v2 (czx_*).
+Recruitment: v2-style fan-out (tier1->512 bldgs, tier2->165, tier3+/5->45; 104 military groups; 25 custom-battle factions; 28 culture animpacks).

@@ -1,1 +1,0 @@
-9.0 兼容补丁：修复 Random_Legendary_Heroes_Arthas 的旧版 DB 表（battle_vortexs/mercenary/missile_weapons/land_units_to_unit_abilites 等 5 张按当前原版版本重编码并同路径遮蔽）；重命名已被 9.0 移除的 unit_set 引用（skv_infantry→skv_all、vmp_corpses→vmp_corpse_units、wh2_dlc11_emp_...→emp_infantry）；并将过期的 dilemma.twui.xml 还原为当前 v142 原版（旧版使用了 9.0 已改名的 CanMakeChoice/MakeChoice 调用签名）。需排在目标 pack 之前。

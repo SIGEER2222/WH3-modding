@@ -1,8 +1,0 @@
-﻿generate	key	localised_description	localised_title	ui_image	prioritized	event_category	sound_popup_override	sound_click_override	override_icon	is_large_dilemma
-#dilemmas_tables;3;db/dilemmas_tables/!!!!!!!wh3saberhero										
-true	dilemma_saber			dilemma_saber	true	Event	UI_CAM_EVENT_Dilemma			false
-true	dilemma_saber_ksl			dilemma_saber	true	Event	UI_CAM_EVENT_Dilemma			false
-true	dilemma_saber_emp			dilemma_saber	true	Event	UI_CAM_EVENT_Dilemma			false
-true	dilemma_saber_brt			dilemma_saber	true	Event	UI_CAM_EVENT_Dilemma			false
-true	dilemma_saber_hef			dilemma_saber	true	Event	UI_CAM_EVENT_Dilemma			false
-true	dilemma_saber_dwf			dilemma_saber	true	Event	UI_CAM_EVENT_Dilemma			false

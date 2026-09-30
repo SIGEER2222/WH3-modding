@@ -1,1 +1,0 @@
-覆盖强化原版震旦巨炮 wh3_main_cth_art_grand_cannon_0：炮门 4→8、炮组 44→88 人、炮组/炮身/牛/articulation 实体血量翻倍、wh2_main_heavy_metal_160 最高护甲、移速翻倍、近战攻防 +50/冲锋 25、新破甲近战武器 cthgco_cth_grand_cannon_melee_ap60、新高角弹道远程武器 cthgco_cth_grand_cannon_high_1000_750（射程 750、弹速 1000、弹药 x5、装填 6s）并可切换爆破弹（范围 7 爆炸）、fire_arc 180°、抵御冲锋/先锋部署/永不战败/再生、damage_mod_all=50、招募回合 1、继承役农长柄矛手全部招募建筑许可。单位 key 沿用原版，存档兼容。

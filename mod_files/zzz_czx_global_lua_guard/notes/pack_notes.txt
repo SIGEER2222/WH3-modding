@@ -1,1 +1,0 @@
-全局 Lua 回调防护：包住 core 监听器及可替换的 campaign/battle callback，异常限流记录并阻止单个脚本回调中断事件泵；不能捕获 Warhammer3.exe 原生访问违例。

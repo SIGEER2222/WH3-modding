@@ -1,5 +1,0 @@
-unique_id	factor	resource	minimum	maximum	specific_faction_set	sort_order
-#pooled_resource_factor_junctions_tables;3;db/pooled_resource_factor_junctions_tables/psw_pql_资源因素
-psw_pql_qyyszf	psw_pql_qyyszf	psw_pql_qyyszf	-2147483647	2147483647		0
-psw_ewnl_cs_get	faction	psw_ewnl_cs	-2147483647	2147483647		0
-psw_ewnl_cs_use	faction	psw_ewnl_cs	-2147483647	2147483647		0

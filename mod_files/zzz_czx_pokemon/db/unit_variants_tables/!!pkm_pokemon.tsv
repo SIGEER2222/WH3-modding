@@ -1,9 +1,0 @@
-faction	name	unit	variant	unit_card
-#unit_variants_tables;5;db/unit_variants_tables/!!pkm_pokemon
-	pkm_001_bulbasaur	pkm_001_bulbasaur	pmv001	pm001
-	pkm_003_venusaur	pkm_003_venusaur	pmv003	pm003
-	pkm_004_charmander	pkm_004_charmander	pmv004	pm004
-	pkm_006_charizard	pkm_006_charizard	pmv006	pm006
-	pkm_007_squirtle	pkm_007_squirtle	pmv007	pm007
-	pkm_009_blastoise	pkm_009_blastoise	pmv009	pm009
-	pkm_025_pikachu	pkm_025_pikachu	pmv025	pm025

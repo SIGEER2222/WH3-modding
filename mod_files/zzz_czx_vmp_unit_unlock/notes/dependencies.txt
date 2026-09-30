@@ -1,3 +1,0 @@
-zzz_czx_swarm_units.pack
-# leishou/gou/cishe 的真模型与兵牌由 Imperial Arbiter 提供
-Imperial Arbiter.pack

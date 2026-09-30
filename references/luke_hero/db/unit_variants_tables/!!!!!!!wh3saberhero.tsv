@@ -1,7 +1,0 @@
-﻿faction	name	unit	variant	unit_card
-#unit_variants_tables;5;db/unit_variants_tables/!!!!!!!wh3saberhero				
-	saber	saber	saber02	saber
-	saber_1	saber_1	saber01	saber
-	saber_knight	saber_knight	saber_knight	wh_dlc07_brt_grail_guardians
-	saber_lord	saber_lord	saber02	saber
-	saber_1_lord	saber_1_lord	saber01	saber

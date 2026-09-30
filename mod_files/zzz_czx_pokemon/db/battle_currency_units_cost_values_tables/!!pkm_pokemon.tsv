@@ -1,9 +1,0 @@
-﻿cost_value	currency_type	item_type
-#battle_currency_units_cost_values_tables;0;db/battle_currency_units_cost_values_tables/!!pkm_pokemon
-600.0	supplies_currency	pkm_001_bulbasaur
-1500.0	supplies_currency	pkm_003_venusaur
-600.0	supplies_currency	pkm_004_charmander
-1500.0	supplies_currency	pkm_006_charizard
-600.0	supplies_currency	pkm_007_squirtle
-1500.0	supplies_currency	pkm_009_blastoise
-550.0	supplies_currency	pkm_025_pikachu

@@ -1,3 +1,0 @@
-chance_to_replenish	key	max_count	unit_record	use_partial_replenishment	max_replenish_per_turn	ui_order
-#mercenary_unit_groups_tables;3;db/mercenary_unit_groups_tables/psw_弹药单位组
-100.0	psw_boss_wh_dlc08_bst_mon_cygor_boss	0	psw_boss_wh_dlc08_bst_mon_cygor_boss	true	0.10000000149011612	0

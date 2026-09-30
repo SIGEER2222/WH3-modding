@@ -1,3 +1,0 @@
-group	initial_unit_count	key	pool	faction_requirement	subculture_requirement	tech_requirement
-#mercenary_pool_to_groups_junctions_tables;3;db/mercenary_pool_to_groups_junctions_tables/psw_弹药池关联组
-psw_boss_wh_dlc08_bst_mon_cygor_boss	1	1924080912	wh_dlc08_monster_hunt_of_renown_pool		wh_dlc03_sc_bst_beastmen	

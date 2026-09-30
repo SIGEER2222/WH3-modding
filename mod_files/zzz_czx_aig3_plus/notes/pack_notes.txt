@@ -1,1 +1,0 @@
-AI General III 战术补完：给 delegated 军队的 planner 常驻 doctrine 指令（rush→attack_unit，hold→defend_position+僵持爬行锚点），并对托管单位自动施放非被动技能（v1 烘焙表+黑名单移植）。需 aigeneral_iii_pancake 在前。

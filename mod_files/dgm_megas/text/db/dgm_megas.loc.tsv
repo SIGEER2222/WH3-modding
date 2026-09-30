@@ -1,0 +1,146 @@
+key	text	tooltip
+#Loc;1;text/db/dgm_megas.loc
+land_units_onscreen_name_dgm_chr359_lillymon	丁香兽 Lillymon	false
+unit_description_short_texts_text_dgm_chr359_lillymon	丁香兽 — 花仙炮 / 花之鞭	false
+unit_description_historical_texts_text_dgm_chr359_lillymon	A Fairy Digimon born from a blooming flower. Flower Cannon launches a petal-shaped energy bolt from its wrist flower. [Flower Cannon · Flower Wreath]	false
+unit_abilities_onscreen_name_dgm_chr359_skill	花仙炮 Flower Cannon	false
+unit_abilities_tooltip_text_dgm_chr359_skill	丁香兽 的招牌技能：花仙炮（Flower Cannon）。	false
+land_units_onscreen_name_dgm_chr027_blackwargreymon	黑暗战斗暴龙兽 BlackWarGreymon	false
+unit_description_short_texts_text_dgm_chr027_blackwargreymon	黑暗战斗暴龙兽 — 黑暗盖亚能量炮 / 黑色龙兽克星	false
+unit_description_historical_texts_text_dgm_chr027_blackwargreymon	A "Jet-Black Dragon Warrior" created from dark towers. Dark Terra Force condenses negative energy into a world-ending sphere. [Dark Terra Force · Black Dramon Killer]	false
+unit_abilities_onscreen_name_dgm_chr027_skill	黑暗盖亚能量炮 Dark Terra Force	false
+unit_abilities_tooltip_text_dgm_chr027_skill	黑暗战斗暴龙兽 的招牌技能：黑暗盖亚能量炮（Dark Terra Force）。	false
+land_units_onscreen_name_dgm_chr105_gallantmon_cm	红莲骑士兽·真红莲形态 Gallantmon CM	false
+unit_description_short_texts_text_dgm_chr105_gallantmon_cm	红莲骑士兽·真红莲形态 — 君往何处 / 神圣之枪	false
+unit_description_historical_texts_text_dgm_chr105_gallantmon_cm	Gallantmon's hidden form unsealed with Grani's power. Quo Vadis disintegrates the target into electrons with a crimson spear-light. [Quo Vadis · Lightning Joust]	false
+unit_abilities_onscreen_name_dgm_chr105_skill	君往何处 Quo Vadis	false
+unit_abilities_tooltip_text_dgm_chr105_skill	红莲骑士兽·真红莲形态 的招牌技能：君往何处（Quo Vadis）。	false
+land_units_onscreen_name_dgm_chr329_ancientgreymon	古代暴龙兽 AncientGreymon	false
+unit_description_short_texts_text_dgm_chr329_ancientgreymon	古代暴龙兽 — 欧米茄爆裂 / 古代龙颚	false
+unit_description_historical_texts_text_dgm_chr329_ancientgreymon	An Ancient Dragon Warrior of legend, one of the Ten Warriors. Omega Burst releases fire energy surpassing modern eruptions. [Omega Burst · Ancient Jaws]	false
+unit_abilities_onscreen_name_dgm_chr329_skill	欧米茄爆裂 Omega Burst	false
+unit_abilities_tooltip_text_dgm_chr329_skill	古代暴龙兽 的招牌技能：欧米茄爆裂（Omega Burst）。	false
+land_units_onscreen_name_dgm_chr331_ancientgarurumon	古代加鲁鲁兽 AncientGarurumon	false
+unit_description_short_texts_text_dgm_chr331_ancientgarurumon	古代加鲁鲁兽 — 绝对零度 / 双刃大剑	false
+unit_description_historical_texts_text_dgm_chr331_ancientgarurumon	An Ancient Beast Warrior of legend, wielder of twin great swords. Absolute Zero freezes the battlefield at -273°C. [Absolute Zero · Sharp Blade Claymore]	false
+unit_abilities_onscreen_name_dgm_chr331_skill	绝对零度 Absolute Zero	false
+unit_abilities_tooltip_text_dgm_chr331_skill	古代加鲁鲁兽 的招牌技能：绝对零度（Absolute Zero）。	false
+land_units_onscreen_name_dgm_chr013_gallantmon	红莲骑士兽 Gallantmon	false
+unit_description_short_texts_text_dgm_chr013_gallantmon	红莲骑士兽 — 皇家救星 / 圣枪格拉墨	false
+unit_description_historical_texts_text_dgm_chr013_gallantmon	A Holy Knight Digimon of the Royal Knights, clad in 99.9% Chrondigizoit. Royal Saber purifies evil with its holy lance. [Royal Saber · Gram Lance]	false
+unit_abilities_onscreen_name_dgm_chr013_skill	皇家救星 Royal Saber	false
+unit_abilities_tooltip_text_dgm_chr013_skill	红莲骑士兽 的招牌技能：皇家救星（Royal Saber）。	false
+land_units_onscreen_name_dgm_chr749_mr_jesmon_alt	杰斯兽(MR) Jesmon (Alt)	false
+unit_description_short_texts_text_dgm_chr749_mr_jesmon_alt	杰斯兽(MR) — 压倒剑阵 / 剑灵突贯	false
+unit_description_historical_texts_text_dgm_chr749_mr_jesmon_alt	An alternate rendering of Jesmon — same Royal Knight, different armour pack. Its blade spirits strike as one. [Iron Judgment · Blade Spirit Rush]	false
+unit_abilities_onscreen_name_dgm_chr749_mr_skill	压倒剑阵 Iron Judgment	false
+unit_abilities_tooltip_text_dgm_chr749_mr_skill	杰斯兽(MR) 的招牌技能：压倒剑阵（Iron Judgment）。	false
+land_units_onscreen_name_dgm_chr019_dorugoramon	多路战龙兽 Dorugoramon	false
+unit_description_short_texts_text_dgm_chr019_dorugoramon	多路战龙兽 — 多路神灵 / 巨龙之爪	false
+unit_description_historical_texts_text_dgm_chr019_dorugoramon	A Beast Dragon Digimon of the X-Antibody "Dest" legend. Brave Metal drops colossal mass upon the enemy. [Brave Metal · Dragon Kaiser]	false
+unit_abilities_onscreen_name_dgm_chr019_skill	多路神灵 Brave Metal	false
+unit_abilities_tooltip_text_dgm_chr019_skill	多路战龙兽 的招牌技能：多路神灵（Brave Metal）。	false
+land_units_onscreen_name_dgm_chr213_slayerdramon	斩龙兽 Slayerdramon	false
+unit_description_short_texts_text_dgm_chr213_slayerdramon	斩龙兽 — 天龙斩破 / 斩龙大剑	false
+unit_description_historical_texts_text_dgm_chr213_slayerdramon	A Dragon Man Digimon whose only purpose is slaying dragons. Tenryu Slash cleaves with the greatsword Fragarach. [Tenryu Slash · Fragarach]	false
+unit_abilities_onscreen_name_dgm_chr213_skill	天龙斩破 Tenryu Slash	false
+unit_abilities_tooltip_text_dgm_chr213_skill	斩龙兽 的招牌技能：天龙斩破（Tenryu Slash）。	false
+land_units_onscreen_name_dgm_chr350_examon	艾克萨兽 Examon	false
+unit_description_short_texts_text_dgm_chr350_examon	艾克萨兽 — 龙帝之光 / 龙帝之爪	false
+unit_description_historical_texts_text_dgm_chr350_examon	The Dragon Emperor, a Holy Knight Digimon of impossible mass. Pendragon's Glory fires its wings as a laser; Avalon's Gate ends all. [Pendragon's Glory · Dragon's Demise]	false
+unit_abilities_onscreen_name_dgm_chr350_skill	龙帝之光 Pendragon's Glory	false
+unit_abilities_tooltip_text_dgm_chr350_skill	艾克萨兽 的招牌技能：龙帝之光（Pendragon's Glory）。	false
+land_units_onscreen_name_dgm_chr215_examon_alt	艾克萨兽·初代 Examon Alt	false
+unit_description_short_texts_text_dgm_chr215_examon_alt	艾克萨兽·初代 — 阿瓦隆之门 / 龙枪安布罗修斯	false
+unit_description_historical_texts_text_dgm_chr215_examon_alt	A Dragon Emperor Digimon and Holy Knight. Avalon's Gate summons a meteor strike; the lance Ambrosius skewers all. [Avalon's Gate · Ambrosius Lance]	false
+unit_abilities_onscreen_name_dgm_chr215_skill	阿瓦隆之门 Avalon's Gate	false
+unit_abilities_tooltip_text_dgm_chr215_skill	艾克萨兽·初代 的招牌技能：阿瓦隆之门（Avalon's Gate）。	false
+land_units_onscreen_name_dgm_chr036_barbamon	巴尔巴兽 Barbamon	false
+unit_description_short_texts_text_dgm_chr036_barbamon	巴尔巴兽 — 万魔殿狂宴 / 死亡诱惑	false
+unit_description_historical_texts_text_dgm_chr036_barbamon	A Demon Lord of greed, one of the Seven Deadly Sins. Pandemonium Lost drags victims into a feast of dark flame. [Pandemonium Lost · Death Lure]	false
+unit_abilities_onscreen_name_dgm_chr036_skill	万魔殿狂宴 Pandemonium Lost	false
+unit_abilities_tooltip_text_dgm_chr036_skill	巴尔巴兽 的招牌技能：万魔殿狂宴（Pandemonium Lost）。	false
+land_units_onscreen_name_dgm_chr600_venommyotismon	怨毒吸血魔兽 VenomMyotismon	false
+unit_description_short_texts_text_dgm_chr600_venommyotismon	怨毒吸血魔兽 — 猛毒灌注 / 暴君凶蛮	false
+unit_description_historical_texts_text_dgm_chr600_venommyotismon	A colossal Beast Digimon of pure malice. Venom Infusion floods the field with corrosive ichor. [Venom Infusion · Tyrant Savage]	false
+unit_abilities_onscreen_name_dgm_chr600_skill	猛毒灌注 Venom Infusion	false
+unit_abilities_tooltip_text_dgm_chr600_skill	怨毒吸血魔兽 的招牌技能：猛毒灌注（Venom Infusion）。	false
+land_units_onscreen_name_dgm_chr675_magnagarurumon	铠甲加鲁鲁兽 MagnaGarurumon	false
+unit_description_short_texts_text_dgm_chr675_magnagarurumon	铠甲加鲁鲁兽 — 恒星猎手 / 装甲冲击	false
+unit_description_historical_texts_text_dgm_chr675_magnagarurumon	An Android Digimon, one of the Ten Legendary Warriors of Light. Starburst Hunter unloads every gunport at once. [Starburst Hunter · Armor Rush]	false
+unit_abilities_onscreen_name_dgm_chr675_skill	恒星猎手 Starburst Hunter	false
+unit_abilities_tooltip_text_dgm_chr675_skill	铠甲加鲁鲁兽 的招牌技能：恒星猎手（Starburst Hunter）。	false
+land_units_onscreen_name_dgm_chr678_magnagarurumon_sv	铠甲加鲁鲁兽SV MagnaGarurumon SV	false
+unit_description_short_texts_text_dgm_chr678_magnagarurumon_sv	铠甲加鲁鲁兽SV — 星光爆裂 / 全弹齐射	false
+unit_description_historical_texts_text_dgm_chr678_magnagarurumon_sv	MagnaGarurumon's special-variant frame. Starburst Velocity releases a saturation missile storm. [Starburst Velocity · Full Barrage]	false
+unit_abilities_onscreen_name_dgm_chr678_skill	星光爆裂 Starburst Velocity	false
+unit_abilities_tooltip_text_dgm_chr678_skill	铠甲加鲁鲁兽SV 的招牌技能：星光爆裂（Starburst Velocity）。	false
+land_units_onscreen_name_dgm_chr733_dianamon	狄安娜兽 Dianamon	false
+unit_description_short_texts_text_dgm_chr733_dianamon	狄安娜兽 — 新月钩镰 / 月神之箭	false
+unit_description_historical_texts_text_dgm_chr733_dianamon	A Deity Digimon of the Olympos XII, mistress of the moon. Crescent Harken cuts with blades of frozen moonlight. [Crescent Harken · Arrow of Artemis]	false
+unit_abilities_onscreen_name_dgm_chr733_skill	新月钩镰 Crescent Harken	false
+unit_abilities_tooltip_text_dgm_chr733_skill	狄安娜兽 的招牌技能：新月钩镰（Crescent Harken）。	false
+land_units_onscreen_name_dgm_chr734_craniamon	颅骨兽 Craniamon	false
+unit_description_short_texts_text_dgm_chr734_craniamon	颅骨兽 — 神佑降临 / 魔枪克劳·索拉斯	false
+unit_description_historical_texts_text_dgm_chr734_craniamon	A Holy Knight Digimon shielded by the Black Wall. God Bless hardens its armor; the magic lance Claiomh Solais pierces. [God Bless · Claiomh Solais]	false
+unit_abilities_onscreen_name_dgm_chr734_skill	神佑降临 God Bless	false
+unit_abilities_tooltip_text_dgm_chr734_skill	颅骨兽 的招牌技能：神佑降临（God Bless）。	false
+land_units_onscreen_name_dgm_chr737_justimon	裁决兽 Justimon	false
+unit_description_short_texts_text_dgm_chr737_justimon	裁决兽 — 正义踢击 / 三相臂刃	false
+unit_description_historical_texts_text_dgm_chr737_justimon	A hero Digimon bearing justice on its right arm. The Accel Arm transforms for sword, blaster or hammer blows. [Justice Kick · Accel Arm]	false
+unit_abilities_onscreen_name_dgm_chr737_skill	正义踢击 Justice Kick	false
+unit_abilities_tooltip_text_dgm_chr737_skill	裁决兽 的招牌技能：正义踢击（Justice Kick）。	false
+land_units_onscreen_name_dgm_chr738_dynasmon	杜纳斯兽 Dynasmon	false
+unit_description_short_texts_text_dgm_chr738_dynasmon	杜纳斯兽 — 龙息冲击 / 龙镖投掷	false
+unit_description_historical_texts_text_dgm_chr738_dynasmon	A Royal Knight Digimon fused with dragon power. Breath of Wyvern breathes a torrent of draconic fire. [Breath of Wyvern · Dragon Thrower]	false
+unit_abilities_onscreen_name_dgm_chr738_skill	龙息冲击 Breath of Wyvern	false
+unit_abilities_tooltip_text_dgm_chr738_skill	杜纳斯兽 的招牌技能：龙息冲击（Breath of Wyvern）。	false
+land_units_onscreen_name_dgm_chr740_ravemon	渡鸦兽 Ravemon	false
+unit_description_short_texts_text_dgm_chr740_ravemon	渡鸦兽 — 爆裂风枪 / 渡鸦螺旋爪	false
+unit_description_historical_texts_text_dgm_chr740_ravemon	A Cyborg Bird Digimon whose left wing is jet-black steel. Spiral Raven Claw shreds foes in a dark whirlwind. [Blast Wing · Spiral Raven Claw]	false
+unit_abilities_onscreen_name_dgm_chr740_skill	爆裂风枪 Blast Wing	false
+unit_abilities_tooltip_text_dgm_chr740_skill	渡鸦兽 的招牌技能：爆裂风枪（Blast Wing）。	false
+land_units_onscreen_name_dgm_chr742_lotosmon	莲花兽 Lotosmon	false
+unit_description_short_texts_text_dgm_chr742_lotosmon	莲花兽 — 七彩恩典 / 蛇藤汲取	false
+unit_description_historical_texts_text_dgm_chr742_lotosmon	A Fairy Digimon born of a lotus flower. Seven's Grace unleashes rainbow petals that heal and burn alike. [Seven's Grace · Serpent Drain]	false
+unit_abilities_onscreen_name_dgm_chr742_skill	七彩恩典 Seven's Grace	false
+unit_abilities_tooltip_text_dgm_chr742_skill	莲花兽 的招牌技能：七彩恩典（Seven's Grace）。	false
+land_units_onscreen_name_dgm_chr766_alphamon_alt	阿尔法兽·改 Alphamon Alt	false
+unit_description_short_texts_text_dgm_chr766_alphamon_alt	阿尔法兽·改 — 灵魂数据化 / 王龙剑	false
+unit_description_historical_texts_text_dgm_chr766_alphamon_alt	An alternate-model Alphamon, the Aloof Hermit of the Royal Knights, wielder of the Ouryuken blade. [Digitalize of Soul · Ouryuken]	false
+unit_abilities_onscreen_name_dgm_chr766_skill	灵魂数据化 Digitalize of Soul	false
+unit_abilities_tooltip_text_dgm_chr766_skill	阿尔法兽·改 的招牌技能：灵魂数据化（Digitalize of Soul）。	false
+land_units_onscreen_name_dgm_chr773_valkyrimon	女武神兽 Valkyrimon	false
+unit_description_short_texts_text_dgm_chr773_valkyrimon	女武神兽 — 激光标枪 / 芬里尔之剑	false
+unit_description_historical_texts_text_dgm_chr773_valkyrimon	A Bird Warrior Digimon of Nordic legend. Its golden bird Flare hurls Laser Javelins; the Fenrir Sword freezes foes. [Laser Javelin · Fenrir Sword]	false
+unit_abilities_onscreen_name_dgm_chr773_skill	激光标枪 Laser Javelin	false
+unit_abilities_tooltip_text_dgm_chr773_skill	女武神兽 的招牌技能：激光标枪（Laser Javelin）。	false
+land_units_onscreen_name_dgm_chr118_chaosmon	混沌兽 Chaosmon	false
+unit_description_short_texts_text_dgm_chr118_chaosmon	混沌兽 — 暗黑日珥 / 霸王双剑	false
+unit_description_historical_texts_text_dgm_chr118_chaosmon	A chaos Digimon fused from BanchoLeomon and Darkdramon. Dark Prominence burns with the flame of a dark sun. [Dark Prominence · Bantyo Blade]	false
+unit_abilities_onscreen_name_dgm_chr118_skill	暗黑日珥 Dark Prominence	false
+unit_abilities_tooltip_text_dgm_chr118_skill	混沌兽 的招牌技能：暗黑日珥（Dark Prominence）。	false
+units_onscreen_name_dgm_chr359_lillymon	丁香兽 Lillymon	
+units_onscreen_name_dgm_chr027_blackwargreymon	黑暗战斗暴龙兽 BlackWarGreymon	
+units_onscreen_name_dgm_chr105_gallantmon_cm	红莲骑士兽·真红莲形态 Gallantmon CM	
+units_onscreen_name_dgm_chr329_ancientgreymon	古代暴龙兽 AncientGreymon	
+units_onscreen_name_dgm_chr331_ancientgarurumon	古代加鲁鲁兽 AncientGarurumon	
+units_onscreen_name_dgm_chr013_gallantmon	红莲骑士兽 Gallantmon	
+units_onscreen_name_dgm_chr749_mr_jesmon_alt	杰斯兽(MR) Jesmon (Alt)	
+units_onscreen_name_dgm_chr019_dorugoramon	多路战龙兽 Dorugoramon	
+units_onscreen_name_dgm_chr213_slayerdramon	斩龙兽 Slayerdramon	
+units_onscreen_name_dgm_chr350_examon	艾克萨兽 Examon	
+units_onscreen_name_dgm_chr215_examon_alt	艾克萨兽·初代 Examon Alt	
+units_onscreen_name_dgm_chr036_barbamon	巴尔巴兽 Barbamon	
+units_onscreen_name_dgm_chr600_venommyotismon	怨毒吸血魔兽 VenomMyotismon	
+units_onscreen_name_dgm_chr675_magnagarurumon	铠甲加鲁鲁兽 MagnaGarurumon	
+units_onscreen_name_dgm_chr678_magnagarurumon_sv	铠甲加鲁鲁兽SV MagnaGarurumon SV	
+units_onscreen_name_dgm_chr733_dianamon	狄安娜兽 Dianamon	
+units_onscreen_name_dgm_chr734_craniamon	颅骨兽 Craniamon	
+units_onscreen_name_dgm_chr737_justimon	裁决兽 Justimon	
+units_onscreen_name_dgm_chr738_dynasmon	杜纳斯兽 Dynasmon	
+units_onscreen_name_dgm_chr740_ravemon	渡鸦兽 Ravemon	
+units_onscreen_name_dgm_chr742_lotosmon	莲花兽 Lotosmon	
+units_onscreen_name_dgm_chr766_alphamon_alt	阿尔法兽·改 Alphamon Alt	
+units_onscreen_name_dgm_chr773_valkyrimon	女武神兽 Valkyrimon	
+units_onscreen_name_dgm_chr118_chaosmon	混沌兽 Chaosmon	
