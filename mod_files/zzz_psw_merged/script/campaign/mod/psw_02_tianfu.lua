@@ -913,12 +913,65 @@ local function psw_faction_button_pressed_listener(ui_button)
     true)
 end
 
+-- §10.40 护栏：first_tick 落在 loading-dismiss→intro 级联窗口内，内联跑
+-- psw_faction_button_created（find_uicomponent/CreateComponent/SetImagePath）
+-- 会命中半销毁 UI 树（+0x22c0f80/+0x26a93d6 UAF 族）。优先用全局 guard 的
+-- defer_until_intro_settled；无 guard 时用本地探测：纯引擎状态先行，前 6 次
+-- 不碰 UI 树，polls>=20 且连续 10s 全绿才放行，120s 硬兜底。
+local function czx_psw02_defer_until_intro_settled(fn)
+    local guard = rawget(_G, "CZX_LUA_GUARD")
+    if guard and type(guard.defer_until_intro_settled) == "function" then
+        guard.defer_until_intro_settled(fn)
+        return
+    end
+    local polls, stable = 0, 0
+    local function hazards_clear()
+        local ok_play, playing = pcall(function() return cm:is_intro_cutscene_playing() end)
+        if ok_play and playing then return false end
+        local ok_cs, any_cs = pcall(function() return cm:is_any_cutscene_running() end)
+        if ok_cs and any_cs then return false end
+        if polls < 6 then return false end
+        local ok_ls, ls_uic = pcall(function() local _, u = core:get_loading_screen() return u end)
+        if ok_ls and ls_uic then return false end
+        local ok_root, root = pcall(function() return core:get_ui_root() end)
+        if ok_root and root then
+            local ok_n, n = pcall(function() return root:ChildCount() end)
+            if ok_n and n then
+                for i = 0, n - 1 do
+                    local ok_c, c = pcall(function() return UIComponent(root:Find(i)) end)
+                    if ok_c and c then
+                        local ok_id, id = pcall(function() return c:Id() end)
+                        if ok_id and id and string.sub(tostring(id), 1, 14) == "movie_overlay_" then
+                            return false
+                        end
+                    end
+                end
+            end
+        end
+        return true
+    end
+    local function probe()
+        polls = polls + 1
+        if hazards_clear() then stable = stable + 1 else stable = 0 end
+        if (polls >= 20 and stable >= 10) or polls > 120 then
+            pcall(fn)
+        else
+            cm:real_callback(probe, 1000, "czx_psw02_intro_gate")
+        end
+    end
+    cm:real_callback(probe, 2000, "czx_psw02_intro_gate")
+end
+
 --- first tick
 
 cm:add_first_tick_callback(
 
     --Whenever the game first starts, we run this function. Which calls an event listener
     function()
+
+        -- §10.40：建按钮+挂监听器整体推迟到 intro 落定（监听器只服务按钮，
+        -- 落定前也点不到，一并推迟无副作用）
+        czx_psw02_defer_until_intro_settled(function()
 
         ui_root = core:get_ui_root()
 
@@ -932,15 +985,39 @@ cm:add_first_tick_callback(
             ui_tooltip = psw_tooltip
             ui_button = psw_button
             ui_button_image_path = psw_button_image_path
-            
+
             psw_faction_button_created(pswyoFactionName, ui_tooltip, ui_button, ui_button_image_path)
             psw_faction_button_pressed_listener(ui_button)
             out("#### wh2_main_lzd_hexoatl buttons ####")
 
-        
+            -- 兜底重试：docker 未就绪/创建失败时 psw_faction_button_created
+            -- 静默 return，无重试则按钮永久缺失；每 5s 重试直到按钮存在，
+            -- 上限 ~10min（按钮已存在时 psw_faction_button_created 仅置 visible）
+            local btn_tries = 0
+            local function psw_ensure_button()
+                btn_tries = btn_tries + 1
+                local missing = true
+                local ok = pcall(function()
+                    local root = core:get_ui_root()
+                    local bgm = root and find_uicomponent(root, "hud_campaign", "faction_buttons_docker", "button_group_management")
+                    if bgm then
+                        if not find_uicomponent(bgm, ui_button) then
+                            psw_faction_button_created(pswyoFactionName, ui_tooltip, ui_button, ui_button_image_path)
+                        end
+                        missing = not find_uicomponent(bgm, ui_button)
+                    end
+                end)
+                if (not ok or missing) and btn_tries < 120 then
+                    cm:real_callback(psw_ensure_button, 5000, "psw_ensure_button")
+                end
+            end
+            cm:real_callback(psw_ensure_button, 5000, "psw_ensure_button")
+
+
         end
 
-    out("#### FIRST STEP ####")
+        out("#### FIRST STEP ####")
+        end)
     end
 )
 

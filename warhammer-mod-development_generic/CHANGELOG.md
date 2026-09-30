@@ -1,3 +1,45 @@
+## 2026-09-30 回合级联 UAF 崩溃簇收口（references §10.44）
+
+1. **09-29 晚~09-30 早 6 dump 归因**：三次崩在 AI FactionTurnStart 级联中段（`+0x22c0f80`/`+0x132c34c`/`+0x22c8774`），两条已修未发的修复链 + 两个遗留测试驱动包叠加。`!ai_treasury` 的 `aifaction_name.lua` 每派系回合内联 ~700 次 UI 写（同包第二条写路径，treasury_guard 新版已遮蔽）；`czx_fast_end_turn` 的 `whose_turn_is_it` 禁写门构建错名未部署（部署名陷阱再发）。
+2. **手术**：移出 `zzz_czx_turn_watch`/`zzz_czx_newcamp_tmb` 两个 autotest 驱动包（123→121，备份 `state.db.bak_20260930_crashfix`）；修复包挂 `scratch/deploy_crashfix_on_exit.ps1` 待游戏退出字节覆盖部署。
+3. **判据新增**：工坊包遮蔽修复后仍崩→列全该包 lua 找其余内联写路径；诊断/驱动包验证完必须立即出 playset（turn_watch 的 DISMISS_IDS 含 accept/confirm，疑似替玩家点下合邦接受）。
+
+## 2026-09-27 Mod Manager 冲突报告落地（references §4.2）
+
+1. **能力落地**：`wyccc-warhammer-mod-manager` 新增「冲突报告」（RPC `get_conflict_report(deep)` + 前端 `ConflictReportModal`），对已启用播放集做静态三层盘点——同路径文件遮蔽（靠前胜）、mod↔vanilla 遮蔽（深度模式 twui 组件 id 集 / db 片段行级 diff）、DB 行级冲突（异名片段同主键，靠后覆盖），另列声明依赖缺失与过期 DB 片段（声明版本超前/解析失败）。
+2. **schema 沉淀**：`tools/schema/schema_wh3.ron` 全表 schema 烤成 `backend/wh3_db_schema_full.json`（1742 表/2337 版本，含 is_key 主键标记），DB 解码补 `OptionalI32`。
+3. **真集验证**（113 项存档集 `d8c514a3`）：快扫 ~2s / 深扫 ~15s——168 同路径遮蔽、1662 vanilla 遮蔽、1567 行级冲突、1 缺失依赖（`czx_mod_fixes`→`!!_nanu_dynamic_rors` 失效）；命中 PSW horde 表等已知冲突类。
+4. **解码修正**（同日晚复核）：首版报出的"60 过期 DB 片段"实为两个解码器缺口，已修后归零——无版本标记片段须按 **v0** 定义解析（RPFM 惯例，非最高版本）；pack 压缩载荷补 **LZMA1** 格式（`u32 大小 + 0x5d + u32 dict + 裸流`，`@z_double_skill_points` 全包此前静默漏读）。`parse_db_table` 加 `force_version` 兜底扫描：声明版本失配时遍历已知版本再判 invalid。
+
+## 2026-09-27 preferences 分辨率改动归因盘点（references §10.43）
+
+1. **用户报障"脚本一直改分辨率"→ 排查定案**：工作区内唯一写 `x_res/y_res` 的脚本是 `scratch/_deploy_psw_on_exit.sh`（09-26 21:19 一次性 watcher，sed 复位 1920×1080，是恢复方）；真正把 prefs 弄成 1024×768 的是 `bisect_prefs.ps1` 式截断写 + 崩溃/kill 导致 prefs 重生成——CA 默认 1024×768@居中(604,227) 被干净退出写回。
+2. **澄清**：`wh3_click.py` SetWindowPos 仅 z-order；`_uia_resize*.ps1` 只动 AssetEditor；MOD Lua 无写分辨率键（FET 的三条 gfx/内存 SetPref 已于 09-23 删）。排查口径与预防写入 references §10.43。
+
+## 2026-09-27 Route A 落地：NxO d043 整模换源重绑通过工作室验收
+
+1. **路线 A 执行**：放弃在 Cyber Sleuth chr012（无口腔内壁）上修补，改用 Digimon World: Next Order `d043.fbx`（spriters-resource 342134，Tabbit 真浏览器绕过 CF 下载）整模换源——4172v/4986f、J_* 同款骨架、`J_tooth` 即真铰链骨、内嵌 198 actions、自带口腔内壁（红色内壳+上下颚）与 c00/spec/e00/r00 四图。
+2. **重绑结果**：scan→fit→bind 重跑 wf1 管线（`scratch/garu_qa/garu_srcmap.json` jmap：`J_tooth→jaw_0` keep 模式保住原生颌部权重、L/R 骨按 x 符号直通不镜像）→ 42 骨 bound GLB + 38 条 `src_*` 原生剪辑注入（`dump_src_anim.py` + `inject_src_anim.py` 复用，`dot_*` 辅助节点排除修 singular matrix）。
+3. **同机位闭/开验收（像素级通过）**：walk_fa0 中立帧 vs prov_fa0 t=1.01（颌骨实测 +62°）——下颌绕后铰链下摆、舌出、齿列分离、红色口腔内壁全程封闭无穿帮；上吻/鼻桥/面颊/喉部零位移。证据：Tabbit artifacts `task-d2fc1f7b-0d4b-41c5-8c27-3317efd64370` 下 `shot-b7a006de`（闭）与 `shot-0e422ea4`（开）；更早一版 `shot-6ab98756`（同帧更近景）。颌骨摆幅全剪辑实测：prov 62°、feel_fi0 65°、atck_fd0 56°、spat 55°。
+4. **glTF 材质天坑**：FBX→GLB 转出材质未写 `metallicFactor`/`roughnessFactor`，glTF 规范缺省 metal=1/rough=1 → 工作室无环境贴图时渲染近全黑。修法=JSON patch pbrMetallicRoughness（`scratch` 内一行脚本）；**后续所有 NxO 源转 GLB 必须补此项**。同时发现 Blender 端渲图未受影响的差异（Blender Principled 默认值不同）——跨端材质一致性需单列检查。
+5. **规范落地**：颌部专项规程入 `custom_model_unit_pipeline.md` **§8d**——验收门 M0–M4（骨位审查→选区审查→源能力审查→同机位闭/开视觉验收→报告规范）、修复顺序（先铰链后权重，源不行就换源）、garu_qa 工具表；§9 坑表补五条（垂肉=铰链错位/裂脸=选区越线/楔形穿帮=无内壁/死骨/金属度缺省近全黑）。
+6. **遗留债**：38 条 src_* 仅存在工作室 GLB；进游戏包仍需 .anim 转换或运行时 graft 路径；暗色材质修复只落在 bound.glb 两处副本，管线导出端（tools/digimon_batch.py）未加 metal patch 步骤。
+
+## 2026-09-27 加鲁鲁兽颌部修复三轮假阳性复盘 + §8 视觉验收规范加固
+
+1. **病灶定案（三层叠加）**：① 颌骨铰链错位——`jaw_0` 被放在源 `J_tooth` 锚点（吻尖牙列）而非铰链位（头骨后下，对 donor wf1 jaw_0），绕吻尖旋转导致下颌后段甩出垂肉；② 权重选区混入嘴线以上顶点——canon up<0 过滤后 478 顶点（源 J_tooth 蒙皮迁移），上吻/鼻桥/面颊零位移；③ 源模型天花板——Cyber Sleuth chr012 无口腔内壁网格、J_tooth 在全部 13 条源剪辑里旋转恒定，张嘴动作需人工注入铰链包络。
+2. **验证失效根因（规范级教训）**：三轮"修好"判定均假阳性——(a) `read` 图片返回 "Images omitted" 时仍写了看图结论（预期补全替代观察）；(b) 远景截图目标几十像素即采信；(c) 自设数值指标（位移/漂移/口缝）被当定案依据，实际只证明"选中的顶点做了刚体旋转"不证明"选对了顶点"。
+3. **§8 新增四条验收铁规**（custom_model_unit_pipeline.md）：视觉证据闸（图像未实际入上下文则该轮无视觉结论）；验收图分辨门（目标解剖结构不可分辨=作废）；变形验收双向检查（同机位闭/开+同类参照，判"不该动的没动"而非"该动的动了"）；可动骨位审查先于权重手术（颌骨原点必须在解剖铰链位）。
+4. **资产升级路径**：Digimon World: Next Order（PC）同模型已定位（spriters-resource 342134）——4172v、同 J_* 骨架、J_tooth 为真铰链骨（94 条剪辑驱动 ~27°）、含完整口腔内壁+spec 图；可作口腔囊供体或整模换源基准。
+5. **工具沉淀**：`scratch/garu_qa/` 下 dump_src_anim/inject_src_anim（glTF 节点空间动画注入，绕 Blender pose-basis 语义）、jaw_hinge_fix/jaw_anim_trans_fix（铰链迁移+轨道平移重写）、precise_jaw_fix（源蒙皮规范坐标系近邻迁移）、jaw_axis_probe/jaw_proof（候选轴扫描+刚体性数值审计）。
+
+## 2026-09-26 附肢骨架盘点 + 复合特征骨架工作流（设计入档）
+
+1. **数码兽附肢盘点**（源 rig `scratch/dgm_pub_src/glb/` 104 只，J_hane/J_wing=翼、J_sippo/J_tail=尾）：翼+尾 21 只、仅翼 22 只、仅尾 37 只、都无 24 只；视觉有翼但骨名漏检 4 只（仙女兽/叮克兽/喷射西尔芙兽/帝皇龙龙形态）。扫描脚本 `scratch/scan_dgm_wing_tail.py`。
+2. **bound 骨架 vs vanilla 实测**：sun dragon 127j（单侧翼≈20 骨膜翼式+尾 12）、eagle 95j（单侧 21 羽骨+13 尾扇）、snake02 126j（尾 20 主链）、hu1 72j（0 附肢）、wf1 ~42j（尾 3）。数码兽源 rig 精度不输 CA（莫斯提兽 48 翼骨），绑后塌缩：bi1 鸟系 3 只唯一达标；wf1 系尾 3 骨翼全废；hu1 系翼→cape 骨、尾冻结。
+3. **新增 references 内容**：`vanilla_bone_conventions.md` 惯例 6「附肢骨量基线」（翼两派=羽扇式 bird01 vs 膜翼式 dragon01b；weighted4 u8 索引 → 骨架 ≤255 硬上限）；`custom_model_unit_pipeline.md` §3d「复合特征骨架」工作流——主干模板接 donor 剪辑 + 源特征链以 `x_*` 骨移植进骨架（spec 文件 `<unit>/feature_chains.json`，合成器 `synth_composite_skel.py` 待建，donor 剪辑走跟随轨道生成），附硬性验收门 G0-G4（盘点留证/骨数底线/附肢顶点归属/轨道活性/形态验收）。
+4. **用户定调**：模型差异太大借不了现成龙骨架，必须逐模型复合适配；验收从"能看"升级为硬指标（骨数底线+附肢活性），当前 18 只翼尾单位待按此返工，人形系最差优先。
+
 ## 2026-09-26 验收复审：离线直乘假验证器纠偏 + 工作室 crest 车道塌头修复
 
 1. **上轮验收截图被用户驳回成立**：亚古兽 run 中段头顶塌成锯齿、残片挂脸、嘴前凸红球。逐层解剖证明**资产无缺陷**——`tools/blender_pose_render.py`（世界 delta 约定，管线正统 QA 渲染器）渲 run f9/atk f31/idle f30 三视角+头特写全干净；真凶是工作室运行时 `rebindStrayWeights` 的 crest 车道按 `crestAbove=0.55` 绝对高度阈值抢 head 骨顶点（亚古兽 94 冠顶顶点被当"背帆"偷到休眠软链骨→塌头）。修复（model-studio importer.js）：crest 车道叠加 `detachAt` 顶点距分布空隙判据，连续颅壳不偷、只偷真游离簇。疗效：亚古兽全车道归零（rebind 全 0），工作室渲染与管线渲染逐帧一致。
@@ -390,3 +432,13 @@
   三视图重导出确认（model-studio/scratch/_viz/out3/）。
 - 部署：zzz_czx_digimon_v4.pack（816MB，全动态无损）→ pos 86，
   旧条目已清。data/ 下 v2.pack / v2.pack.off / v3.pack 待用户清理。
+
+## 2026-09-26 晚：UICreated 派发崩 +0x26a93d6 / 回合边界崩 +0x133b734
+- references/crash_and_load_order_diagnostics.md 新增 §10.42：7 会话日志断在
+  "UICreated, environment is Campaign UI" 行（search_panel/advice_interface，
+  与 §10.11 0xc000041d 同位置、竞态）；+0x133b734 为 FactionTurnStart 回调
+  内联 character_list()+CcoCampaignCharacter.SkillList.At() 原生调用嫌疑，
+  修法=cm:real_callback 推迟出级联窗；补记 WMM used_mods-* 时间戳语义与
+  同名 mod 多版本并存=靠前遮蔽（非合并）的取证/卫生教训。
+- 签名表补 +0x26a93d6（UICreated 派发包络内构造）与 +0x133b734（回合级联窗
+  读 this=null）两行。

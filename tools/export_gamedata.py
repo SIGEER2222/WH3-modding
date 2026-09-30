@@ -40,9 +40,12 @@ except ImportError:  # pragma: no cover
 GAME_DATA = Path(r"E:\Program Files (x86)\Steam2\steamapps\common\Total War WARHAMMER III\data")
 WORKSPACE = Path(r"E:\Code\WH3-modding")
 import os
-SCHEMA_RON = Path(os.environ.get(
-    "RPFM_SCHEMA_WH3",
-    Path.home() / "AppData/Roaming/FrodoWazEre/rpfm/config/schemas/schema_wh3.ron",
+_SCHEMA_ENV = os.environ.get("RPFM_SCHEMA_WH3")
+_TOOLS_RON = Path(__file__).resolve().parent / "schema" / "schema_wh3.ron"
+_RPFM_RON = (Path.home()
+             / "AppData/Roaming/FrodoWazEre/rpfm/config/schemas/schema_wh3.ron")
+SCHEMA_RON = Path(next(
+    str(c) for c in (_SCHEMA_ENV, _TOOLS_RON, _RPFM_RON) if c and Path(c).is_file()
 ))
 
 # CA-owned pack prefixes; user mods in data/ are excluded.
@@ -156,7 +159,23 @@ def iter_pack_entries(path: Path, prefixes=()):
 
 
 def _decompress(raw: bytes) -> bytes:
-    """Decompress a payload that carries a zstd/lz4 frame (maybe at offset 4)."""
+    """Decompress a payload that carries a zstd/lz4 frame (maybe at offset 4)
+    or CA's LZMA block (u32 dsize + 0x5d props + u32 dict + raw LZMA1)."""
+    # CA LZMA: [u32 dsize][0x5d][u32 dict][LZMA1 raw stream]
+    if len(raw) >= 13 and raw[4] == 0x5D:
+        declared = struct.unpack_from("<I", raw, 0)[0]
+        if 0 < declared <= 512 * 1024 * 1024:
+            try:
+                import lzma
+                filt = [{"id": lzma.FILTER_LZMA1,
+                         "dict_size": struct.unpack_from("<I", raw, 5)[0],
+                         "lc": 3, "lp": 0, "pb": 2}]
+                out = lzma.LZMADecompressor(
+                    lzma.FORMAT_RAW, filters=filt).decompress(raw[9:])
+                if len(out) == declared:
+                    return out
+            except Exception:
+                pass
     offsets = []
     for off in (0, 4):
         if raw[off : off + 4] in (ZSTD_MAGIC, LZ4_MAGIC):

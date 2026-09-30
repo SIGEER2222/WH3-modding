@@ -1,3 +1,2 @@
 model_id	key	building_bmd	port_bmd	construction_bmd	damaged_bmd	destroyed_bmd	port_construction_bmd	port_walled_bmd	wall_bmd	on_sea_bmd	devastated_bmd	devastated_occupied_bmd
 #campaign_settlement_display_buildings_tables;8;db/campaign_settlement_display_buildings_tables/psw_建筑关联模组
-alxy_mzid	2023061711	prefabs/campaign/chd_outpost_02.bmd	prefabs/campaign/chd_outpost_02.bmd	prefabs\campaign\construction_minor.bmd	prefabs\campaign\damage_effect.bmd	prefabs\campaign\destroyed_effect.bmd	prefabs\campaign\construction_minor.bmd	prefabs/campaign/chd_outpost_02.bmd	prefabs/campaign/chd_outpost_02.bmd			

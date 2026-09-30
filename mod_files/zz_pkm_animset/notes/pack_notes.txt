@@ -1,1 +1,0 @@
-test: pm025 animset only (bin+skeleton+anims+3 anim db tables), no units

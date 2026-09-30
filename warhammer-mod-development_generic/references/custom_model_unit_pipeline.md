@@ -206,6 +206,53 @@ blender -b -P tools/blender_skel_overlay.py -- <bound.glb> <out.png>   # 网格+
 - VMD 必须指向真实存在的 wsmodel——死链会让单位无声失败（本项目 leishou 曾有此坑）。
 - **graft/retarget 产出的剪辑要补 `be_prop_*` 轨道**：供体 clip 的 prop 挂点轨道在重定向后变恒等（钉 animroot 原点），启用 CA 式 `<SLOT attach_point="be_prop_N">` 武器槽前必须补写：`scratch/fix_beprop_tracks.py`（全动态剪辑）+ `fix_beprop_tracks_dyn.py`（tb/rb 混合压缩剪辑→重建全动态）。逐帧 `L_prop=inv(W_animroot)⊗W_driver`，映射见 vanilla_bone_conventions.md 惯例 2。**⚠ 压缩编码解出的 quat 可能非单位（|q|=1.0011 实测），FK/求逆前逐 quat 归一化，否则 |q|² 缩放在长力臂上放大成 mm~cm 级偏差 `[实测 2026-09-26]`**。
 
+### 3d. 复合特征骨架（逐模型保附肢链）`[设计 2026-09-26，工具待建]`
+
+动机：固定模板族是"有就有、没有就塌"——hu1 零翼零尾，有翼有尾的模型绑上去翼变披风、尾冻结（数码兽实测：天使兽六翼→cape 骨、圣龙兽源 20 翼骨→wf1 全废，见 vanilla_bone_conventions.md 惯例 6）。**复合骨架 = wh3 模板主干照常接 donor 剪辑/graft + 源 rig 特征链原样移植**（`x_*` 前缀骨挂进主干），特征链吃源剪辑真数据。
+
+```
+1. 附肢盘点（逐模型，落盘）：扫源 rig 关节名
+   （wing|hane|feather|tail|sippo|ear|fin|horn|mimi…），产出
+   <unit>_anatomy.json：每条特征链骨数/侧别/链根挂点。
+   参考 scratch/scan_dgm_wing_tail.py。
+2. 特征链 spec：<unit>/feature_chains.json
+   [{"name":"x_wing_l","src":"J_hane.*_L|J_wing.*_l","parent":"spine_2","keep":"all"}]
+   - parent 只能是主干模板骨名（wing→spine_2/肩骨，尾→pelvis/root，
+     耳→head，鳍→spine_*）
+   - keep=all 或 top N（源骨数>N 时保近端 N 节，末端骨弃）
+   - 翼型决定链结构：羽扇抄 bird01 布局、膜翼抄 dragon01b 布局（惯例 6）
+3. 合成骨架 [待建 tools/synth_composite_skel.py]：
+   fitted JSON（fit_skeleton 产物）bones[] 末尾追加 x_* 骨：
+   - 链根世界位 = parent 骨位 +（源链根-源躯干参照）× fit 缩放
+   - 链内世界姿态抄源 rig rest（保原轴向/骨距 → 源轨道可直接写）
+   - 重算 local_pos/local_quat + IBM；custom_name 照常 czx_<u>
+   - 骨架 .anim/invmats 仍走 write_skeleton/write_invmats，接口不变
+4. 蒙皮：rig2 keep 模式；jmap 把附肢顶点组 1:1 指到 x_* 骨
+   （J_hane1_L→x_wing_l_0）。附肢权重 100% 继承源美术、零启发式；
+   主干照旧走 jmap/auto-bind。
+5. 动画：
+   - 源剪辑 graft：主干 bonemap 照旧；x_* 通道直接写源骨局部轨道——
+     父骨运动差由 delta 层吸收（与 retarget_delta 同构，[需验证]）
+   - donor/vanilla 剪辑没有源数据：x_* 轨道必须生成，禁止恒等摆烂——
+     v1 方案 = 父骨世界增量阻尼跟随（旋转=父 Δ×damp、平移恒等）
+     [待建 gen_follow_tracks]；或写"收翼/贴尾"常量姿势轨道
+   - 纯装饰链可在 spec 标 "static_ok":true 显式豁免
+6. 接入照旧（§3c-i）：骨架 .anim + invmats + bin/animpack +
+   battle_skeletons 行 + RMV2 头骨名。
+```
+
+**硬性验收门（复合骨架专用，与 §8 通用门叠加执行）**：
+
+| 门 | 要求 | 拒收条件 |
+|---|---|---|
+| G0 盘点留证 | `<unit>_anatomy.json` 落盘，含源附肢链骨数/挂点 | 无盘点文件直接拒 |
+| G1 骨数底线 | `bone_count ≥ 模板骨数 + Σ声明链骨数`；源侧 ≥3 骨的链成品不得为 0；翼链每侧 ≥3、尾链 ≥3（源不足按源数）；总关节 ≤255（weighted4 u8 上限） | 任一不达标即拒 |
+| G2 附肢顶点归属 | 源附肢顶点组顶点的主导骨 ∈ 对应 x_* 链 | 附肢顶点主导骨落在 cape/spine/leg/animroot 的计数 >0 = 拒收（animroot>0 原规则不变） |
+| G3 轨道活性 | 每根 x_* 骨在发货剪辑集中 ≥1 条非常量旋转轨道 | 全剪辑恒等的链须 spec `static_ok` 豁免，否则拒收 |
+| G4 形态验收 | 叠加三视图 + 中段帧 + LBS max_r ≤ ~1×体型 + 证据全路径 | 同 §8 既有规则 |
+
+当前债：数码兽 v2 的 21 只"翼+尾"单位里只有鸟系 3 只达标（bi1 骨架自带羽/尾链）；18 只需按本流程逐个重做复合骨架才能解锁翼尾表现。人形系（天使/天女/座天使等）是最差档，优先处理。
+
 ## 5. DB 生成
 
 沿用 `unit_creation_workflow.md` 的最小链：main_units / land_units / variants / unit_variants / 属性组 / unit_set / 招募 / 自定义战权限 / loc。本项目约定：
@@ -271,6 +318,10 @@ unit_variants.variant ──→ 乘员 VMD（原版是 wh_emp_state_troops：乘
    - **中段帧三视图强制**：奔跑、combat_walk、至少两条 attack（含跳跃/移动攻击）各抽 ≥1 个中间帧出正/侧/顶（或等效角）三视图——钉死顶点/抢蒙/内衬外露只在运动中段帧暴露，静态 bind 通过不算过 `[实测]`。
    - **渲染完必须自己先抽帧检查再向用户汇报**：至少看首帧+中段帧；有供体时先渲供体地面真值作基线。汇报要写明"看过哪些帧、看到什么现象"，渲染成功不等于通过 `[实测]`。
    - **证据图必须留全路径（强制，2026-09-26 起）**：声称"已修复/验收通过"时，汇报必须附验收图的**磁盘绝对路径**（如 `E:\Code\...\scratch\_preview\xxx.png` 或 tabbit 截图落盘路径），不许只说"截图确认正常"。图必须留在磁盘上可复查——口头描述不算证据，矩阵/自检日志同理需给出 JSON/log 文件路径 `[实测]`。
+   - **视觉证据闸（强制，2026-09-27 起，加鲁鲁兽颌部三轮假阳性根因）**：写任何"图上看到 X"的判词前，必须确认**本轮上下文中实际接收了该图的像素数据**——`read`/截图工具返回 "Images omitted"、占位符、或全糊图时，该轮**禁止输出视觉结论**，只能写"未获得有效图像"并重渲/重截。禁止用"我刚改了 X 所以图上应该是 Y"的预期补全观察描述——验收描述的每个断言必须能指出图中具体区域依据 `[实测]`。
+   - **验收图分辨门**：验收截图/渲染必须能分辨目标解剖结构（嘴缝、齿列、下颌线、翼缘、关节轮廓）；目标区域只占几十像素或被截出画框的图一律作废重渲，不算样本 `[实测]`。
+   - **变形类验收须带对照与双向检查**：开口/关节变形验收 = 同机位 闭/开 两张 + 同类参照（供体或源模型同视角）；判定标准是"不该动的部位未动"（上吻/面颊/喉部零位移），不是"有缝/有位移"。位移量、漂移值等数值指标只用于定位病灶，不作定案依据 `[实测]`。
+   - **可动骨位审查先于权重手术**：下颌/指爪/翼等可动部位变形异常时，先核对该骨**原点是否为解剖铰链位**（对供体骨架相对位置，如 donor jaw_0 在头骨后下方而非吻尖），再谈权重选区——铰链错了改权重永远修不对 `[实测，加鲁鲁兽 2026-09-27]`。
 4. **游戏内**：Mod Manager 启动 → 自定义战看模型/动画/技能/自爆表现；战役看招募建筑图标/兵牌/porthole。
 
 ## 8b. 反向导出：原版单位 → GLB（wh3_export_unit_glb.py）`[实测 2026-09-26]`
@@ -325,6 +376,44 @@ python tools/inject_anims_glb.py x.glb --clips a.anim,b.anim --dry       # 只�
 
 坑：czx_* 与 humanoid01 骨名完全相同 → 检测必须加单位名亲和度，否则谁排在前面就认谁（aerovd≺agumon）。
 
+## 8d. 颌部（嘴/颚）验收与修复规程 `实测 2026-09-27，加鲁鲁兽四轮迭代定案`
+
+颌部是全身最容易"指标全绿但视觉报废"的部位（位移/漂移/口缝增量都能造假——只证明选中的顶点刚体旋转，不证明选对了顶点）。单独列门。
+
+### 验收门（M0–M4，全过才算过）
+
+| 门 | 内容 | 拒收信号 |
+|---|---|---|
+| **M0 骨位审查** | 颌骨原点必须是**解剖铰链位**（头骨后下方耳下关节处），对 donor 同骨架相对位置核（如 wf1 donor jaw_0 在头骨 -0.05/+0.04）。源锚点≠铰链：`J_tooth`/`J_kuti` 常是牙列/吻尖锚点，fit 时 landmark 会错落在吻尖 | jaw 骨世界坐标贴近吻尖/牙列而非头后；对 donor 相对位置偏差 >20% 头长 |
+| **M1 选区审查** | 颌权重顶点必须严格在嘴线以下。首选**源蒙皮迁移**（源 rig 的 `J_tooth`/`J_ago`/`J_joe` 蒙皮组经颌部规范坐标系——头骨原点+头→颌轴归一化——近邻匹配到 bound 网格）；空间几何过滤只能当补充（canonical up<0 剔除嘴线以上）。**禁止纯空间球/半径盲选**——会把面颊/喉肉一起拽走 | 颌主导顶点 canonical up>0（嘴线以上有点）；张嘴时上吻/鼻桥/面颊有位移 |
+| **M2 源能力审查** | 动手修之前先核源模型两件事：① 源剪辑里颌骨**真的会转吗**（逐帧局部旋转 vs rest 角度扫描全剪辑取最大摆幅——"骨存在"≠"骨会动"，chr012 J_tooth 13 条全恒定）；② 源模型**有口腔内壁吗**（内壳/舌/上下颚面片）。无内壁张嘴必穿帮——这是**换源/补壳**的信号，不是权重能修的 | 源剪辑颌骨旋转全恒定=死骨，张嘴得人工注铰链包络或换源；内壁缺失张嘴露楔形缺口见背景 |
+| **M3 变形视觉验收** | 同机位**闭/开两张**特写（相机钉 head_0+snout_0 中点，侧前 3/4 视角），开大摆幅原生剪辑里实测颌角最大的帧（别挑保守帧）+ 至少一条含颌驱动的 donor/studio 剪辑。判定标准="不该动的没动"+内壁封闭不露底 | 垂肉/甩下巴（铰链错位）、裂脸掀鼻桥（选区越线）、楔形穿帮（无内壁）、颌动但不动画里没轨道 |
+| **M4 报告规范** | 每条视觉断言标：哪张图（绝对路径）、哪个像素区域、是否过分辨门、图像是否实际入上下文。数值（颌角/位移/漂移）只能作 M0–M2 的**定位**依据 | "截图确认正常"无路径、Images omitted 仍写结论、远景几十像素当样本 |
+
+### 修复顺序（严格按序，跳步必返工）
+
+1. **先铰链后权重**：M0 不过 → 迁颌骨原点到 donor 比例铰链位 → **重算该骨 IBM**（保 rest 姿态不变形）→ **重写全部动画剪辑里该骨的平移轨道**到新局部系（不改旋转）——漏一步则 rest 对但一播动画骨头跳回旧位。
+2. **再选区**：M1 不过 → 源蒙皮迁移（`precise_jaw_fix.py`：源 J_tooth 顶点云→规范坐标→近邻 bound 顶点→0.85 权重），旧错误选区先回滚再写新组。
+3. **源不行就换源**：M2 判定死骨/无内壁 → 停止权重手术，走整模换源（NxO 系同源 J_* 骨架直换，jmap 保 `J_tooth→jaw_0` keep 模式即可继承原生颌权重+原生颌动画）。补壳（内缩复制下颌面片翻面）是下策，只在换源不可行时用。
+4. **每步留备份**：动 GLB 前 `.bak`，验证失败可逐层回退归因。
+
+### 工具沉淀（scratch/garu_qa/）
+
+| 脚本 | 用途 |
+|---|---|
+| `bound_jaw_inspect.py` | dump bound GLB 颌骨位/选区分布/主导骨审计（M0/M1 用） |
+| `jaw_axis_probe.py` / `jaw_proof.py` | 铰链轴扫描 + 刚体旋转性数值审计（M0 定位） |
+| `jaw_hinge_fix.py` / `jaw_anim_trans_fix.py` | 铰链迁移 + IBM 重算 + 全剪辑平移轨道重写（修复步 1） |
+| `precise_jaw_fix.py` | 源蒙皮规范坐标系近邻迁移选区（修复步 2，可加 canon up<0 过滤） |
+| `dump_src_anim.py` + `inject_src_anim.py` | FBX 原生剪辑采样→glTF 节点空间注入；`dot_*` 辅助节点必须排除（singular matrix） |
+| `garu_srcmap.json` | jmap 模板：`J_tooth→jaw_0` keep + 四足 L/R 直通（源 +x=L 即目标 right，不镜像） |
+
+### 邻接坑
+
+- **glTF 材质缺省金属度**：FBX→GLB 不写 `metallicFactor`/`roughnessFactor` 时规范缺省 1/1，无环境贴图的渲染器里近全黑——JSON patch `pbrMetallicRoughness`；Blender 端因 Principled 默认值不同可能正常，**跨端一致才作数**。
+- **Blender 导入含动画 GLB 后手动 pose 无效**：armature 挂着最后一条 action，渲染求值覆盖手动姿态——先 `arm.animation_data.action=None`（4.5+ 还要清 action_slot），否则闭/开渲出来一模一样造成"修复无效"假象。
+- **slotted action**：Blender 4.4+ 赋 action 不设 `action_slot` → fcurve 有方差但 pose 冻结，采样全成静帧。
+
 ## 9. 已知坑速查
 
 | 症状 | 根因 | 修法 |
@@ -348,10 +437,39 @@ python tools/inject_anims_glb.py x.glb --clips a.anim,b.anim --dry       # 只�
 | inject_rt 重定向剪辑进 GLB 仍解体 | .anim 局部 TRS（wh3 骨架局部约定）≠ GLB 节点局部约定（Blender 骨轴系），直接写轨道必错位 | `scratch/fix_injected_anims.py` 原地修：世界空间 delta 重定向 `W_glb=ΔW_skel⊗W_glb_bind` 再按父子链解回节点局部，写 `extras.wsFixed` 幂等标记；缺省扫全部 dgm_pub_batch skel json |
 | 动画中段肢体折叠/腿过头/揉团（静态 bind 正常） | .anim 量化轨按 donor 局部范围裁剪，retarget 目标值越界被钳到 ±127（toe_left_0 超 740×） | retarget_clip 写回后量化轨自动提升无损（tb3→12/rb4→8）；凡写 .anim 必须回读 `resolve_locals`+`world_from_locals` 对比意图 `[实测]` |
 | 待机/张嘴时下颚到胸口垂暗红"领带" | jmap 把下颚源骨（`J_joe/J_ago/J_chin/J_mouth/J_kuti/J_kuci/J_joe_l/r/J_ago2/J_grey_chin/J_garuru_chin`）错配到 head/eyebrow/spine_2/root——头抬起时颚部内衬滞留撕开 | jmap 改指该骨架 `jaw`/`jaw_0`；删 `*_world.glb`+`*_bound.glb` 清 phase_bind/rmv2 重跑（world.glb 存在即跳权重重映射）。验收信号：张嘴帧中线暗红垂带；顶点审计=喉部中线前方顶点主导骨非 jaw |
+|| 张嘴时下颌甩出下垂"下巴袋/喉肉"（垂肉） | 颌骨原点错落在吻尖牙列锚点（fit 到 `J_tooth` 而非解剖铰链位），绕吻尖旋转把下颌后段甩开 | §8d 修复步 1：迁铰链到 donor 比例位（头骨后下）→重算该骨 IBM→重写全剪辑该骨平移轨道；改权重永远修不对铰链错位 `[实测 加鲁鲁兽]` |
+|| 张嘴连上吻/鼻桥/面颊一起掀起（裂脸） | 颌选区混入嘴线以上顶点（空间球/半径盲选抓了面颊上唇） | §8d 修复步 2：源蒙皮迁移选区 + canonical up<0 剔除嘴线以上；顶点审计=颌主导顶点 canon up>0 即病灶 `[实测]` |
+|| 张嘴露楔形缺口、能看穿到背景 | 源模型无口腔内壁网格（手游低模嘴是贴图画出来的） | §8d M2：权重修不了——整模换源（NxO 系同源 J_* 骨架）或补内壳；验收信号=开口帧下颌后方透出场景底色 `[实测]` |
+|| 颌骨存在但全部剪辑里嘴纹丝不动 | 源 rig 该骨是定位锚不是动画骨，全部源剪辑旋转恒定（chr012 `J_tooth` 13/13 恒定） | §8d M2：人工注铰链包络或换源（NxO `J_tooth` 为真铰链骨、94 条剪辑驱动 27–65°）；先跑全剪辑颌角扫描再定方案 `[实测]` |
+|| GLB 在工作室/无环境贴图渲染器里整体近全黑，贴图明明在 | 材质未写 `metallicFactor`/`roughnessFactor`，glTF 规范缺省 1/1 → 金属面反射空环境=黑 | JSON patch `pbrMetallicRoughness`（metal=0、rough≈0.75）；FBX→GLB 导出端必须补写；Blender 端正常不算数（Principled 默认值不同），跨端一致才作数 `[实测]` |
 | 奔跑/攻击时体侧甩出"门板"长条、爪尖滞留不动 | 工作室 importer 运行时 `rebindStrayWeights` steal 规则把 hand_* 爪尖顶点抢挂休眠 cape_*_0（亚古兽 71 顶点） | `STEAL_SRC_RE` 收窄到 arm/forearm/elbow（不含 hand/wrist）；验收=`modelReport.rebind.steal>0` 且 byBone 落 hand/wrist/weapon 即拒收 |
 | 自检 fail=0 但视觉明显不对 | 几何自检只测"不爆炸"，不测动画源/贴图方向 | 必做中段帧截图 + 对照 vanilla 导出基线（wh3_export_unit_glb） |
 | 工作室里头顶塌陷成锯齿碎块、深色残片挂脸 | 运行时 `rebindStrayWeights` crest 车道按绝对高度阈值（0.55m）抢 head 骨顶点——大头单位连续颅壳被误杀（亚古兽 94 顶点） | crest 车道须叠加 `detachAt` 顶点距空隙判据（importer.js）：连续分布不偷、只偷空隙外游离簇；验收=`rebind.crest` 高计数且 byBone 落 head/skull 即拒收 `[实测]` |
 | 自制离线蒙皮脚本渲出假"帆/塌陷"但管线渲染干净 | `W_anim·IBM` 直乘混用坐标约定：GLB 绑定帧=Blender 骨朝向、骨架 frame0=WH3 约定，逐骨 roll 差 90~180° | 离线验证一律走 `tools/blender_pose_render.py` 的 delta 法（`desired = C@(A@B^-1)@C_inv @ matrix_local`）；直乘结果不可作证据 `[实测]` |
+
+## 9b. 原版资产离线归档（游戏卸载后可用）[实测 2026-09-27]
+
+游戏卸载前已把管线所需的原版输入全量落盘，此后 `export_gamedata`/`wh3_export_unit_glb` 依赖的 pack 不复存在，下列目录是全部替代源：
+
+| 目录 | 内容 |
+|---|---|
+| `tools/_skel/` | 全部 597 个骨架原始文件（`animations/skeletons/*.anim` + `.bone_inv_trans_mats` + `.anm.meta`）；410 个 v8 骨架有解析 JSON，其余为 v7（用 clip 解析器读 bind pose） |
+| `tools/_clips/<骨架>/` | **全部 343 个有战斗动画的骨架**的 `animations/battle/<skel>/**` 全量（83699 文件约 1.9GB）；retarget donor 从这里取 |
+| `tools/_animdb/` | `animations/` 全树除 battle/：`database/`（bin/fragment）+ `persistent/` + campaign/tech/locomotion 等（43074 文件 2.4GB）+ 根级 41 个 `.animpack`（约 2GB，bin clone 模板全集） |
+| `tools/_donor/<unit>/` | 36 个原版单位导出的中间产物：RMV2、wsmodel、VMD、骨架 anim、嵌用 clip、DDS；映射见 `_index.json` |
+| `tools/_props/` | variantmeshes 下全部 prop/weapon/shield/banner 类文件（11760 文件 2.9GB，含 2583 个 prop RMV2 + wsmodel/material/DDS）；武器挂点素材从这里取 |
+| ~~`tools/_vfx/`~~ | **已于 2026-09-29 E 盘清理删除**（游戏仍安装，可从 pack 重导）；model-studio `assets/wh3archive/glb/vfx/` 仍留有转换后 GLB |
+| `tools/_shaders_xml/` | `shaders/*.xml.shader` 914 个（24MB）——可重组 shader 描述文件；`.hlsl_compiled` 预编译库未导（不可重组） |
+| `tools/_commontex/` | `commontextures/` 全树 256 文件 213MB（渐变 ramp 等，NPR 用） |
+| ~~`tools/_warmachines/`~~ | **已于 2026-09-29 E 盘清理删除**（游戏仍安装，可重导）；wh3archive `glb/warmachines/` 留有转换后 GLB |
+| ~~`tools/_ui_icons/`~~ | **已于 2026-09-29 E 盘清理删除**（游戏仍安装，可重导）；wh3archive `tex/ui/` 留有转换后 PNG |
+| `E:\Code\model-studio\models\ref_*.glb` | **2131 个原版单位**自包含蒙皮 GLB（骨架+权重+代表 clip+512px 贴图），共 7.4GB；3098 个 VMD 按 body RMV2 集合去重后 2432 组，`scratch/_mass_export.py` 驱动、`mass_export_done.txt` 为已导清单、`_vmd_dedup_scan.py` 为分组扫描 |
+
+未归档（与单位/特效制作无关或过大）：terrain/battleterrain 地形（36GB）、rigidmodels 场景建筑（13.6GB）、audio（16GB）、movies（8.3GB）、skyboxes、prefab 部署、`.hlsl_compiled` 编译库；db/script/loc 已有 `gamedata/`/`bilingual/` 文本 dump 覆盖。
+
+**可视化入口**（2026-09-27 加）：起 `E:\Code\model-studio` 的 `python tools\serve.py` 后开 `http://localhost:8787/browse.html` —— `assets/wh3archive/`（gitignore，不在仓库）里有 manifest.json + `glb/{props,warmachines,vfx}/` 3555 个 RMV2 转的静态 GLB（转换器 `scratch/_rmv2_to_glb.py`，含法线自算和贴图内嵌）+ `tex/` 2311 张保比例 PNG；`tools/httpd.py` 的 `GET /wh3/<rel>` 别名直读本目录 `_ui_icons/_vfx/_shaders_xml/_props` 原文件（2026-09-29 清理后仅 `_shaders_xml`/`_props` 仍在线，`_ui_icons`/`_vfx` 别名失效但 wh3archive 转换副本可用）。单位模型组运行时从 `api/models` 并入 ref_*.glb。RMV2 顶点坑：`vsize32-vtype0` 和 `28B` 是 `pos f16×4`（w 可为 0=不缩放），f32 先验会"恰好有限但轴向塌缩"误判，须双路解码比轴向伸展数；**vt0-32B 静态布局 = pos f16×4@0 + uv f16×2@8 + pad@12 + nrm/tan u8 打包@16+**（uv 在 @8 不是 @20——@16 起是 u8 字节，当 f16 读会出 inf/巨值；探测 UV 偏移时须"先到先得"严格大于才替换，否则偏移+2 的 (真v,0) 假对会平分顶掉真 uv 造成 v 恒 0 黑贴图）；28B 布局 = pos8+bi/bw4+nrm4+uv4@16+tan4+4B。
+
+`wh3_export_unit_glb.py` 已支持 v7 骨架（`parse_anim` 失败时自动走 `parse_anim_clip` 取 frame0 作 bind pose，如 humanoid11b）；贴图解析有文件名兜底（老单位引用的 `*_diffuse.dds` 路径不存在时按文件名全索引匹配），嵌入 PNG 默认缩到 512px（`TEX_MAX` 常量，调大可得高清贴图）。骨架目录前缀即骨架短名（`wh_variantmodels/bc1/`=bigcat01、`hu11b/`=humanoid11b、`spt1/`=serpent01、`ce2/`=centaur02、`hc5/`=hybridcreature05、`md1/`=mound01 等）；units 的 VMD 名常是 `bst_minotaur_base`/`bst_centigors_base`/`bst_chaos_spawn_left_side` 这种 `_base`/`_side` 变体才含身体网格。worm01b/worm02/bloodworm01 在 battle clips 与 variantmodels 里均无资产（疑似仅战役/特殊用途骨架）。
 
 ## 10. 相关文档
 

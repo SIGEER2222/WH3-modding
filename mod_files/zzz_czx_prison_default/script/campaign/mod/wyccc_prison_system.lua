@@ -4885,15 +4885,31 @@ end
 
 local function save_state(context)
     cm:save_named_value(STATE_KEY, state_by_faction, context)
-    cm:save_named_value(STATE_KEY .. "_battle_snapshot", pending_battle_snapshot, context)
-    cm:save_named_value(STATE_KEY .. "_pending_captures", pending_battle_capture_finalizations, context)
+    -- Battle snapshots and queued captures reference transient pending-battle
+    -- interfaces. They are invalid after a save/load boundary and must never
+    -- be persisted into a campaign save.
 end
 
 local function load_state(context)
     state_by_faction = cm:load_named_value(STATE_KEY, state_by_faction, context)
-    pending_battle_snapshot = cm:load_named_value(STATE_KEY .. "_battle_snapshot", pending_battle_snapshot, context)
-    pending_battle_capture_finalizations = cm:load_named_value(
-        STATE_KEY .. "_pending_captures", pending_battle_capture_finalizations, context)
+    pending_battle_snapshot = {attackers = {}, defenders = {}, warden_key = "", warden_side = ""}
+    pending_battle_capture_finalizations = {}
+    for _, key in ipairs({
+        SVR_QUEST_BATTLE, SVR_DETECTED, SVR_CAGE_KILLED,
+        SVR_CAGE_WINDOW_EXPIRED, "wyccc_prison_battle_capture_committed",
+        "wyccc_prison_battle_target_is_commanding"
+    }) do
+        pcall(function() core:svr_save_bool(key, false) end)
+    end
+    for _, key in ipairs({
+        SVR_TARGET_FACTION, SVR_TARGET_ARMY_INDEX, SVR_TARGET_ARMY_ID,
+        SVR_TARGET_UNIT_ID, SVR_WARDEN_FACTION, SVR_WARDEN_SIDE,
+        "wyccc_prison_battle_target_unit_index",
+        "wyccc_prison_battle_target_unit_key",
+        "wyccc_prison_battle_character_unit_map"
+    }) do
+        pcall(function() core:svr_save_string(key, "") end)
+    end
     for faction_key in pairs(state_by_faction or {}) do
         local state = get_state(faction_key)
         for _, record in ipairs(state.prisoners or {}) do
@@ -5081,6 +5097,11 @@ pcall(function()
         true
     )
 end)
+-- §10.40 +0x22c0f80: 面板开合序号戳——供回合开始级联安静窗判据。
+local wyccc_panel_seq = 0
+core:remove_listener("wyccc_prison_panel_stamp")
+core:add_listener("wyccc_prison_panel_stamp", "PanelOpenedCampaign", true,
+    function() wyccc_panel_seq = wyccc_panel_seq + 1 end, true)
 core:add_listener("wyccc_prison_faction_turn", "FactionBeginTurnPhaseNormal", function(context)
     local faction = nil
     pcall(function() faction = context:faction() end)
@@ -5096,21 +5117,57 @@ end, function(context)
     -- especially for a defeated character whose wrapper is being rebuilt.
     -- Keep turn-start work UI-only; the first-tick/load path still performs a
     -- one-time state reconciliation for existing saves.
-    if not panel_uic or not is_uicomponent(panel_uic) or not visual_ui_ready
-        or not entry_button_uic or not is_uicomponent(entry_button_uic) then
-        local setup_ok, setup_error = pcall(setup_ui)
-        if not setup_ok then
-            log("turn-start UI setup failed safely: " .. tostring(setup_error))
+    -- 9.0: never run setup_ui/refresh_ui inside this dispatch.  Turn start
+    -- floods the event feed (mass force_add_trait messages), auto-opens the
+    -- events panel and rebuilds HUD subtrees while listeners are still being
+    -- dispatched; CreateComponent/SetContextObject work inline here produced
+    -- +0x22c8774 wild-pointer writes (09-29 10:30 dump, schwartzhafen T4).
+    -- 09-29 13:19 dump (+0x22c0f80 null+0x58 read): 1.5s 固定延迟仍落在
+    -- 级联窗内——绑定完成 0.1s 后 events 面板构建、tab_details 自选点击
+    -- 读死 context。除 ui_locked 外追加"安静窗"判据：无 blocking 面板且
+    -- 连续 2 个 0.5s 拍无新 PanelOpenedCampaign；面板长开不挡，只挡开合。
+    local attempts = 0
+    local last_seq = -1
+    local stable = 0
+    local function deferred_turn_ui()
+        attempts = attempts + 1
+        if uim.ui_locked then
+            stable = 0
+            last_seq = wyccc_panel_seq
+        else
+            local blocking = nil
+            pcall(function() blocking = uim:get_open_blocking_panel() end)
+            if blocking then
+                stable = 0
+                last_seq = wyccc_panel_seq
+            elseif wyccc_panel_seq == last_seq then
+                stable = stable + 1
+            else
+                last_seq = wyccc_panel_seq
+                stable = 0
+            end
+        end
+        if stable < 2 then
+            if attempts < 40 then cm:callback(deferred_turn_ui, 0.5) end
             return
         end
-    end
-    if panel_uic and is_uicomponent(panel_uic) and panel_uic:Visible() then
-        local refresh_ok, refresh_error = pcall(refresh_ui)
-        if not refresh_ok then
-            ui_refresh_in_progress = false
-            log("turn-start UI refresh failed safely: " .. tostring(refresh_error))
+        if not panel_uic or not is_uicomponent(panel_uic) or not visual_ui_ready
+            or not entry_button_uic or not is_uicomponent(entry_button_uic) then
+            local setup_ok, setup_error = pcall(setup_ui)
+            if not setup_ok then
+                log("turn-start UI setup failed safely: " .. tostring(setup_error))
+                return
+            end
+        end
+        if panel_uic and is_uicomponent(panel_uic) and panel_uic:Visible() then
+            local refresh_ok, refresh_error = pcall(refresh_ui)
+            if not refresh_ok then
+                ui_refresh_in_progress = false
+                log("turn-start UI refresh failed safely: " .. tostring(refresh_error))
+            end
         end
     end
+    cm:callback(deferred_turn_ui, 1.5)
 end, true)
 core:add_listener("wyccc_prison_battle_completed", "BattleCompleted", true, function()
     local faction = player_warden_faction()
@@ -5154,6 +5211,10 @@ cm:add_first_tick_callback(function()
         -- A quest battle returns without cage markers, but its character and
         -- UI teardown still owns these interfaces. Use the native battle-
         -- sequence gate for every load, including uncaptured battle returns.
+        -- 9.0: defer past the dismiss cascade. This callback fires inside the
+        -- LoadingScreenDismissed dispatch while the screen teardown and the
+        -- intro movie overlay are in flight; running CreateComponent-heavy
+        -- setup_ui() inline here produced +0x22c8774 wild-pointer writes.
         cross_culture_annex.after_battle_sequence("wyccc_prison_load_reconciliation", function()
             local faction = player_warden_faction()
             if faction then
@@ -5167,7 +5228,7 @@ cm:add_first_tick_callback(function()
             setup_ui()
             initialize_startup_alarielle_test()
             cross_culture_annex.schedule_capture_finalization()
-        end)
+        end, 0.5)
     end)
 end)
 

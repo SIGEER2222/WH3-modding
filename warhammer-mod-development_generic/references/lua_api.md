@@ -418,7 +418,8 @@ WH3 的 twui 控件常通过 `<callbacks_with_context>` 绑定 Cco（component c
 
 - 勾选状态由引擎按角色持久化（`IsAutoManaging`），**改 twui 文件改变不了默认值**——状态不在 UI 层。
 - Lua 改状态的可靠方式：`find_uicomponent` 找到控件 → `uic:CurrentState()` 读状态 → `uic:SimulateLClick()` 模拟点击（触发 ContextCommand，等价于玩家点击；vanilla `wh_campaign_interventions.lua` 同款用法）。
-- 另一条路：`uic:GetContextObject("CcoXxx")` 拿到 context object 后 `:Call("IsAutoManaging")`/`:Call("ToggleAutoManaging")` 直接读写，绕过 UI 状态；context 类型与可用函数查 `gamedata/ui/metadata.json` `[需验证]`。
+- 另一条路：`uic:GetContextObject("CcoXxx")` 拿到 context object 后 `:Call("IsAutoManaging")`/`:Call("ToggleAutoManaging")` 直接读写，绕过 UI 状态 `[已部署 2026-09-28，读回验证待复查]`；context 类型与可用函数查 `gamedata/ui/metadata.json`。
+- **CCO 符号名必须逐一对照 `gamedata/ui/metadata.json`**：`Call("不存在的方法")` 不抛 Lua 异常、只返回 nil/空，包在 pcall 里会静默退化成默认值（点数=0），表现像"功能失效但无报错"。已踩坑清单：`SkillPointsToSpend`→正确名 `SkillPointsAvailable`；技能项 `MaxLevel`→`TotalLevels`；科技项 `Key`/`Researched`→`NodeKey`/`IsResearched`；`CcoCampaignFaction` 无 `AvailableTechnologyList`/`ResearchableTechnologyList`，只有 `TechnologyList` `[实测 2026-09-28]`。
 - `PanelOpenedCampaign` 的 `context.string` 是布局名，注意 `character_panel` 与 `character_details_panel` 两种写法都出现过，监听时两者都要兼容；兜底方案是 `ComponentLClickUp` 上挂"面板是否已打开"条件 + `cm:callback` 延迟 0.1s 检查——打开面板的点击触发后回调执行时面板已建好。
 - `SimulateLClick` 会再次触发 `ComponentLClickUp`，监听器内必须做幂等检查（已勾选就不再点），避免自激循环。
 
@@ -565,3 +566,15 @@ campaign_space_bar_options > background > options_list
 - **claim 交接语义（源码确认）**：AIG3 每次 `setup_or_update_ai` 都对全部 `ai_list` 单位 `claim_units(this_mod_key, ...)`——`this_mod_key` 硬编码 `"aigeneral_pancake"`，所以**托管单位的 `is_unit_claimed(uid)` 返回 `"aigeneral_pancake"` 而非 nil**；submod 对 AIG3 单位调 `claim_units(自己的key, {uid})` 会同步触发 AIG3 注册的 release 回调 → `set_ai_enabled(ids,false)`+`add_exclusion_by_id`，单位当场移出 `ai_list`/planner 并被排除（不会再被自动收回）——这是干净的"摘出做专属微操"通道，摘出后 UC 逐单位指令不再与 planner 抢权。归还：`release_claims_without_callbacks({uid}, 自己key)` + `pan_aigeneral:set_ai_enabled({uid}, true, false)`（`add_to_ai` 内部自清 exclusion，无需手动 `clear_exclusion_by_id`；随后 `setup_or_update_ai` 自动重新 claim 回 `"aigeneral_pancake"`）。
 - **摘出前必查**：`pan_aigeneral.units_overridden[uid]`（玩家 override 进行中勿抢）、`is_excluded_id(uid)`（玩家/其他 mod 主动排除的勿抢）、`is_unit_claimed(uid)` 非 nil 且非 `"aigeneral_pancake"` = 别家 mod 持有勿抢。routing 单位应归还（`is_routing()`）让 pending 流程在集结后自动重接。
 - **摘出单位下单签名**（`lib_battle_script_unit.lua`/`lib_battle_patrol_manager.lua` 实证）：`su.uc:attack_unit(target_unit, bool, true)`、`su.uc:goto_location_angle_width(v(x,z), bearing度, ordered_width, run)`、术毕 `su.uc:release_control()`；引擎原生风筝行为 `su:change_behaviour_active("skirmish", true, true)`（先 `unit:can_use_behaviour("skirmish")` 探测）——拉扯微操能用引擎 behaviour 就别自写状态机。
+
+### 观察选项 observation_options（过回合显示速度/镜头跟随，zz_obs_probe 九轮实测 2026-09-28）
+
+设置面板 `settings_panel > camera_settings > dropdowns_list` 里 armies/heroes/fleets 的"速度/镜头"下拉背后是**模型层对象**，不是 UI 组件状态——可直接用脚本 API 读写，完全绕开 `SimulateLClick→DropdownMenuOption` 原生派发（+0x22c0f80 崩族根因）。
+
+- 取对象：`world:observation_options_for_faction(f, x)`——**第二参被引擎忽略，返回的是"派系 f 自己的观察选项" OPT[f]，一系一录**（原版实证 `wh3_prologue_kislev_expedition_stage_1.lua:590` 用 `(f,f)` 自形式；实测 `for_faction(me,f)`/`for_faction(me,me)` 读写同一条 OPT[me]）。
+- 记录：`obs:armies_options()`（军队）/ `obs:agents_options()`（英雄事务官）/ `obs:navies_options()`（舰队），各返回 `OBSERVATION_OPTIONS_SCRIPT_INTERFACE`；容器本身是 `CHARACTER_OBSERVATION_OPTIONS_SCRIPT_INTERFACE`。
+- 记录方法：`locomotion_speed()` / `set_locomotion_speed(枚举)`；`camera_follow_behaviour()` / `set_camera_follow_behaviour(枚举)`。
+- **枚举全集（实测，非法值静默保持原值=可安全盲写）**：`locomotion_speed ∈ {NORMAL, FAST, VERYFAST}`（面板"最快"=VERYFAST；SLOW/FASTEST/VERY_FAST/数字均无效）；`camera_follow_behaviour ∈ {OFF, LOW, MEDIUM, HIGH, VERYHIGH}`（原版 prologue 用 "OFF"/"LOW"）。
+- 提交：`obs:set_xxx_options(rec)` 写回记录后 `cm:set_character_observation_options_for_faction(f, obs)`——**可写任意派系 OPT[f]**（远程派系实测落库），`world:faction_list()` 全量 799 派系写一遍仅 ~4ms。
+- **组变体（allies/enemies/neutrals）是单向写路径**：`observation_options_for_<group>(f)` getter 返回**不绑定模型的默认对象**（写后读恒 NORMAL、两次调用互不影响、改动不传播），对应 `set_character_observation_options_for_<group>(f, obs)` 是原版 apply_* 按钮同款接口——调了无害、Lua 侧无法验证落点。全签名矩阵（容器/单记录/换位/三参/四参）写后所有可读面均无变化。要"作用于全 scope"就枚举全派系逐写 OPT[f]+组 setter 兜底，不要靠组 getter 验证。
+- 注意：原版派系开场脚本在 intro 期间也会写观察选项——mod 写入要等 `end_cinematic`+稳定窗后执行否则被覆盖；写发生在模型层，不受 `uim.ui_locked` 影响（持锁期可写，实测 lock_ui 持锁中写入成功且存活）。

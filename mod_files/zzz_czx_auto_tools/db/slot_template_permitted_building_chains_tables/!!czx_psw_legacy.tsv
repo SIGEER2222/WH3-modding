@@ -1,0 +1,4 @@
+chain	chain_set	remove	slot_template	super_chain
+#slot_template_permitted_building_chains_tables;1;db/slot_template_permitted_building_chains_tables/!!czx_psw_legacy
+	psw_horde_primary_legacy_set	false	psw_horde_primary	
+	psw_horde_secondary_legacy_set	false	psw_horde_secondary	

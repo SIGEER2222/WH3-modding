@@ -1,1 +1,0 @@
-骑士王 Luke 佩剑修复补丁：修复 saber 相关 dilemma/效果接线问题，依赖骑士王本体 mod。

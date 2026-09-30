@@ -30,7 +30,8 @@
 
 - prop rmv2 **无骨架**（skeleton-less），引擎运行时挂到 `attach_point` 指定的骨上；可换 variant。
 - hu1 原版剪辑里 `be_prop_0..5`（animroot 的直属子骨）每根都有轨道——`be_prop_0` 就是武器轨道骨，剪辑按武器弧线 key 它（跟手但不等于手）。
-- **graft 管线注意 [实测 2026-09-26]**：graft_batch/batch_chr 重定向后 `be_prop_*` 与 `root` 轨道全是恒等/零（probe 实测 czx_imper0 attack clip 55 帧 be_prop_0 恒在原点）。所以现阶段 prop 槽接 be_prop 会把武器钉在脚底原点——不可用。要启用 CA 式挂法需在 graft 阶段补生成 be_prop 轨道（每帧 = 持械手世界变换）。imperialpm 的 Omega Blade 当前按"顶点搬到手部 bind 位 + 全绑 hand_right"修，视觉等价。
+- **graft 管线注意 [实测 2026-09-26]**：graft_batch/batch_chr 重定向后 `be_prop_*` 与 `root` 轨道全是恒等/零（probe 实测 czx_imper0 attack clip 55 帧 be_prop_0 恒在原点）。**已修**：`scratch/fix_beprop_tracks.py`（全动态剪辑）+ `scratch/fix_beprop_tracks_dyn.py`（压缩/static-map 剪辑重建为全动态）按 CA 惯例补写 prop 轨道，逐帧 `L_prop = inv(W_animroot) ⊗ W_driver`。driver 映射：`be_prop_0/1→hand_right`（weapon_1/2）、`be_prop_2→hand_left`（shield）、`be_prop_3→spine_2`（weapon_3 背挂）、`be_prop_4→root`（weapon_4 胯挂）、`be_prop_5→hand_left`（weapon_5）。digimon_v2 全量 9496 剪辑：ok=8765 / no-prop=731（无 prop 骨骨架正常跳过）/ other=0；抽样 140 剪辑归一化 FK 下 prop 世界位置与 driver **逐帧零偏差**，四元数半球连续。**坑：非单位四元数**——压缩编码（rb=4 s8-range）解出的 quat 可能 |q|≠1（实测 animroot |q|=1.0011），`q·v·conj(q)` 会按 |q|² 缩放向量，1.8m 力臂产生 ~8mm 偏差；FK/求逆前必须逐 quat 归一化（引擎按单位 quat 处理）。imperialpm 的 Omega Blade 仍是"顶点搬手部 bind 位 + 全绑 hand_right"的焊接方案，与 prop 槽不冲突。
+- **轨道 ≠ 挂载**：剪辑里有 be_prop 轨道只是挂点会动；要让武器真正出现还需 VMD `<SLOT attach_point="be_prop_N">` 指到对应 prop rmv2/wsmodel + variant 表配装。digimon 各 VMD 当前武器仍以 skinned 方式进 body 网格，prop 槽挂载是后续可选项。
 
 ## 惯例 3：羽骨全链且全部带动画轨道
 
@@ -40,12 +41,30 @@ bird01/dragon01b：`wing_shoulder_* → wing_*_0/1/2` 主链，每级挂 `feathe
 
 snake02：`tail_0..19` 主链 20 节 + `tail_left/right_{upper,lower}_{0..5}` 侧链 + 每条发蛇 `head_snake_a..f` 带 `*_jaw`。metalseadramon 类蛇形 digimon 若要从 vanilla 蛇套 graft，源剪辑的 tail_N 节数远超目标骨数时末端衰减要按节数比例而不是按骨名。
 
+## 惯例 6：附肢骨量基线（复合骨架验收参照）`[实测 2026-09-26]`
+
+逐个解析 GLB 骨架的附肢骨量，作为"模型带翼/尾时骨架至少该给多少骨"的底线参照：
+
+| skeleton | joints | 单侧翼 | 尾 | 附肢占骨比 |
+|---|---|---|---|---|
+| humanoid01 (hu1) | 72 | 0 | 0 | 0% —— 附肢挂 cape/spine 的元凶 |
+| wolf (wf1) | ~42 | 0 | 3 | 尾仅摆动级 |
+| bird01/eagle | 95 | ~21（wing×3 + feather 初9/次6/三6） | 13（tail_0+左中右扇×4） | ~40% |
+| dragon01b 双头龙 | 132 | ~20（wing×2+肩+爪×2+webbing×3+指骨×6+36 feather 双侧） | 12（7 链 + 5 尾尖扇） | ~45% |
+| hef_sun_dragon | 127 | 同 dragon01b（膜翼蝠翼式，非羽扇） | 同 12 | ~45% |
+| snake02 medusa | 126 | 0 | 20 主链 + 双侧链 + 发蛇 head_snake_a..f | ~50% |
+
+- **能动的附肢 = 骨数堆出来的**：CA 给会飞的模型 40-50% 的骨量都花在翼/尾上；反过来说，凡骨架把附肢塌成 ≤2 根的，该附肢在动画里注定静止或随躯干晃。
+- 数码兽源 rig 对照：莫斯提兽 48 翼骨、圣龙兽 20 翼骨、九尾狐 17 尾骨、杰斯兽X 15 尾骨——源模型精度不低于 CA，丢的是绑定端（绑 hu1/wf1 后翼尾骨量归零）。
+- 翼的两派结构：**羽扇式**（bird01，feather 叶骨挂 wing 主链）vs **膜翼式**（dragon，指骨撑膜 + webbing 膜骨 + feather 骨做膜面细分）。选/造特征链时按模型翼型决定链结构，蝠翼型抄 dragon 布局，羽翼型抄 bird 布局。
+- 引擎侧容量：weighted4 顶点权重 u8 索引 → 骨架总关节数硬上限 255；comp skeleton 预算大头照附肢分，主干骨数不退让。
+
 ## 惯例 5：be_prop / animroot / root 分工
 
-- `animroot`：实体根（移动/朝向），剪辑里通常恒等。
+- `animroot`：实体根（移动/朝向）。**不是恒等**——grafted 剪辑里 animroot 带常量 X 轴 180° 姿态（坐标系翻转），写 be_prop 局部值必须 `inv(W_animroot)` 换算，不能直接抄 driver 局部/世界值。
 - `root`：骨架运动根（躯干基准）。
 - `be_prop_0..5`：animroot 直属、道具挂点、剪辑按武器轨迹 key。
-- grafted 剪辑里 animroot/root/be_prop 全静态——自定义单位所有动态都在 root 之下。
+- grafted 剪辑里 be_prop 曾全静态（已按惯例 2 修复补写）；animroot 常量翻转保留。
 
 ## 复用工具
 

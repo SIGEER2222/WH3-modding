@@ -1,4 +1,0 @@
-﻿agent	faction	subtype	mod_disabled
-#faction_agent_permitted_subtypes_tables;1;db/faction_agent_permitted_subtypes_tables/!!czx_nag_undead_unlock
-wizard	wh3_dlc29_nag_host_of_nagash	czx_kerrigan	false
-general	wh3_dlc29_nag_host_of_nagash	czx_kerrigan_lord	false

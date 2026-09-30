@@ -333,12 +333,39 @@ def encode_loc(rows) -> bytes:
 # 单位 MOD 必须为每个新增单位提供完整说明（名称 + 短描述 + 长背景描述），
 # 技能同理。缺 key 或描述是占位符（与单位名相同/过短）时直接拒绝打包。
 MIN_HISTORICAL_LEN = 40  # 低于此长度视为存根（原版单位背景通常是整段文字）
+VANILLA_DB = Path(__file__).resolve().parent.parent / "gamedata" / "db"
+
+
+def _vanilla_keys(table: str, col: str) -> set[str]:
+    """原版已存在的主键集合。沿用 vanilla 键的 overwrite 行由原版 loc 兜底，
+    gate 只卡真正新增的键；gamedata 缺失时返回空集（退化为全量检查）。"""
+    tsv = VANILLA_DB / table / "data__.tsv"
+    keys: set[str] = set()
+    if not tsv.is_file():
+        return keys
+    with tsv.open(encoding="utf-8-sig", errors="replace") as f:
+        header = f.readline().rstrip("\n").split("\t")
+        f.readline()  # #table;version;path 元数据行
+        try:
+            idx = header.index(col)
+        except ValueError:
+            return keys
+        for line in f:
+            cells = line.split("\t")
+            if len(cells) > idx and cells[idx].strip():
+                keys.add(cells[idx].strip())
+    return keys
+
 
 def check_unit_loc_coverage(db_rows: dict, loc_keys: dict, mod_name: str) -> None:
     unit_keys = [r.get("unit", "").strip() for r in db_rows.get("main_units_tables", [])]
     unit_keys = [k for k in unit_keys if k]
     ability_keys = [r.get("key", "").strip() for r in db_rows.get("unit_abilities_tables", [])]
     ability_keys = [k for k in ability_keys if k]
+    vanilla_u = _vanilla_keys("main_units_tables", "unit")
+    vanilla_a = _vanilla_keys("unit_abilities_tables", "key")
+    unit_keys = [k for k in unit_keys if k not in vanilla_u]
+    ability_keys = [k for k in ability_keys if k not in vanilla_a]
     if not unit_keys and not ability_keys:
         return
 

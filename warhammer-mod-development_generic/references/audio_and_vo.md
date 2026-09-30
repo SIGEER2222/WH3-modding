@@ -127,8 +127,30 @@ core:add_listener(name, "ScriptTriggeredVOFinished", cond, cb, true)
 - **坑**：① torchaudio≥2.9 的 `torchaudio.load/save` 强制走 torchcodec，缺 FFmpeg dll 即崩；**通用解法是 monkeypatch `torchaudio.load/save` 到 soundfile**（见 `scratch/tts_lab/indextts_clone.py` 顶部）。② hf-mirror 的 `snapshot_download` 个别文件 HEAD 请求必失败（HF_ENDPOINT 不生效时），**直接 curl `hf-mirror.com/<repo>/resolve/main/<file>` 逐文件下载更稳**；大文件必须对比 `x-linked-size` 响应头校验完整性（gpt.pth 3.5GB 曾静默截断到 800MB）。③ HF cache 在 Windows 无符号链接权限时设 `huggingface_hub.file_download._are_symlinks_supported_in_dir[cache_dir]=False` 走复制模式；C: 盘紧张就把 `HF_HOME` 指到 E:。④ IndexTTS-2 vendored 的 GPT2 代码与 transformers≥4.56 不兼容（`QuantizedCacheConfig`/`_crop_past_key_values`/`forced_decoder_ids` 等已删），本机工作区 `scratch/tts_lab/index-tts-main` 已打补丁可跑（CPU 单条约 100-120s，RTF≈25）。⑤ descript-audiotools 会把 protobuf 降到 3.19 弄崩 onnxruntime——装完记得 `pip install --upgrade protobuf`。
 - 环境：`C:\Users\22448\venvs\wh3tts`（torch 2.11.0+cu128 GPU 版 + qwen-tts + sparktts 源码 + indextts 源码 + faster-whisper + edge-tts）；**推理一律 GPU 优先（用户规则）**，RTX 2070 8GB 上 Qwen 克隆 ~11s/条、IndexTTS-2 ~11-24s/条、Spark 秒级。HF 缓存在 `scratch/tts_lab/hf_cache/`（E:）；产出样例在 `scratch/tts_lab/out/`。GPU 版 torch 装法：`pip install "torch==2.11.0+cu128" "torchaudio==2.11.0+cu128" --index-url https://download.pytorch.org/whl/cu128`（PyPI 的 win wheel 是 CPU 版，必须走 pytorch 官方 index；首次要加 `--force-reinstall --no-deps` 覆盖同版本号 cpu 包，再不带 no-deps 补依赖）。
 
+## 技能触发音频（ability → phase_audio → wwise）链路
+
+单位按技能按钮播放自定义音乐/循环音效，纯 DB 无脚本。实测样例：`references/temari_luna_techniques.md`（工坊 3807340793 拆解，§2）。
+
+调用链：
+
+```
+unit_special_abilities.<key>          (active_time=曲长秒数；停止按钮另建 ability)
+  → special_ability_to_special_ability_phase_junctions
+  → special_ability_phases.<key>      (phase_audio=<audio_key>, cant_move=true 站桩)
+  → audio_ability_phases.<audio_key>  (unit_removal_event=Stop_*, max_distance=10000)
+  → audio_metadata_tags: Play_<id> / Stop_<id> 两行
+      (is_persistent_loop=true, play_at_base=true, culling_distance_override=10000)
+  → audio/wwise/global_music_<id>.bnk + <wwise数字hash>.wem + event_data__<id>.dat
+```
+
+- **停止按钮** = 第二个 ability，其 phase_audio 行带 `stop_event=Stop_*`——停止本体就是播 Stop 事件。
+- **节拍/动画同步** = `animations/audio/battle/<id>/<name>.snd.meta`，二进制 SOUND_TRIGGER 记录把 Play/Stop 事件打在动画时间轴（非脚本计时）。
+- **互斥**：自定义 ability 用 junction 塞进 vanilla `special_ability_exclusive_toggle_groups` 组（如 `wh3_dlc24_zhangu_war_drum_exclusive_toggle`）即与原版技能天然互斥。
+- `main_units.audio_voiceover_culture` 等 VO 字段与 phase_audio 链路互不干扰，可并存。
+
 ## 快速接入清单
 
 - **复用原版语音**（最常见，零音频文件）：新单位 `main_units` 行填 `audio_voiceover_actor_group` + `audio_voiceover_culture`；`land_units` 填 `selection_vo` + `man_entity`；领主/英雄另填 `agent_subtypes.audio_voiceover_actor_group`。实测样例：`references/luke_hero` 的 saber 系单位直接挂 `wh2_dlc10_vo_actor_High_Elves_Sisters_of_Averlorn`。
 - **自配语音**：自制 `.wem` + `.bnk`（内含自定义 actor/culture state 与决策树路径），DB 字段指向自定义 key。
+- **技能播放自定义音乐/循环音效**：`special_ability_phases.phase_audio` → `audio_ability_phases` → `audio_metadata_tags` Play_/Stop_ → `global_music_<id>.bnk`+`.wem`，纯 DB 零脚本；停止=第二个 ability 播 stop_event；动画卡点用 `.snd.meta` SOUND_TRIGGER。完整样例 `references/temari_luna_techniques.md`。
 - 兵牌悬停/点击的 UI 音效不属于 VO 链，走 `audio_ui_categories`/`UI_CAM_*` 普通 Event。

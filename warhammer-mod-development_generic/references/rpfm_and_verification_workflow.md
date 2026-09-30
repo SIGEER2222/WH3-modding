@@ -21,12 +21,12 @@
 
 需要从源文件生成 `.pack` 时，默认由 Codex 自动完成全流程：
 
-1. `python tools/build_pack.py <mod名> --deploy` 一步完成全流程（旧的分步手工流程已废弃）：
+1. `C:\Users\22448\AppData\Local\Programs\Python\Python313\python.exe tools/build_pack.py <mod名> --deploy` 一步完成全流程（部署阶段使用硬编码 `E:\` 路径，不得用 WSL Python）：
    - 打包：`mod_files/<mod名>/` → `mod_output/<mod名>.pack`（PFH5；`text/**/*.loc.tsv` 编码为二进制 loc，`db/<table>/*.tsv` 按元数据行编码，其余路径原样复制）。**`notes/pack_notes.txt` 缺失或为空直接失败**。
-   - 部署：复制 `.pack` + 预览 `.png` 到游戏 `data\`（包被运行中游戏锁定时重试 3 次后报错）。
-   - 注册：备份 `state.db`（`.bak_deploy_<mod名>`）→ upsert `user_mod_data`（`alias` 取 `notes/alias.txt` 或 `--alias`，**缺失直接失败**；`notes` 取 pack_notes）→ 把 `local:data:<sha256(规范化路径)[:18]>` 插入当前 playset 末尾并同步 `app_state.enabled_order:<game_id>`。
+   - 部署：复制 `.pack` + `preview.png` 到游戏 `data\`（包被运行中游戏锁定时重试 3 次后报错）。
+   - 注册：备份 `state.db`（`.bak_deploy_<mod名>`）→ upsert `user_mod_data`（`alias` 取 `notes/alias.txt` 或 `--alias`，**缺失直接失败**；`notes` 取 pack_notes）→ 把 `local:data:<sha256(规范化路径)[:18]>` 插入实时读取的当前 playset 末尾并同步 `app_state.enabled_order:<game_id>`。
    - 改名换版：`--deploy-name <新名>.pack --replace <旧mod_id>`（包路径变 → mod_id 变 → 旧 user_mod_data/playset 记录失效，必须 replace 重写）。
-2. 同路径 loc 遮蔽**靠前胜出**：本地汉化/覆盖补丁必须排在被覆盖包之前。
+2. 同内部路径的 Loc、Lua、UI/XML 或 DB 片段是**文件级遮蔽**，最近实测靠前 pack 胜出；不同 DB 片段提供同主键行时最近实测靠后 pack 胜出。两者方向相反，排序前读 `crash_and_load_order_diagnostics.md` 第四节；同时需要两种方向时拆包。
 3. 打包后执行临时反导出检查，检查完删除校验文件，避免后续误打包。
 
 仅当用户明确说要自己用 RPFM 打包时，才停在源文件并提供导入路径与检查清单。
@@ -63,14 +63,14 @@
 
 ### 覆盖式补丁 diagnostics
 
-制作类似汉化补丁的覆盖式 DB 补丁时，补丁 pack 会故意包含与主 MOD 相同 key 的最小覆盖行。RPFM diagnostics 在主包作为依赖/上下文打开后仍可能报告 `DuplicatedCombinedKeys`，这类提示只有在以下条件同时满足时才可视为预期 `[实测/需随版本复查]`：
+覆盖式 DB 补丁会故意与主 MOD 提供相同主键。RPFM diagnostics 在主包作为依赖/上下文打开后仍可能报告 `DuplicatedCombinedKeys`；只有以下条件同时满足时才可视为预期 `[实测/需随版本复查]`：
 
-1. 重复 key 正是本轮计划覆盖的主 MOD key。
-2. 诊断列为主键列，例如 `key` 或 `unit`。
-3. 没有同时出现 invalid reference、missing file、type mismatch、schema/version 或 TSV 导入错误。
-4. 补丁文档中说明该 pack 依赖主 MOD，并记录需要按项目约定放在主 MOD 前面加载以覆盖同 key 行。
+1. 重复 key 正是计划覆盖的目标 key。
+2. 诊断列是该表主键列。
+3. 没有 invalid reference、missing file、type mismatch、schema/version 或 TSV 导入错误。
+4. 补丁已声明对主 MOD 的依赖，并按冲突层级排序：同路径文件遮蔽放在目标前；不同片段同主键 DB 行覆盖放在目标后。
 
-如果 `DuplicatedCombinedKeys` 出现在非计划覆盖的表、非目标 key，或伴随其他诊断，应按普通冲突继续排查，不要一概忽略。
+非计划表/key 的重复，或伴随其他 diagnostics 时，继续按普通冲突排查，不得一概忽略。
 
 ### Workshop 发布文本
 
@@ -95,12 +95,12 @@ Markdown 可以作为草稿，但发布前应转换为 Steam 支持的 BBCode，
 生成 Workshop release 时，按可上传目录整理发布材料 `[实测/需随版本复查]`：
 
 1. 目录默认放在 `workshop_release/<release_version>/<workshop_item_name>/`，其中 `<release_version>` 可沿用项目已有批次目录。
-2. 上传文件至少包含 `<pack_name>.pack` 与同名 `<pack_name>.png`。缩略图优先复制 MOD 源目录中已确认的 `thumbnail.png` 或用户指定图片，不从 `assets/` 擅自整理、改名或清理素材。
+2. 上传文件至少包含 `<pack_name>.pack` 与同名 `<pack_name>.png`。默认从 MOD 源目录复制 `preview.png`；仅用户指定其他图片时改用指定源，不擅自整理或清理 `assets/`。
 3. 文案使用 `description.bbcode.txt`，可另放 `release_notes.bbcode.txt` 与 `UPLOAD_FILES.txt`。说明中至少写清：依赖项、加载顺序、主要改动、语言/本地化关系、兼容性和冲突风险。
-4. 对汉化补丁、威力加强补丁等 submod/patch，说明必须明确它不是完整主 MOD，并写明需要主 MOD；若它通过同 key 覆盖生效，应记录项目约定的加载顺序。
-5. 需要分发压缩包时，可在 release 版本目录生成 `<workshop_item_name>.zip`；压缩包应只包含上传所需文件和说明，不包含源 TSV、README、临时导出或 `_source/`。
-6. 生成后核对 `.pack` 与 `mod_output/` 来源文件哈希一致、`.png` 与选定 thumbnail 哈希一致，并检查 zip 条目。
-7. `workshop_release/` 与 `mod_output/` 属于生成/发布产物，默认不纳入 git；除非用户明确要求归档发布产物，否则只提交 `mod_files/` 源文件与指南更新。
+4. 对汉化补丁、数值补丁等 submod/patch，说明必须明确它不是完整主 MOD，并写明需要主 MOD；排序必须按实际冲突层级描述，不能笼统写“补丁靠前/靠后”。
+5. 需要分发压缩包时，可在 release 版本目录生成 `<workshop_item_name>.zip`；压缩包只包含上传所需文件和说明，不含源 TSV、README、临时导出或 `_source/`。
+6. 生成后核对 `.pack` 与 `mod_output/` 来源文件哈希一致、发布 `.png` 与 `preview.png` 或用户指定图片哈希一致，并检查 zip 条目。
+7. `workshop_release/` 与 `mod_output/` 属于生成/发布产物，默认不纳入 git；除非用户明确要求归档，否则只提交 `mod_files/` 源文件与指南更新。
 
 ### TSV 导入/导出
 
@@ -124,7 +124,7 @@ WH3 或 RPFM 更新后，不要只看 MOD 是否能被启动器加载。先把 R
 6. 依赖刷新后，优先用 RPFM diagnostics 判断 MOD 是否需要兼容：schema/version、type mismatch、invalid reference、missing file、missing loc、banned table、datacore 或 duplicated key 是否出现新增错误。
 7. 对 MOD 源 TSV，按表逐项和当前原版/RPFM 导出样例比对元数据行、列名、列数、列顺序和类型。表版本或列结构变了，就需要重导出模板并迁移旧数据；不要只改 metadata 版本号。
 8. 对引用原版 key 的行，重新查 donor 链路是否仍存在：单位、武器、projectile、effect、bundle、unit set、招募权限、UI 资源、Loc key、脚本 API。invalid reference 通常比启动器能加载更能说明兼容性问题。
-9. **实机不可见时先核对 MOD 是否真的启用**：pack 文件存在于游戏 `data/` 不等于游戏会读取它。检查 wh3mm/当前 preset 的 `mods` 列表中是否存在目标 pack，且 `isEnabled` 不是 `false`；同时确认目标 patch 在主 MOD 之后。启用状态变更后必须重启游戏再测试。
+9. **实机不可见时先核对 MOD 是否真的启用**：pack 存在于游戏 `data/` 不等于游戏会读取它。实时检查 `state.db` 当前 playset 的 `playset_items` 与 `enabled_order`，确认目标 pack 已启用，并按实际冲突层级满足顺序；状态变更后重启游戏再测试。
 10. 若 RPFM diagnostics 清洁，仍需进游戏做最小回归：自定义单位是否可招募/可见、数值是否生效、头像/兵牌/模型是否正常、Lua 日志是否加载、关键 UI 文本是否显示。
 
 ### RPFM Server 5.0.6 WH3 dependencies 缓存实测 `[实测/需随版本复查]`
@@ -171,7 +171,7 @@ WH3 或 RPFM 更新后，不要只看 MOD 是否能被启动器加载。先把 R
 
 ### API 核验优先级
 
-1. 本地 `gamedata/documentation/script`。
+1. 本地 `gamedata/documentation/script/`（仅在目录实际存在时）。
 2. 本地 `gamedata/script/campaign/` 原版调用。
 3. Chadvandy WH3 文档。
 4. TW Modding 社区教程。

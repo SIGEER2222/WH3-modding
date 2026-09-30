@@ -1,1 +1,0 @@
-Digimon mini patch: adds Agumon & Gabumon (custom models/anims) wired like swarm units (all-faction custom battle + rogue armies + building recruitment). Swarm-style DB: no battle_skeletons/culture_to_battle_animation tables.

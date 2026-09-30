@@ -1360,6 +1360,55 @@ local function Lalolalo9_AutoConstruction_button_creation()
 end
 
 
+-- §10.40 护栏：first_tick 落在 loading-dismiss→intro 级联窗口内，内联跑
+-- button_creation（find_uicomponent/CreateComponent/SetVisible）会命中半销毁
+-- UI 树（+0x22c0f80/+0x26a93d6 UAF 族）。优先用全局 guard 的
+-- defer_until_intro_settled；无 guard 时用本地探测：纯引擎状态先行，前 6 次
+-- 不碰 UI 树，polls>=20 且连续 10s 全绿才放行，120s 硬兜底。
+local function czx_lalo9_defer_until_intro_settled(fn)
+    local guard = rawget(_G, "CZX_LUA_GUARD")
+    if guard and type(guard.defer_until_intro_settled) == "function" then
+        guard.defer_until_intro_settled(fn)
+        return
+    end
+    local polls, stable = 0, 0
+    local function hazards_clear()
+        local ok_play, playing = pcall(function() return cm:is_intro_cutscene_playing() end)
+        if ok_play and playing then return false end
+        local ok_cs, any_cs = pcall(function() return cm:is_any_cutscene_running() end)
+        if ok_cs and any_cs then return false end
+        if polls < 6 then return false end
+        local ok_ls, ls_uic = pcall(function() local _, u = core:get_loading_screen() return u end)
+        if ok_ls and ls_uic then return false end
+        local ok_root, root = pcall(function() return core:get_ui_root() end)
+        if ok_root and root then
+            local ok_n, n = pcall(function() return root:ChildCount() end)
+            if ok_n and n then
+                for i = 0, n - 1 do
+                    local ok_c, c = pcall(function() return UIComponent(root:Find(i)) end)
+                    if ok_c and c then
+                        local ok_id, id = pcall(function() return c:Id() end)
+                        if ok_id and id and string.sub(tostring(id), 1, 14) == "movie_overlay_" then
+                            return false
+                        end
+                    end
+                end
+            end
+        end
+        return true
+    end
+    local function probe()
+        polls = polls + 1
+        if hazards_clear() then stable = stable + 1 else stable = 0 end
+        if (polls >= 20 and stable >= 10) or polls > 120 then
+            pcall(fn)
+        else
+            cm:real_callback(probe, 1000, "czx_lalo9_intro_gate")
+        end
+    end
+    cm:real_callback(probe, 2000, "czx_lalo9_intro_gate")
+end
+
 local function AssignPlayerFaction()
     local factionList = cm:get_human_factions()
    for f, faction in pairs(factionList) do
@@ -1452,7 +1501,9 @@ local function lalolalo9_Autoconstruction_init()
     end
     ]]
     AssignPlayerFaction()
-    Lalolalo9_AutoConstruction_button_creation()
+    -- §10.40：推迟到 intro 序列落定后再建 HUD 按钮（内部含 4 个监听器注册，
+    -- 一并推迟无妨——它们只服务按钮/浏览器，落定前本来也点不到）
+    czx_lalo9_defer_until_intro_settled(Lalolalo9_AutoConstruction_button_creation)
     if Lalolalo9AutoConstructionEnabled == 1 then
         if Lalolalo9AutoConstructionStartEnd == 0 then
             Lalolalo9_AutoConstruction_ListenerStarterStartTurn()

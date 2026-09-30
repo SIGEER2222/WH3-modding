@@ -167,9 +167,17 @@ def convert_unit(u):
     print('=' * 20, u['key'])
     donor = parse_rmv2(DONOR / u['donor_rmv2'])
     donor_model = donor['models'][0][0]
+    glb_path = Path(u['glb_path'] if 'glb_path' in u else OUT / u['glb'])
+
+    # 多 prim（多材质）自动分件：>1 part 走 rmv2_convert_mp 全套件，
+    # 单 prim 保持原单件路径不变——判别只看 GLB 材质组数，不改写 u。
+    from rmv2_convert_mp import glb_mesh_parts
+    parts_raw = glb_mesh_parts(glb_path, u['skel'])
+    if len(parts_raw) > 1:
+        return convert_unit_mp(u, parts_raw, donor, donor_model, glb_path)
 
     pos, nrm, uv, tan, idx, bone_idx, weights = glb_mesh(
-        Path(u.get('glb_path', OUT / u['glb'])), u['skel'])
+        glb_path, u['skel'])
 
     pos_r = pos.copy(); pos_r[:, 0] *= -1
     nrm_r = nrm.copy(); nrm_r[:, 0] *= -1
@@ -249,6 +257,61 @@ def convert_unit(u):
                    extra=u['vmd_slots_extra']),
         encoding='utf-8')
     print('wrote resources under', out_dir)
+
+
+def convert_unit_mp(u, parts_raw, donor, donor_model, glb_path):
+    """多 prim 分支（rmv2_mp 产线集成）：逐 GLB 材质拆 part，写全套件——
+    rmv2(N part)+每 part 5 槽 DDS+逐 part xml.material+wsmodel 稀疏枚举+vmd。
+
+    与单件路径的差异：贴图改从 mesh GLB 逐材质提取（mat_idx 与 part 对齐；
+    u['src_glb']/tex_override 不参与——D4 override 通道随本通道退役）、
+    material/wsmodel 逐 part 枚举。alpha 恒 off（受损材质全 OPAQUE，
+    变体指派留 write_part_materials 的 alpha_on_parts 口）。"""
+    import tempfile
+    from rmv2_convert_mp import (write_rmv2_v8_mp, emit_part_texture_pngs,
+                                 texconv_dir, write_part_materials,
+                                 write_wsmodel_mp)
+    parts = []
+    for _mi, _name, (pos, nrm, uv, tan, idx, bidx, w) in parts_raw:
+        pos = pos.copy(); pos[:, 0] *= -1
+        nrm = nrm.copy(); nrm[:, 0] *= -1
+        if tan is not None:
+            tan = tan.copy(); tan[:, 0] *= -1
+        parts.append((pos, nrm, uv, tan, idx, bidx, w))
+
+    # donor 材质克隆只设 tex_dir/model_name——_clone_mat_for_part 逐 part
+    # 自行改写 5 槽路径为 <pbase>_<slot>.dds。
+    d = dict(donor_model['material'])
+    d['textures'] = list(d['textures'])
+    d['tex_dir'] = u['pack_dir'].replace('\\', '/') + '/tex'
+    d['model_name'] = u['model_name']
+    donor_mp = dict(donor_model); donor_mp['material'] = d
+
+    out_dir = MOD / u['pack_dir']
+    out_dir.mkdir(parents=True, exist_ok=True)
+    rmv2_path = out_dir / (u['model_name'] + '.rigid_model_v2')
+    n_parts, lods, nbytes = write_rmv2_v8_mp(
+        rmv2_path, u.get('rmv2_skel_name', donor['skeleton']),
+        parts, donor_mp, lod_levels=1)
+
+    stage_dir = Path(tempfile.mkdtemp(prefix='wh3_mptex_'))
+    emit_part_texture_pngs(glb_path, parts_raw, u['model_name'], stage_dir)
+    dds = texconv_dir(stage_dir, out_dir / 'tex')
+
+    mats = write_part_materials(out_dir / 'materials', u['pack_dir'],
+                                u['model_name'], n_parts)
+    write_wsmodel_mp(
+        out_dir / (u['model_name'] + '.wsmodel'),
+        u['pack_dir'] + '\\' + u['model_name'] + '.rigid_model_v2',
+        [(pi, 0, u['pack_dir'] + '\\materials\\' + mn) for pi, mn in mats])
+    vmd_dir = MOD / 'variantmeshes' / 'variantmeshdefinitions'
+    vmd_dir.mkdir(parents=True, exist_ok=True)
+    (vmd_dir / (u['key'] + '.variantmeshdefinition')).write_text(
+        VMD.format(wsmodel=u['pack_dir'] + '\\' + u['model_name'] + '.wsmodel',
+                   aent=u['audio_entity'], aarm=u['audio_armour'],
+                   extra=u['vmd_slots_extra']), encoding='utf-8')
+    print(f'   mp: {n_parts} parts x{lods} lod, {nbytes}B rmv2 + '
+          f'{len(dds)} dds + {len(mats)} xml.material under {out_dir}')
 
 
 def convert():

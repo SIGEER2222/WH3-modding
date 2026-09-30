@@ -1,10 +1,10 @@
 # Codex Project Context — 事件叙事归档
 
-2026-09-25 从 `project_context.md` 拆出：本文件是**按日事件叙事**（崩溃日结、部署记录、实测结论）的只追加归档。主文件只保留当前状态与持久事实。
+2026-09-25 从 `project_context.md` 拆出：本文件是**按日事件叙事**（崩溃日结、部署记录、实测结论）的只追加归档。常驻主文件只保留路由与持久边界；当前本机/playset/具体 MOD 最近状态在 `.codex/runtime_state.md`。
 
-- 已固化的通用经验在 `warhammer-mod-development_generic/CHANGELOG.md` 与 `references/`；本文件供溯源查阅。
+- 已固化的通用经验在 `warhammer-mod-development_generic/CHANGELOG.md` 与 `references/`；本文件只供溯源查阅。
 - WorkBuddy 侧同名硬链接：`.workbuddy/memory/codex_project_context_history.md`。
-- 归档条目按原样搬迁，其中被后续条目推翻的结论保留原文（时间线意义）；最新状态以 `project_context.md` 为准。
+- 归档条目按原样保留，被后续条目推翻的结论仍有时间线意义；当前状态以实时查询为准，`runtime_state.md` 仅提供最近记录和路由。
 
 ---
 
@@ -157,3 +157,69 @@
 - 数码: 104只全部≥1技能(均值2.6),无需改
 - audit_dangling_refs 对 vanilla key 有假阴性,需对照 gamedata/db/ 验证
 - 部署: 游戏在跑(PID21420用户手动),已挂 deploy_on_game_exit.ps1 监视器,退出自动部署 pokemon+swarm
+
+## 2026-09-25 晚：9.0 旧存档与播放集清单收口
+
+- 诊断冻结于 `scratch/crash_20260925_212244/`：无同刻 Event 2004，故本轮不是 OOM。早期 `+0x1bb9418` 已由 `czx_chop_90fix` 遮蔽旧 HUD 解决；`+0x22c0f80` 由 `zzz_czx_fast_end_turn` 的 fleets 下拉自动点击触发，现源码已移除 fleets 点击。
+- 活动播放集曾包含两个失效引用：`local:data:2bc18e784693bed592` 与 `steam:3278112051:!!_nanu_dynamic_rors.pack`。已备份 `state.db` 后移除，114 项清单经 WMM 可成功启动主菜单；`zzz_czx_nag_undead_unlock.pack` 也保持移出，源文件和 data 产物未删除。
+- `zzz_czx_prison_default.pack` 已重建部署为 `local:data:da0e9dd1bfc96eb954`，放在 `wyccc_prison_system.pack` 前；源码仅持久化永久收押状态，读档清空战斗快照、待处理收监队列和 battle svr 标记。静态审计 0 findings，包内 Lua 已回读确认。
+- 同一 `伊泰恩_自动保存.*` 仍以 `+0x257ce84` 崩溃，但 triage 的存档指纹为 `8.1.0/8.1.1`，运行 exe 为 `9.0.0.0`；无监狱包对照与有监狱包同类崩溃，结论为 8.1.x→9.0 跨版本存档 world-restore 引擎兼容问题，不是 MOD 内容问题。不要继续用该旧存档验证 MOD。
+- WMM 114 项清单启动请求成功，`Warhammer3.exe` 在 90 秒检查时仍存活；但 `modified.log` 仍为 113/114 挂载差，故主菜单和全量挂载尚未完成证明。监狱补丁已确认在工坊监狱包前胜出。后续验证应使用 9.0 新开战役，并先解决两个未挂载 Workshop 条目。
+
+## 2026-09-26：用户报障"有些程序看不到窗口"→ UI 自动化禁令入规范
+
+- 定因：`scratch/wh3_click.py`、`real_click.py`、`minimize_others.py`（09-22 战斗自动化测试期产物）为让程序化点击落在游戏上，对其他顶层窗口 `ShowWindow(h,0)`（SW_HIDE，任务栏/Alt-Tab 均不可见）/SW_MINIMIZE，并 `taskkill` steamwebhelper/gameoverlay。
+- 复查当前桌面：首轮 `MainWindowHandle` 判据漏检（主窗口被 SW_HIDE 后该属性归 0）；改用 `EnumWindows`+`!IsWindowVisible` 后实锤 Devin（pid 14956，1920x1059 与 1022x766 两窗）与 msedge（1920x1059）主窗口仍被藏，已 `ShowWindow` 恢复（`scratch/_hidden_check.ps1` 为复查/恢复工具）。QQ/Steam/PixPin 等托盘程序自隐藏属正常未动。游戏本体（PID 35908）窗口可见正常。
+- 处置：AGENTS.md 项目硬约束、SKILL.md 高风险原则、references §10.41、CHANGELOG 同步立规——自动化只允许操作 `Warhammer3.exe` 自身窗口（PrintWindow/PostMessageW/SetForegroundWindow），禁止藏/移/最小化其他程序窗口、禁止杀无关进程；三脚本头部加禁跑警告。
+
+
+## 2026-09-26 深夜：digimon be_prop 挂点轨道补写（iter13 遗留收口）
+
+- **做了什么**：scratch/fix_beprop_tracks.py（全动态剪辑）+ fix_beprop_tracks_dyn.py（static-map/压缩剪辑重建全动态）对 mod_files/zzz_czx_digimon_v2/animations/battle/ 全部 grafted 剪辑补写 be_prop_* 轨道：L_prop=inv(W_animroot)⊗W_driver，映射 0/1→hand_right、2→hand_left、3→spine_2、4→root、5→hand_left（对齐 vanilla hu1 VMD attach_point 惯例）。
+- **全量结果**：9496 剪辑 → ok=8765 / no-prop=731（无 prop 骨骨架正常跳过）/ other=0；799 个压缩剪辑（meg/met/ple/sea/dorugo/omega0/shine0/veemo0/wargr0 九族）经 resolve_locals 重建为全动态后写 prop。抽样 140 剪辑：归一化 FK 下 prop 世界位置与 driver 逐帧零偏差、四元数半球连续、非 prop 通道保真（0 pos / <=0.003 deg rot）。
+- **关键技术坑**：压缩编码（rb=4 s8 range）解出**非单位四元数**（animroot |q|=1.0011）——q·v·conj(q) 按 |q|^2 缩放，1.84m 力臂放大成 ~8mm 偏差。FK/求逆必须逐 quat 归一化（引擎按单位 quat 处理）。原始压缩剪辑可从 mod_output 旧包/部署包回取（本轮已就地覆盖）。
+- **部署**：mod_output/zzz_czx_digimon_v2.pack 重建为 533MB（+42MB）。WH3（pid 22636，12:34 手动拉起）运行中 pack 锁定——scratch/deploy_digimon_when_free.sh watcher 挂后台，游戏退出后自动 build_pack --deploy + sha256 校验。**教训**：WSL 里 tasklist //FI（git-bash 双斜杠习惯）在 tasklist 是非法参数静默失败、grep 不到名字会误判"进程已退"——进程检测用 powershell.exe Get-Process；deploy() 的 PermissionError 三重试兜底正确拦下了本次误触，旧包未被损坏。
+- **遗留**：轨道 != 挂载——VMD <SLOT attach_point="be_prop_N"> + prop rmv2 + variant 配装才是武器实显；当前 digimon 武器仍是 skinned 进 body。L4 战斗复测等游戏空档与并发会话让位。
+
+## 2026-09-27 崩溃簇分诊（13 dump 三族）+ playset 切换/部署收口
+
+- **崩溃分布**：`+0x1a957e7`×6（16:10-17:30，战局 init，`params=[0x0,0x20]`；17:30 vanilla 空表对照同崩=环境级定案已录 §10.31）、`+0x4e5b30`×5（17:14-17:43 挂载期 `params=[0x0,0x3e8]`，未到主菜单；同集 17:46/17:49 成功挂载=间歇性）、`+0x22c0f80`×2（14:10/15:37）+`+0x22c8774`×1（17:53）=§10.40 intro 窗族。
+- **环境证据**：mp_log 09:46 UTC 段 `Native_Platform_Ready failed → PLATFORM_OFFLINE`——Steam 离线态，与 §10.31「等环境恢复」判断一致；无 Event 2004。
+- **17:53 关键样本**：新 nag 战役 `script_log_270926_1749`（307 载），dismiss 级联 194.5s 完→fet2 门控放行后 224.1s 下拉点击→14s 静默→238.3s flyover 起步→239.7s CinematicTrigger→崩。崩溃窗内零 mod 行；mp_log 叠 `REPORT_START_OF_TURN_END`+78s starvation。结论=§10.40 引擎侧残留（vanilla 内联 mo:start() 不可控），guard v2 在位仍中。
+- **playset 切换**：当前活动集 = `d8c514a3`「存档纳迦什军团_自动保存.516926157.save」113 项（存档快照，15:47 建）；其 pos24 冻结在旧 `auto_tools3`（带未拆 debug 探针 first_tick/FactionTurnStart 原生扫描）——已手术换 `zzz_czx_auto_tools.pack`（d567...），备份 `state.db.bak_20260927_swap`，enabled_order 同步。
+- **部署收口**：confid_90fix(00:01 新版)/psw_merged/psw_90fix/90_wyccc_fix/autoconstruction 五个滞留包已同名拷入 data\；digimon_matfix 等 v2/v5 裁决后联动。
+- **遗留**：《全合集》c2cfd9b4（139 项）仍带失效 nanu 引用 + wsid 3278112051 文件缺失=挂载缺口（该集若启用须先清）；`!!prayer_of_star_witch_movie.pack` 在 used_mods 无 Mod: 挂载行（文件在盘）长期项；prefs 仍挂 OOM 危险档（minimise_memory_usage=true/gfx_texture_quality=3）。
+
+## 2026-09-27 晚：Mod Manager 冲突报告功能落地（mod↔mod / mod↔vanilla 静态检测）
+
+- **起因**：用户要求把本次崩溃排查沉淀的冲突知识做进 Mod Manager（参考 MO2/Vortex）。实现为按需报告，不进常规扫描热路径。
+- **落地**（`wyccc-warhammer-mod-manager`）：`backend/conflict_scan.py`（文件级遮蔽按 playset 靠前胜 + vanilla manifest 遮蔽比对 + DB 片段解码行级冲突靠后覆盖 + 声明依赖缺失/禁用区分 + 表版本与解析失败诊断）、`wh3_db_schema_full.json`（RON 全表烤出 1742 表含 is_key）、`parse_db_table` 加 `schema_map` 参数与 `OptionalI32` 解码；RPC `get_conflict_report(deep)`；前端 `ConflictReportModal`（类型/严重度过滤、winner 标注、点参与包跳列表、深扫按钮）+ 六语文案。测试：后端 12 新用例、前端 3 组件用例。
+- **真集验证**（113 项存档集 d8c514a3）：快扫 ~3s / 深扫 ~15s；168 同路径遮蔽（如 `zzz_psw_merged` 赢 `psw_全局变量总表.lua`）、1662 vanilla 遮蔽（`!all_ancillaries.pack` 空片段清 1407 原版行属已知刻意覆盖）、1567 行级冲突、1 缺失依赖（`czx_mod_fixes`→失效 `!!_nanu_dynamic_rors`）。诊断细则入 references §4.2。
+- **教训**：`parse_db_table` 的 schema_map 必须是 `{表名:{版本:字段}}` 嵌套，直传版本层会全表 unparsed；mod manager 仓库整仓在 CRLF 归一化中（git diff 全文件假象），该测试失败 `force_update_*` 系本机 WH3 正在运行属环境性。
+- **晚复核纠偏**[修正初报"60 过期片段"结论]：首版报的 60 个 db_fragment_invalid 实为两个解码器缺口而非 mod 过期——①无版本标记片段被误配最高版本定义（RPFM 惯例无标记=v0，PSW 主包/wyccc_base_lib/自家 swarm_units 全是这种）；②CA/RPFM 的 **LZMA1** 压缩载荷（`u32 dsize + 0x5d + u32 dict(8MB) + 裸 LZMA1 流`）完全不支持，`@z_double_skill_points` 全包 12 个压缩条目静默 None。两处已修（`parse_db_table` 加 force_version + v0 优先 + `_decode_fragment` 全版本兜底；`_decompress_payload` 加 LZMA 路径并对 zlib 输出加声明大小校验防 1 字节假阳性）。修复后 invalid=0、unparsed=0、行级冲突 1567。playset 压缩普查：15/111 包压缩（13 zstd/1 lz4.frame/1 lzma）。
+
+## 2026-09-28 下午：intro/flyover 崩族最终根除——fet 直写 observation_options（v6）
+
+- **定案**：`+0x22c0f80`（读 null+0x58）= DropdownMenuOption 回调读死 context；fet 模拟点击 armies/heroes 下拉在 UI 持锁/面板挂起期概率性崩（0728/2008 日志末行均为 clicked option2，存活三次点击皆无锁）。v4 的 `_ui_idle` 门控三连存活但治标。
+- **API 定案**（zz_obs_probe 九轮探针）：`observation_options_for_faction(f,x)` 第二参忽略返回派系自身记录 OPT[f]；`set_character_observation_options_for_faction(f,obs)` 可写任意派系、799 全写 ~4ms；`observation_options_for_allies/enemies/neutrals` getter 是不绑模型的默认对象=单向写路径只能发不能验；locomotion_speed 枚举 {NORMAL,FAST,VERYFAST}、camera_follow {OFF..VERYHIGH} 非法值静默保持。
+- **v6 实现**：`_apply_all` 枚举全派系逐写 OPT[f]+三组 setter 兜底+本地回读；`_ui_idle` 移除（模型写与 UI 锁无交，实测持锁期写入存活）；`end_cinematic`+稳定窗保留防原版 intro 覆盖。SimulateLClick 点击机全删。
+- **验证**（nagv6，script_log_280926_1647）：flyover 完整（end_cinematic 280.9s）→ apply 314.9s（writes ok=799 fail=0、三组 setter true、me.*=VERYFAST）→ SURVIVED+90s 无 dump。
+- **部署名陷阱二踩**：`--deploy` 默认名 zzz_czx_fast_end_turn.pack 但 playset 引用 end_turn2.pack——静默白改过一次，务必 `--deploy-name zzz_czx_fast_end_turn2.pack`。
+- **清理**：zz_obs_probe 已从 playset/state.db/data\ 移除（源保留 mod_files/zz_obs_probe）；state.db 备份 .bak_remove_probe。
+
+## 2026-09-28 深夜续：22:24 +0x22c8774 战后返回崩——静默窗轮询器收口
+
+- **复核修正**：2221 会话日志断在 168.8s 但 mp_log（RETURNING_FROM_BATTLE 14:24:14UTC）换算崩点 ~182s 引擎时——**~14s 全静默窗**；mp_log 全程 starvation 风暴（21/21/30s stall）。形态=09-27 17:53 首例同签名（§10.40"零 mod 行+starvation=引擎侧残留"）。
+- **静默窗盘点**（wh3diag grep register_repeating --scope used）：常驻原生调用剩三处——sell4 双 tick 持捕获引用（150/250ms，9 处 ancillary_panel:Visible()）、!ai_treasury interval=0 每帧 find+SetStateText 写、psw_UI singleshot（面板开窗一次性，已排除常驻）。
+- **处置**：①sell4 改 fresh_panel+Address() 代际校验，全部 9 处换 panel_visible() 门控，面板重建则延迟重绑；②新建 zzz_czx_treasury_guard 同路径遮蔽 !ai_treasury.pack（pos12 压 13，mod_id local:data:1c928b235a5e11d7f6），interval 0→500ms+ui_locked+Visible 三重门——**两个新静默写源已清**。备份 scratch/state.db.bak_20260928_tg。
+- **部署边界**：游戏运行中 data\ 锁——treasury_guard 已手动拷入 data\+playset/state.db 手术完毕（下启动生效）；sell4 新包建好在 mod_output，后台 watcher 等游戏退出自动 deploy。运行中 2247 会话带 canary 版，三组 canary（reposition/move_up/deferred create）全部成对、无新 dump。
+- **新范式入 §10.40**：静默窗崩溃先盘点 register_repeating 常驻计时器（无日志但每 tick 原生调用）+ 捕获 UIC 引用跨 teardown 复用一律按 UAF 族处理。
+
+## 2026-09-30 晚：多签名崩溃簇复核 + 播放集剪除事故恢复 + 测试垃圾大清删
+
+- **崩溃簇复核（36 dump）**：当日多签名并存——`+0x1813d25`×11（11:49 起，exe 09:08 升 9.0.1.0 后的新主导偏移，stub 期早期 init）、若干 null+8/+0x5a0/+0x10 挂载期变体、用户真实闪退 `+0x22bf668`（18:04，null+0x58 UI teardown 族，script_log_300926_1802：141s 点 tab_army→units_panel 构建窗内 BRF 12 钮注入+czx_disband deferred create 随即崩）。`used_mods.txt` 曾污染至 214 行/127 唯一，zz_* 测试包混入真实清单。
+- **CreamAPI 回流再修**：steam_api64.dll 又变回 Cream shim（834,560B，f641ad26），SmokeAPI（4.2MB）躺在旁边未生效——早会话的 swap 被还原（疑 exe 更新/验证触发，未查实）。已重命名复原：active=SmokeAPI(460a2ade)，Cream 存 `steam_api64.cream_active.dll`+`.cream.dll`。
+- **播放集剪除事故（18:06–18:22）**：15 项被移出（digimon_v2/pokemon/tmb+vmp unlocks/global_lua_guard/hero_grants/prison_default/czx_90_wyccc_fix/czx_mod_fixes/cth_grand_cannon/jar_army_size/zz_iso×2）→ 用户报"虫群和数码宝贝没了"（古墓王档招募链断+单位定义未挂载）。按 18:13 基线手术补回 13 真包原位（备份 `state.db.bak_20260930_postrestore`），剪除者未查明（另一会话或 WMM 前台操作）。
+- **大清删（用户指令）**：data\ 测试残留 28 项删（zz_* png、s1_*.xml、孤立封面）；9 个被锁 .pack 挂 `scratch/_cleanup_testpacks_on_exit.ps1` 退出后删+部署重建 czx_mod_fixes；mod_output 清 19 个 zz_* 产物；mod_files 清 45 个 zz_* 测试源目录。`test.pack`（steam:3241827850）移出播放集→119 项（订阅保留）。czx_mod_fixes 删失效 nanu 依赖声明（nanu 系不在集）。
+- **深扫基线（119 项，scratch/smoke_conflict.py 已支持动态 playset+user_dir）**：四类高危检查全零（prefs_dangling/dangerous_pref/unlisted_movie/pack_unreadable）；db_missing_reference ×11 medium 惰性（跨战役键+不可招死引用）；missing_dependency ×1=nanu（待 watcher 部署后消失）；steam_api_suspicious=SmokeAPI 已知良性误报。
+- **遗留**：`+0x1813d25` 早期 init 崩未定级（exe 更新后偏移漂移）；`+0x22bf668` UI teardown 残点=BRF 重建+disband deferred create；播放集剪除操作者未查明；`!!!!wyccc_faction_grants.pack`（dgm_megas+swarm→tmb 军组/建筑授权 18+42 行）已生成挂载，但授权≠单位定义，须配合播放集内单位包才生效。

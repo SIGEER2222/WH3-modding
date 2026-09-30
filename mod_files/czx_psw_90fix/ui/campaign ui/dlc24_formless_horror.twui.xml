@@ -2,7 +2,7 @@
 <layout
 	version="142"
 	comment=""
-	precache_condition="PlayersFaction.CultureContext.Key == &quot;wh3_main_tze_tzeentch&quot; || PlayersFaction.FactionRecordContext.Key == &quot;wh_main_chs_chaos&quot;">
+	precache_condition="">
 	<hierarchy>
 		<root this="189A30B3-F90F-40AA-A77DCE58FA008414">
 			<dlc24_formless_horror this="1945C597-E70B-4A33-AC97B772FB11F2B2">

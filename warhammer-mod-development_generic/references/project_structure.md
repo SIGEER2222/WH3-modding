@@ -55,19 +55,16 @@ mod_files/<MOD名称>/
 | Workshop BBCode 文案 | `workshop_release/<MOD名>/description.bbcode.txt` |
 | 原版 DB | `gamedata/db/<table_name>/` |
 | 原版脚本 | `gamedata/script/` |
-| 原版脚本文档 | `gamedata/documentation/script` |
+| 原版脚本文档 | `gamedata/documentation/script/`（仅在实际存在时） |
 | 英文原文 | `bilingual/EN` |
 | 中文本地化 | `bilingual/localisation__.loc_CN.tsv` |
 | 术语库 | `bilingual/术语库.md` |
 
 ## 打包与发布约定
 
-需要打包 MOD 时，先询问用户选择：
+需要打包 MOD 时，默认由 Codex 使用 Windows Python313 执行 `tools/build_pack.py <mod名> --deploy`，自动生成并部署 `.pack`、写入 Mod Manager 元数据和当前 playset；仅用户明确要求自己使用 RPFM 时，才停在源文件并提供手工清单。
 
-1. 用户手动用 RPFM 打包：Codex 准备 `mod_files/<MOD名>/` 源文件和说明。
-2. Codex 自动打包：Codex 调用 RPFM/脚本生成 `.pack`，并承担 diagnostics 与回归核对。
-
-打包输出放 `mod_output/`。Workshop 发布文件放 `workshop_release/`，其中最终说明文本使用 Steam BBCode；Markdown 只可作为中间草稿。
+打包输出放 `mod_output/`。Workshop 发布文件放 `workshop_release/`，其中最终说明文本使用 Steam BBCode；Markdown 只可作为中间草稿。预览源统一为 `mod_files/<MOD名>/preview.png`。
 
 ## 前端派系选择显示
 

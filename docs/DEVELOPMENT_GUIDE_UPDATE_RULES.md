@@ -22,7 +22,7 @@
 - 与当前 WH3 版本或 RPFM 版本强绑定、但没有复查标记的结论。
 - 只影响本项目工作区的 Codex 行为，而不是 WH3 MOD 开发规则。
 
-这些内容可以写入 `.codex/project_context.md`、`mod_files/<MOD名>/notes/` 或当前任务说明。
+这些内容按性质写入 `.codex/runtime_state.md`、`.codex/project_context_history.md`、`mod_files/<MOD名>/notes/` 或当前任务说明；不要塞回每次会话必读的 `.codex/project_context.md`。
 
 ## 更新目标
 
@@ -32,10 +32,11 @@
 | 新增/派生兵种、坐骑、武器、兵牌、porthole | `warhammer-mod-development_generic/references/unit_creation_workflow.md` |
 | TSV/DB 格式 | `warhammer-mod-development_generic/references/tsv_format.md` |
 | Lua、监听器、First Tick、API | `warhammer-mod-development_generic/references/lua_api.md` |
-| 命名、前缀、`data__`、加载顺序 | `warhammer-mod-development_generic/references/naming_conventions.md` |
+| 命名、前缀、`data__` | `warhammer-mod-development_generic/references/naming_conventions.md` |
+| 加载顺序、文件遮蔽、DB 行冲突、崩溃/OOM | `warhammer-mod-development_generic/references/crash_and_load_order_diagnostics.md` |
 | Effect、Effect Bundle、scope | `warhammer-mod-development_generic/references/common_effect_keys.md` |
 | 工作区、原版文件、本地化资料路径 | `warhammer-mod-development_generic/references/project_structure.md` |
-| RPFM、日志、网页核验、排错流程 | `warhammer-mod-development_generic/references/rpfm_and_verification_workflow.md` |
+| RPFM、打包部署、日志、网页核验、排错流程 | `warhammer-mod-development_generic/references/rpfm_and_verification_workflow.md` |
 | 文件清单变化 | `warhammer-mod-development_generic/MANIFEST.md` |
 | 每次指南规则变化 | `warhammer-mod-development_generic/CHANGELOG.md` |
 
@@ -54,6 +55,7 @@
 6. 如果新增文件或改名，更新 `MANIFEST.md`。
 7. 每次指南规则变化都更新 `CHANGELOG.md`。
 8. 检查 `SKILL.md` 与 reference 是否互相矛盾。
+9. 检查历史事件、单个 MOD 状态和本机环境没有被误放回常驻上下文或通用 SKILL。
 
 ## 写法要求
 

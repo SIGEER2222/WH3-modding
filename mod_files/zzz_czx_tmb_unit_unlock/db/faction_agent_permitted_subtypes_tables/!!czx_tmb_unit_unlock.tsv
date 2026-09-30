@@ -1,0 +1,10 @@
+﻿agent	faction	subtype	mod_disabled
+#faction_agent_permitted_subtypes_tables;1;db/faction_agent_permitted_subtypes_tables/!!czx_tmb_unit_unlock
+wizard	wh2_dlc09_tmb_khemri	czx_kerrigan	false
+general	wh2_dlc09_tmb_khemri	czx_kerrigan_lord	false
+wizard	wh2_dlc09_tmb_lybaras	czx_kerrigan	false
+general	wh2_dlc09_tmb_lybaras	czx_kerrigan_lord	false
+wizard	wh2_dlc09_tmb_exiles_of_nehek	czx_kerrigan	false
+general	wh2_dlc09_tmb_exiles_of_nehek	czx_kerrigan_lord	false
+wizard	wh2_dlc09_tmb_followers_of_nagash	czx_kerrigan	false
+general	wh2_dlc09_tmb_followers_of_nagash	czx_kerrigan_lord	false

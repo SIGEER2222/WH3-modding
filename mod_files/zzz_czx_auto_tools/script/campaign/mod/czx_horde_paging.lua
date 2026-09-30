@@ -19,6 +19,14 @@ local function log(msg)
     ModLog("[czx_paging] " .. msg)
 end
 
+-- §10.40：干预级联 lock_ui 持锁期间 UI 树正在析构，此时 find_uicomponent/
+-- CreateComponent/MoveTo 撞半销毁节点 = +0x22c0f80 族原生 UAF（pcall 兜不住）。
+-- uim.ui_locked 是 Lua 侧表字段，不碰原生树，必须先于任何树遍历判。
+local function _ui_locked()
+    local ok, uim = pcall(function() return cm:get_campaign_ui_manager() end)
+    return not (ok and uim) or uim.ui_locked == true
+end
+
 local function safe_call(fn, ...)
     local ok, ret = pcall(fn, ...)
     if not ok then
@@ -82,12 +90,15 @@ local function dump_slots(slot_list)
                 local ok3, k = pcall(function() return blr:Call("Key") end)
                 if ok3 then bkey = tostring(k) end
             end
-            log(string.format("  slot %d: empty=%s show=%s primary=%s building=%s",
+            log(string.format("  slot %d: empty=%s show=%s primary=%s building=%s tpl=%s/%s/%s",
                 i,
                 tostring(cco_call(ctx, "IsEmpty")),
                 tostring(cco_call(ctx, "ShouldShowSlot")),
                 tostring(cco_call(ctx, "IsPrimary")),
-                bkey))
+                bkey,
+                tostring(cco_call(ctx, "SlotTemplateRecord.Key")),
+                tostring(cco_call(ctx, "SlotTypeKey")),
+                tostring(cco_call(ctx, "Type"))))
         else
             log("  slot " .. i .. ": no CcoCampaignBuildingSlot context")
         end
@@ -287,6 +298,10 @@ end
 
 function init_paging(attempt)
     attempt = attempt or 1
+    if _ui_locked() then
+        log("init_paging skipped: ui_locked")
+        return false
+    end
     local slot_list = try_get_slot_list()
     if not slot_list then
         if attempt < 10 then
@@ -348,8 +363,29 @@ local function on_units_panel_opened(context)
     _horde_view_ref = nil
     _baseline = nil
 
-    -- 延迟初始化，等待 UI 填充
+    -- 延迟初始化，等待 UI 填充；lock_ui 级联（战后占领结算等）期间直接放弃本轮
     cm:callback(function()
+        if _ui_locked() then
+            log("units_panel deferred init skipped: ui_locked")
+            return
+        end
+        -- AI 回合：镜头跟随的 AI 军队开 units_panel 时子树高频拆建（09-29 2232 纳迦什
+        -- 合邦段，+0x22c0f80 族）；AI 面板无交互价值，整轮跳过。
+        local ok_ai, ai_turn = pcall(function()
+            local list = cm:whose_turn_is_it()
+            if not list then return false end
+            local me = cm:get_local_faction_name(true)
+            local any = false
+            for _, f in model_pairs(list) do
+                any = true
+                if me and me ~= "" and f:name() == me then return false end
+            end
+            return any
+        end)
+        if ok_ai and ai_turn then
+            log("units_panel deferred init skipped: AI turn")
+            return
+        end
         local ok, cqi = pcall(function() return cm:get_campaign_ui_manager():get_char_selected_cqi() end)
         if cqi then
             local ok2, char = pcall(function() return cm:get_character_by_cqi(cqi) end)
@@ -418,10 +454,36 @@ cm:add_first_tick_callback(function()
         log("auto select cqi=" .. tostring(cqi) .. " ok=" .. tostring(ok))
     end
 
-    -- 首次进战役后延迟打开并初始化
-    cm:callback(function()
-        try_open_and_init()
-    end, 3)
+    -- 首次进战役后延迟打开并初始化。
+    -- 9.0 修复：加载屏消失级联窗口内引擎正在析构/重建 UI，此时
+    -- find_uicomponent/SimulateLClick 会踩到半销毁组件（+0x22c0f80 UAF）。
+    -- cm:callback 的延迟走战役时钟，loading 期间不走表，回调会堆积到
+    -- dismiss 瞬间一起触发——所以必须等开场运镜全部结束再探测。
+    -- 且只有本局存在 PSW_HORDE 时才需要自动探测，否则跳过。
+    if cqi then
+        local tries = 0
+        local function probe_when_safe()
+            tries = tries + 1
+            local ok_done, intro_done = pcall(function() return cm:has_intro_cutscene_played() end)
+            local ok_intro, intro_playing = pcall(function() return cm:is_intro_cutscene_playing() end)
+            local ok_cs, cutscene_running = pcall(function() return cm:is_any_cutscene_running() end)
+            local safe = ok_done and intro_done
+                and not (ok_intro and intro_playing)
+                and not (ok_cs and cutscene_running)
+            if safe or tries > 150 then
+                log("probe: intro_done=" .. tostring(intro_done)
+                    .. " intro_playing=" .. tostring(intro_playing)
+                    .. " cutscene=" .. tostring(cutscene_running)
+                    .. " tries=" .. tries)
+                try_open_and_init()
+            else
+                cm:callback(probe_when_safe, 2)
+            end
+        end
+        cm:callback(probe_when_safe, 5)
+    else
+        log("no PSW_HORDE, auto-probe skipped")
+    end
 
     core:remove_listener("czx_paging_panel_opened")
     core:add_listener(

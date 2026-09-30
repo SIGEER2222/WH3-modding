@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "defaults": {
+    "required_roles": ["root", "spine", "head"],
+    "motion_slots": ["stand_idle", "combat_idle", "walk", "run", "charge", "attack"],
+    "environment_probes": ["bind_pose", "idle_breath", "walk_cycle", "run_cycle", "charge_cycle", "turn_90", "slope_up_12deg", "slope_down_12deg", "obstacle_025h"]
+  },
+  "templates": {
+    "biped_tail": {
+      "label": "双足带尾",
+      "resource_family": "biped",
+      "target_skeleton": "humanoid01",
+      "required_roles": ["root", "pelvis", "spine", "hind_leg_left", "hind_leg_right", "head"],
+      "optional_roles": ["forelimb_left", "forelimb_right", "jaw", "tail"],
+      "target_roles": {
+        "root": ["root"],
+        "pelvis": ["root", "spine_0"],
+        "spine": ["spine_1", "spine_2"],
+        "hind_leg_left": ["upperleg_left", "lowerleg_left", "foot_left"],
+        "hind_leg_right": ["upperleg_right", "lowerleg_right", "foot_right"],
+        "forelimb_left": ["upperarm_left", "lowerarm_left", "hand_left"],
+        "forelimb_right": ["upperarm_right", "lowerarm_right", "hand_right"],
+        "head": ["neck_0", "head"],
+        "jaw": ["jaw"],
+        "tail": ["cape_0", "cape_1", "cape_left_0", "cape_middle_0", "cape_right_0"]
+      },
+      "source_role_patterns": {
+        "pelvis": ["J_center", "J_root"],
+        "spine": ["J_chest", "J_spine01", "J_spine02"],
+        "hind_leg_left": ["J_leg_l", "J_knee_l", "J_foot_l", "J_toe_l"],
+        "hind_leg_right": ["J_leg_r", "J_knee_r", "J_foot_r", "J_toe_r"],
+        "forelimb_left": ["J_arm_l", "J_ancon_l", "J_hand_l"],
+        "forelimb_right": ["J_arm_r", "J_ancon_r", "J_hand_r"],
+        "head": ["J_neck", "J_head", "J_haed"],
+        "jaw": ["J_joe", "J_chin", "J_kuti", "J_tooth"],
+        "tail": ["J_tail", "J_tail1", "J_tail2", "J_tail3", "J_tail4"]
+      },
+      "attachment_chains": {
+        "tail": {"target": ["cape_0", "cape_1", "cape_left_0", "cape_middle_0", "cape_right_0"], "must_be_serial": true},
+        "jaw": {"target": ["jaw"], "hinge_required": true},
+        "weapon": {"target": ["hand_right", "hand_left"], "rigid_follow": true}
+      },
+      "protect_weight_patterns": ["^J_tail", "^J_joe$", "^J_chin$", "^J_tooth$", "^J_weapon", "^J_armour", "^J_armor"],
+      "motion_donor": {"status": "unapproved", "reason": "raptor/troglodon candidates render with excessive airborne frames; native chr050 candidate remains under review"},
+      "motion_candidates": [
+        {"label": "native_chr050", "status": "review_required", "skeleton": "chr050", "source_dir": "scratch/dgm_digimon_extracted/animations/animations/battle/chr050", "clips": {"walk": "move.anim", "run": "move.anim"}},
+        {"label": "raptor03b", "status": "rejected", "skeleton": "raptor03b", "source_dir": "scratch/_carno_glb/files", "clips": {"run": "animations__battle__raptor03b__locomotion__rp3b_run_01.anim"}}
+      ],
+      "motion_policy": {"ground_contact_required": true, "max_airborne_ratio": 0.25, "max_root_vertical_drift": 0.2},
+      "environment": {"ground_contact_bones": ["foot_left", "foot_right", "toe_left_0", "toe_right_0"], "obstacle_clearance_roles": ["head", "forelimb_left", "forelimb_right"], "slope_max_deg": 12}
+    },
+    "quadruped_longtail": {
+      "label": "四足长尾",
+      "resource_family": "quad",
+      "target_skeleton": "wolf01",
+      "required_roles": ["root", "spine", "foreleg_left", "foreleg_right", "hindleg_left", "hindleg_right", "head"],
+      "optional_roles": ["jaw", "tail"],
+      "target_roles": {"root": ["root"], "spine": ["spine_0", "spine_1", "spine_2"], "foreleg_left": ["upperarm_left", "lowerarm_left", "hand_left"], "foreleg_right": ["upperarm_right", "lowerarm_right", "hand_right"], "hindleg_left": ["leg_left_0", "leg_left_1", "leg_left_2", "foot_left"], "hindleg_right": ["leg_right_0", "leg_right_1", "leg_right_2", "foot_right"], "head": ["neck_0", "head_0"], "jaw": ["jaw_0"], "tail": ["tail_0", "tail_1", "tail_2"]},
+      "source_role_patterns": {"spine": ["J_spine", "J_center"], "foreleg_left": ["J_F_L_"], "foreleg_right": ["J_F_R_"], "hindleg_left": ["J_B_L_"], "hindleg_right": ["J_B_R_"], "head": ["J_head", "J_neck"], "jaw": ["J_tooth", "J_joe", "J_chin"], "tail": ["J_tail"]},
+      "attachment_chains": {"tail": {"target": ["tail_0", "tail_1", "tail_2"], "must_be_serial": true}, "jaw": {"target": ["jaw_0"], "hinge_required": true}},
+      "protect_weight_patterns": ["^J_tail", "^J_tooth$", "^J_joe$", "^J_chin$", "^J_.*_foot"],
+      "motion_donor": {"skeleton": "wolf01", "source_dir": "scratch/salzaar_digimon/vanilla_wf1_wolf/clips", "clips": {"walk": "wf1_walk_01.anim", "run": "wf1_run_01.anim", "charge": "wf1_charge_01.anim", "attack": "wf1_attack_01.anim"}},
+      "environment": {"ground_contact_bones": ["foot_left", "foot_right"], "obstacle_clearance_roles": ["head", "spine"], "slope_max_deg": 18, "obstacle_height": 0.25}
+    },
+    "winged_biped": {
+      "label": "飞翼双足",
+      "resource_family": "bird",
+      "target_skeleton": "bird01",
+      "required_roles": ["root", "spine", "leg_left", "leg_right", "head", "wing_left", "wing_right"],
+      "optional_roles": ["jaw", "tail"],
+      "target_roles": {"root": ["root"], "spine": ["spine_0", "spine_1", "spine_2"], "leg_left": ["leg_left_0", "leg_left_1", "foot_left_0"], "leg_right": ["leg_right_0", "leg_right_1", "foot_right_0"], "head": ["neck_0", "head_0"], "jaw": ["jaw_0"], "wing_left": ["wing_shoulder_left_0", "wing_left_0", "wing_left_1"], "wing_right": ["wing_shoulder_right_0", "wing_right_0", "wing_right_1"]},
+      "source_role_patterns": {"spine": ["J_spine", "J_center"], "leg_left": ["J_leg_l", "J_knee_l", "J_foot_l"], "leg_right": ["J_leg_r", "J_knee_r", "J_foot_r"], "head": ["J_head", "J_neck"], "jaw": ["J_joe", "J_chin"], "wing_left": ["J_wing_l", "J_arm_l"], "wing_right": ["J_wing_r", "J_arm_r"]},
+      "attachment_chains": {"wings": {"target": ["wing_shoulder_left_0", "wing_left_0", "wing_left_1", "wing_shoulder_right_0", "wing_right_0", "wing_right_1"], "must_be_serial": true}, "jaw": {"target": ["jaw_0"], "hinge_required": true}},
+      "protect_weight_patterns": ["^J_wing", "^J_feather", "^J_joe$", "^J_chin$", "^J_weapon"],
+      "motion_donor": {"skeleton": "bird01", "source_dir": "scratch/salzaar_digimon/vanilla_bi1_eagle/clips", "clips": {"walk": "bi1_fly_walk_01.anim", "run": "bi1_fly_charge_01.anim", "charge": "bi1_fly_charge_01.anim", "attack": "bi1_fly_attack_01.anim"}},
+      "environment": {"ground_contact_bones": ["foot_left_0", "foot_right_0"], "airborne_roles": ["wing_left", "wing_right", "tail"], "slope_max_deg": 12, "obstacle_height": 0.25}
+    },
+    "serpentine": {
+      "label": "蛇形长身",
+      "resource_family": "snake",
+      "target_skeleton": "snake01",
+      "required_roles": ["root", "spine", "coil", "head"],
+      "optional_roles": ["jaw", "forelimb_left", "forelimb_right"],
+      "target_roles": {"root": ["root"], "spine": ["spine_0", "spine_1", "spine_2", "spine_3"], "coil": ["tail_0", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "tail_6"], "head": ["neck_0", "neck_1", "head_0"], "jaw": ["jaw_0"], "forelimb_left": ["upperarm_left", "lowerarm_left", "hand_left"], "forelimb_right": ["upperarm_right", "lowerarm_right", "hand_right"]},
+      "source_role_patterns": {"spine": ["J_spine", "J_center"], "coil": ["J_tail", "J_body"], "head": ["J_head", "J_neck"], "jaw": ["J_joe", "J_chin", "J_tooth"], "forelimb_left": ["J_arm_l", "J_hand_l"], "forelimb_right": ["J_arm_r", "J_hand_r"]},
+      "attachment_chains": {"coil": {"target": ["tail_0", "tail_1", "tail_2", "tail_3", "tail_4", "tail_5", "tail_6"], "must_be_serial": true}, "jaw": {"target": ["jaw_0"], "hinge_required": true}},
+      "protect_weight_patterns": ["^J_tail", "^J_joe$", "^J_chin$", "^J_tooth$", "^J_fin"],
+      "motion_donor": {"skeleton": "snake01", "source_dir": "scratch/salzaar_digimon/vanilla_sn1_serpent/clips", "clips": {"walk": "sn01_walk_01.anim", "run": "sn01_run_01.anim", "charge": "sn01_charge_01.anim", "attack": "sn01_attack_01.anim"}},
+      "environment": {"ground_contact_bones": ["tail_0", "tail_4", "tail_8"], "obstacle_clearance_roles": ["head", "forelimb_left", "forelimb_right"], "slope_max_deg": 10, "obstacle_height": 0.25}
+    },
+    "arthropod": {
+      "label": "多足甲壳",
+      "resource_family": "spider",
+      "target_skeleton": "spider01",
+      "required_roles": ["root", "core", "leg_front_left", "leg_front_right", "leg_back_left", "leg_back_right", "head"],
+      "target_roles": {"root": ["root"], "core": ["spine_0", "spine_1", "spine_2", "rear_0", "rear_1"], "leg_front_left": ["leg_left_front_0", "leg_left_front_mid_0", "leg_left_front_1", "leg_left_front_2"], "leg_front_right": ["leg_right_front_0", "leg_right_front_mid_0", "leg_right_front_1", "leg_right_front_2"], "leg_back_left": ["leg_left_back_0", "leg_left_back_mid_0", "leg_left_back_1", "leg_left_back_2"], "leg_back_right": ["leg_right_back_0", "leg_right_back_mid_0", "leg_right_back_1", "leg_right_back_2"], "head": ["head_0"]},
+      "source_role_patterns": {"core": ["J_center", "J_spine", "J_body"], "leg_front_left": ["J_leg_l", "J_arm_l"], "leg_front_right": ["J_leg_r", "J_arm_r"], "leg_back_left": ["J_leg_l"], "leg_back_right": ["J_leg_r"], "head": ["J_head", "J_neck"]},
+      "attachment_chains": {"shell": {"target": ["platform_0", "platform_section_0", "platform_section_1"], "rigid_core": true}, "pincer": {"target": ["pincer_left_inner_0", "pincer_left_mid_0", "pincer_left_outer_0", "pincer_right_inner_0", "pincer_right_mid_0", "pincer_right_outer_0"], "rigid_follow": true}},
+      "protect_weight_patterns": ["^J_leg", "^J_arm", "^J_pincer", "^J_shell", "^J_platform"],
+      "motion_donor": {"skeleton": "spider01", "source_dir": "scratch/salzaar_digimon/vanilla_sp1_spider/clips", "clips": {"walk": "sp1_walk_01.anim", "run": "sp1_run_01.anim", "charge": "sp1_charge_01.anim", "attack": "sp1_attack_01.anim"}},
+      "environment": {"ground_contact_bones": ["leg_left_front_end", "leg_right_front_end", "leg_left_back_end", "leg_right_back_end"], "obstacle_clearance_roles": ["head", "leg_front_left", "leg_front_right"], "slope_max_deg": 22, "obstacle_height": 0.25}
+    }
+  }
+}

@@ -1,3 +1,0 @@
-key	chance_to_replenish	max_count	unit_record	use_partial_replenishment	max_replenish_per_turn
-#mercenary_unit_groups_tables;2;db/mercenary_unit_groups_tables/!!hefadk_avelorn_dragon_knights					
-hefadk_hef_cav_eden_valley_dragon_knights_ror	100.0000	1	hefadk_hef_cav_eden_valley_dragon_knights_ror	true	0.1000

@@ -103,7 +103,10 @@ for o in meshes:
     o.matrix_world = Matrix.Identity(4)
     for m in list(o.modifiers):
         o.modifiers.remove(m)
-    o.vertex_groups.clear()
+    # keep-mode inputs are skinned to TARGET bone names; those groups are
+    # the artist weights we must preserve, so don't wipe them.
+    if not (len(argv) > 8 and argv[8] == 'keep'):
+        o.vertex_groups.clear()
 for o in meshes:
     o.select_set(True)
 bpy.context.view_layer.objects.active = meshes[0]
@@ -138,9 +141,15 @@ if len(argv) > 8 and argv[8] == 'keep':
     gn = [g.name for g in mesh.vertex_groups]
     for v in mesh.data.vertices:
         for g in v.groups:
-            bi = bone_idx.get(gn[g.index])
+            bi = bone_idx.get(gn[g.group])
             if bi is not None:
                 src_w[v.index, bi] += g.weight
+    # never preserve weights onto animroot: verts pinned at the origin
+    # stretch into streaks when the body leaves the ground. Verts whose only
+    # source weight was animroot fall through to auto-bind.
+    _ar = bone_idx.get('animroot')
+    if _ar is not None:
+        src_w[:, _ar] = 0.0
 for o in [o for o in bpy.context.scene.objects
           if o.type == 'ARMATURE' and o is not arm_obj]:
     bpy.data.objects.remove(o, do_unlink=True)
@@ -193,7 +202,8 @@ EXCLUDE = re.compile(
     _builtin if _builtin is not None else
     r'prop|cape|skirt|belt|sleeve|cloth|loincloth|flag|tabard|fx|icon|camera'
     r'|weapon|shield|quiver|scabbard|plume|tassel|feather|wing|hair|beard'
-    r'|finger|thumb|attach|slot|mount|platform|antenna|eyestalk|banner|be_',
+    r'|finger|thumb|attach|slot|mount|platform|antenna|eyestalk|banner|be_'
+    r'|animroot',
     re.I) if _builtin != '' else re.compile(r'(?!x)x')
 allowed_idx = [i for i, b in enumerate(bones)
                if not EXCLUDE.search(b['name'])

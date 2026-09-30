@@ -8,9 +8,13 @@
 WH3-modding/
 ├── AGENTS.md
 ├── README.md
+├── .omp/
+│   ├── AGENTS.md                    # OMP 专用精简项目上下文
+│   └── config.yml                   # OMP 项目级 skill / xdev 配置
 ├── .codex/
-│   ├── project_context.md           # 当前状态+持久事实（必读）
-│   ├── project_context_history.md   # 按日事件叙事归档（按需查阅）
+│   ├── project_context.md           # 常驻项目路由与持久边界（必读）
+│   ├── runtime_state.md             # 本机环境、playset、具体 MOD 状态（按需）
+│   ├── project_context_history.md   # 按日事件叙事归档（按需）
 │   └── handoff_*.md / model_check_*.md  # 会话交接与进度文档
 ├── .agents/
 │   └── README.md
@@ -44,7 +48,9 @@ WH3-modding/
 | 路径 | 职责 | 版本管理 |
 |---|---|---|
 | `AGENTS.md` | Codex 和代理的项目规则入口 | 纳入 |
-| `.codex/project_context.md` | Codex 专用上下文摘要（当前状态+持久事实） | 纳入 |
+| `.omp/` | OMP 专用精简上下文与项目级配置；不存放任务产物 | 纳入 |
+| `.codex/project_context.md` | 常驻项目路由与少量持久边界 | 纳入 |
+| `.codex/runtime_state.md` | 本机路径、playset、Workshop 与具体 MOD 最近状态；操作前仍须实时查询 | 纳入 |
 | `.codex/project_context_history.md` | project_context 拆出的按日事件叙事归档 | 纳入 |
 | `.agents/README.md` | 其他代理入口说明 | 本地隐藏配置，默认忽略 |
 | `.devin/skills/` | Devin 项目级 skill（如 `tabbit` 浏览器自动化本机对接说明） | 纳入 |
@@ -97,11 +103,7 @@ mod_files/
 
 ## 打包与发布结构
 
-打包前先确认用户偏好：
-
-1. 用户手动用 RPFM 打包：Codex 只准备 `mod_files/<MOD名>/` 源文件和必要说明。
-2. Codex 自动打包：Codex 可调用 RPFM/脚本生成 `.pack`，但需要额外执行导入、diagnostics 和回归核对。
-
+需要打包时，默认由 Codex 使用 Windows Python313 执行 `tools/build_pack.py <mod名> --deploy`，自动生成 `.pack`、部署到游戏 `data\`、写入 Mod Manager 元数据并加入当前 playset；仅当用户明确要求自己使用 RPFM 时，才停在源文件和操作清单。
 打包输出默认放：
 
 ```text
@@ -114,8 +116,10 @@ mod_output/
 
 ```text
 mod_files/<MOD名>/
-├── notes/pack_notes.txt   # 一句话功能说明 -> 打进 pack 内 notes.rpfm_reserved
-└── preview.png            # 预览图 -> 复制为 mod_output/<MOD名>.png，部署为 data\<部署包名>.png
+├── notes/pack_notes.txt    # 一句话功能说明 -> pack notes.rpfm_reserved / Mod Manager notes
+├── notes/alias.txt         # Mod Manager 显示名
+├── notes/dependencies.txt  # 补丁型 MOD 的实际依赖 pack 名；非补丁可省略
+└── preview.png             # 复制到 mod_output/，部署为 data\<部署包名>.png
 ```
 
 Workshop 发布材料默认放：
@@ -137,13 +141,20 @@ Steam Workshop 文本描述使用 Steam BBCode。Markdown 可以作为草稿，�
 - 项目级说明归属 `docs/` 与 `AGENTS.md`。
 - 原版数据与中英本地化参考归属 `gamedata/`、`bilingual/`，只读使用。
 - 具体 MOD 源目录中不要保留 `_bak`、`db_binary`、中间导出等生成/备份目录；这些属于临时产物，归属 `scratch/`。
-- 仓库根目录禁止新增任何临时文件/目录；`_tmp_*`、`_preview/`、`_work_*/` 等临时命名只允许出现在 `scratch/` 内。新增顶级目录必须先在本文件与 `AGENTS.md` 登记职责，详见 `AGENTS.md` "工作区卫生" 一节。
+- 仓库根目录禁止新增任何临时文件/目录；`_tmp_*`、`_preview/`、`_work_*/` 等临时命名只允许出现在 `scratch/` 内。新增顶级目录必须先在本文件与 `AGENTS.md` 登记职责，详见 `AGENTS.md`“工作区边界”。
 
-## gamedata / bilingual 重建说明（2026-09-06）
+## gamedata / bilingual 重建说明（2026-09-06；2026-09-28 重导为 9.0）
 
 旧工作区（D 盘）丢失后，这两个目录由 `tools/export_gamedata.py` 从当前游戏
 `data/*.pack` 重新导出，schema 使用 rpfm-schemas 仓库最新 `schema_wh3.ron`
 （比本地 RPFM 缓存 2025-09 的版本新，可用环境变量 `RPFM_SCHEMA_WH3` 覆盖）。
+
+2026-09-28：9.0/DLC29 更新后重新导出（旧导出是 8.x 基线，缺全部
+`wh3_dlc29_*` 等新表行；曾致「验证过的键」查无实据）。
+`export_gamedata.py` 的 schema 解析顺序现为
+`RPFM_SCHEMA_WH3` 环境变量 → `tools/schema/schema_wh3.ron` → RPFM AppData 缓存；
+直接用工具链 schema 跑到 1742 表/1600 解码/仅 autoresolver 一张 RAW，
+用 RPFM 旧缓存会有 ~157 张「no schema version fits」。
 
 - `gamedata/db/<table>/<internal>.tsv`：解码为 RPFM TSV 布局（列名行→元数据行→数据行）。
   无法解码的表保留原始二进制为 `<internal>.raw`（本次仅

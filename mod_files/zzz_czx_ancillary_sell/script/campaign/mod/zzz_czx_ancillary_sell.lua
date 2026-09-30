@@ -124,6 +124,50 @@ local function attach(ancillary_panel)
     local button_list = find_uicomponent(ancillary_panel, "button_list")
     if not ancillary_detail or not list_box or not button_list then return false end
 
+    -- §10.40：上方捕获的 UIComponent wrapper 钉住原生节点；面板被 teardown 重建
+    -- （战斗返回/界面重构）后它们是悬挂引用，对其调任何方法都是原生 UAF（pcall
+    -- 兜不住）。凡是碰树前先做一次「当帧 fresh 浅找 + Address 代际比对」，发现
+    -- 面板换了实例就延迟重绑，绝不在旧 wrapper 上继续调用。
+    local panel_addr = nil
+    pcall(function()
+        if ancillary_panel.Address then
+            panel_addr = tostring(ancillary_panel:Address())
+        end
+    end)
+
+    local rebinding = false
+    local function fresh_panel()
+        local ok_uim, uim = pcall(function() return cm:get_campaign_ui_manager() end)
+        if ok_uim and uim and uim.ui_locked then return nil end
+        local ok_p, fresh = pcall(function()
+            return find_uicomponent(core:get_ui_root(), "ancillary_panel")
+        end)
+        if not ok_p or not fresh then return nil end
+        if panel_addr then
+            local ok_a, a = pcall(function() return fresh:Address() end)
+            if ok_a and a and tostring(a) ~= panel_addr and not rebinding then
+                rebinding = true
+                cm:callback(function()
+                    rebinding = false
+                    local ok_uim2, uim2 = pcall(function() return cm:get_campaign_ui_manager() end)
+                    if ok_uim2 and uim2 and uim2.ui_locked then return end -- 锁窗内不建组件，下 tick 再试
+                    attach(fresh) -- 同名 listener/timer 重新注册即换绑新实例
+                end, 0.3)
+                return nil
+            elseif ok_a and a and tostring(a) ~= panel_addr then
+                return nil
+            end
+        end
+        return fresh
+    end
+
+    local function panel_visible()
+        local fresh = fresh_panel()
+        if not fresh then return false end
+        local ok, v = pcall(function() return fresh:Visible() end)
+        return ok and v == true
+    end
+
     local selected_key = ""
     local last_written_sets = nil
     local checked = {}
@@ -251,6 +295,7 @@ local function attach(ancillary_panel)
     -- double-click window + per-row checkbox maintenance: rows are created/destroyed by the
     -- panel's own list binding, so a lightweight tick attaches a checkbox to any new row and
     -- keeps check states in sync with the `checked` set
+    real_timer.unregister("czx_sell_ui_tick") -- 重绑场景：旧实例的同名 timer 先摘
     real_timer.register_repeating("czx_sell_ui_tick", 150)
     core:add_listener(
         "czx_sell_ui_tick",
@@ -259,7 +304,7 @@ local function attach(ancillary_panel)
             return context.string == "czx_sell_ui_tick"
         end,
         function(context)
-            if not ancillary_panel:Visible() then return end
+            if not panel_visible() then return end
             if dbl_ticks > 0 then
                 dbl_ticks = dbl_ticks - 1
                 if dbl_ticks == 0 then last_click_key = "" end
@@ -296,7 +341,7 @@ local function attach(ancillary_panel)
         "czx_sell_check_click",
         "ComponentLClickUp",
         function(context)
-            return context.string == "czx_checkbox" and ancillary_panel:Visible()
+            return context.string == "czx_checkbox" and panel_visible()
         end,
         function(context)
             local chk = UIComponent(context.component)
@@ -319,7 +364,7 @@ local function attach(ancillary_panel)
         "czx_sell_checked_click",
         "ComponentLClickUp",
         function(context)
-            return context.string == "czx_button_sell_checked" and ancillary_panel:Visible()
+            return context.string == "czx_button_sell_checked" and panel_visible()
         end,
         function(context)
             local faction = cm:get_local_faction(true)
@@ -347,6 +392,7 @@ local function attach(ancillary_panel)
     -- keep the xx_sets whitelist enforced while the owned toggle is on; the panel's own
     -- reset buttons write "all" (we rewrite ours), and search_set writes a real set
     -- whitelist (we yield via the click hook below + this fallback check)
+    real_timer.unregister("czx_owned_filter_tick")
     real_timer.register_repeating("czx_owned_filter_tick", 250)
     core:add_listener(
         "czx_owned_filter_tick",
@@ -355,7 +401,7 @@ local function attach(ancillary_panel)
             return context.string == "czx_owned_filter_tick"
         end,
         function(context)
-            if not ancillary_panel:Visible() then return end
+            if not panel_visible() then return end
             if not btn_owned:CurrentState():starts_with("selected") then return end
             local faction = cm:get_local_faction(true)
             if not faction then return end
@@ -380,7 +426,7 @@ local function attach(ancillary_panel)
         "czx_owned_yield_search_set",
         "ComponentLClickUp",
         function(context)
-            return context.string == "search_set" and ancillary_panel:Visible()
+            return context.string == "search_set" and panel_visible()
         end,
         function(context)
             if btn_owned:CurrentState():starts_with("selected") then
@@ -396,7 +442,7 @@ local function attach(ancillary_panel)
         "czx_owned_toggle",
         "ComponentLClickUp",
         function(context)
-            return context.string == "czx_button_owned" and ancillary_panel:Visible()
+            return context.string == "czx_button_owned" and panel_visible()
         end,
         function(context)
             if btn_owned:CurrentState():starts_with("selected") then
@@ -422,7 +468,7 @@ local function attach(ancillary_panel)
         "czx_sell_track_select",
         "ComponentLClickUp",
         function(context)
-            return context.string:starts_with("CcoAncillaryRecord") and ancillary_panel:Visible()
+            return context.string:starts_with("CcoAncillaryRecord") and panel_visible()
         end,
         function(context)
             local key = context.string:gsub("CcoAncillaryRecord", "")
@@ -446,7 +492,7 @@ local function attach(ancillary_panel)
         "czx_sell_one_click",
         "ComponentLClickUp",
         function(context)
-            return context.string == "czx_button_sell_one" and ancillary_panel:Visible()
+            return context.string == "czx_button_sell_one" and panel_visible()
         end,
         function(context)
             local faction = cm:get_local_faction(true)
@@ -462,7 +508,7 @@ local function attach(ancillary_panel)
         "czx_sell_all_click",
         "ComponentLClickUp",
         function(context)
-            return context.string == "czx_button_sell_all" and ancillary_panel:Visible()
+            return context.string == "czx_button_sell_all" and panel_visible()
         end,
         function(context)
             local faction = cm:get_local_faction(true)
@@ -487,21 +533,39 @@ end
 -- the panel is created by xyz_ancillary_panel's own first-tick callback, which may run after
 -- ours depending on script filename order; retry until it exists
 cm:add_first_tick_callback(function()
-    local attempts = 0
-    local function try_attach()
-        attempts = attempts + 1
-        local panel = find_uicomponent(core:get_ui_root(), "ancillary_panel")
-        if panel and attach(panel) then
-            out(">>> czx_sell >>> sell patch active (attempt " .. attempts .. ")")
-            return
-        end
-        if attempts < 240 then
-            cm:callback(try_attach, 0.5)
+    -- §10.40：find_uicomponent 走 UI 树落在 loading-dismiss→intro 窗口内会
+    -- 命中半销毁组件。先等 intro 序列完结再开始探测；无 intro 的战役靠
+    -- 静默宽限兜底（has_intro_cutscene_played 不会置位）。
+    local settle_polls = 0
+    local function probe_when_settled()
+        settle_polls = settle_polls + 1
+        local ok_done, done = pcall(function() return cm:has_intro_cutscene_played() end)
+        local ok_cs, any_cs = pcall(function() return cm:is_any_cutscene_running() end)
+        local ok_play, playing = pcall(function() return cm:is_intro_cutscene_playing() end)
+        local settled = (ok_done and done)
+            and not (ok_cs and any_cs)
+            and not (ok_play and playing)
+        if settled or settle_polls > 60 then
+            local attempts = 0
+            local function try_attach()
+                attempts = attempts + 1
+                local panel = find_uicomponent(core:get_ui_root(), "ancillary_panel")
+                if panel and attach(panel) then
+                    out(">>> czx_sell >>> sell patch active (attempt " .. attempts .. ")")
+                    return
+                end
+                if attempts < 240 then
+                    cm:callback(try_attach, 0.5)
+                else
+                    out(">>> czx_sell >>> ancillary_panel never appeared, sell patch inactive")
+                end
+            end
+            try_attach()
         else
-            out(">>> czx_sell >>> ancillary_panel never appeared, sell patch inactive")
+            cm:real_callback(probe_when_settled, 2000, "czx_sell_settle_probe")
         end
     end
-    try_attach()
+    cm:real_callback(probe_when_settled, 2000, "czx_sell_settle_probe")
 end)
 
 -- server side: validate + remove + pay

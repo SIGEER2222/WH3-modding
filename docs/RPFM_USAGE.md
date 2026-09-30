@@ -27,18 +27,17 @@ RPFM 不用于：
 - 存放通用开发经验。
 - 作为 Codex 的源码分析目标。
 
-## 打包方式选择
+## 打包方式
 
-制作或修改 MOD 到需要打包时，Codex 应先询问用户选择：
+制作或修改 MOD 到需要打包时，默认由 Codex 使用 Windows Python313 执行：
 
-1. 用户手动用 RPFM 打包。
-2. Codex 自动调用 RPFM/脚本打包。
+```text
+C:\Users\22448\AppData\Local\Programs\Python\Python313\python.exe tools/build_pack.py <mod名> --deploy
+```
 
-默认优先准备 `mod_files/<MOD名>/` 中的源文件，不直接自动打包。自动打包会额外消耗时间，因为需要导入文件、保存 Pack、运行 diagnostics，并做必要的回归核对。
+该流程负责生成 `mod_output/` 产物、部署到游戏 `data\`、备份并更新 Mod Manager 状态、写入本地包元数据和预览图。仅当用户明确要求自己使用 RPFM 时，才停在 `mod_files/<MOD名>/` 源文件并提供手工导入、diagnostics 与验证清单。Steam Workshop 发布文件放入 `workshop_release/`，最终说明文本使用 Steam BBCode。
 
-打包产物默认放入 `mod_output/`。Steam Workshop 发布文件默认放入 `workshop_release/`，其中说明文本使用 Steam BBCode。
-
-## 推荐工作流
+## 用户明确要求时的手工 RPFM 工作流
 
 1. 用 RPFM 打开目标 Pack 或新建 Pack。
 2. 确认游戏为 Total War: WARHAMMER III。

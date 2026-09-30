@@ -1,6 +1,0 @@
-<VARIANT_MESH>
-	<SLOT name="body" >
-		<VARIANT_MESH model="variantmeshes/wh_variantmodels/bi1b/czx/czx_feilong/czx_feilong_01.wsmodel" >
-			<META_DATA>audio_entity_type:wh2_dlc09_tmb_carrion</META_DATA>			<META_DATA>audio_armour_type:chitin</META_DATA></VARIANT_MESH>
-	</SLOT>
-</VARIANT_MESH>

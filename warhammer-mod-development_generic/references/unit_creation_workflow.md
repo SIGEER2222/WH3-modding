@@ -153,7 +153,7 @@
 单位卡和 porthole 是两套东西：
 
 - `unit_variants_tables.unit_card` 指向 `ui/units/icons/<unit_card>.png`，字段值不带 `.png`。
-- Mod 管理器/启动器 thumbnail 不是单位卡资源；本地/Workshop 发布时通常使用与 `.pack` 同名、放在 pack 同目录的 `.png`，并保持小于 1MB。发布缩略图优先做成正方形，常见尺寸为 `256x256`。源目录可额外保留 `thumbnail.png` 作为可维护副本，但不需要作为 DB/UI 资源导入 pack `[已查外部资料 / 需随版本复查]`。
+- Mod 管理器/启动器预览图不是单位卡资源；本地/Workshop 发布时使用与 `.pack` 同名、放在 pack 同目录的 `.png`。本项目可维护源统一为 `mod_files/<MOD名>/preview.png`，由构建/发布流程复制并改为部署包同名；它不作为 DB/UI 资源导入 pack `[已查外部资料 / 需随版本复查]`。
 - 本项目核对的阿瓦隆姐妹与耀星龙原版单位卡是 `60x130` PNG；新单位独立兵牌应按该尺寸生成并放入 `ui/units/icons/` `[已查原版文件/需随版本复查]`。
 - 低画质静态 porthole 通常读取 `ui/units/minspec_portholes/<main_units.unit>.png` 及 mask；缺失时可能显示上一个选择单位的残留头像 `[实测/需随版本复查]`。
 - 高画质动态 porthole 会实时捕捉单位/实体。多实体骑乘单位若只想显示骑手/步兵，通常需要 `main_units_tables.porthole_composite_scene` 指向专用 `.csc`。

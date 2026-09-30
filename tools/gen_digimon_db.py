@@ -477,7 +477,12 @@ def main():
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--entity", default="")
     ap.add_argument("--weapon", default="")
+    ap.add_argument("--mod", default="")
     args = ap.parse_args()
+    if args.mod:
+        global MOD, ROSTER
+        MOD = Path(r"E:\Code\WH3-modding\mod_files") / args.mod
+        ROSTER = MOD / "ROSTER.tsv"
 
     roster = load_roster()
     want = set(args.units.split(",")) if args.units else None
