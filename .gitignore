@@ -9,6 +9,10 @@
 !/mod_files/czx_ia_90fix/
 !/mod_files/czx_saf_90fix/
 !/mod_files/czx_summon_lord_pool/
+!/mod_files/zzz_czx_global_lua_guard/
+!/mod_files/zzz_czx_brf_safety/
+!/mod_files/zzz_czx_psw_click_safety/
+!/mod_files/zzz_czx_treasury_guard/
 !/mod_files/dgm_megas/
 !/mod_files/zzz_czx_ancillary_sell/
 !/mod_files/zzz_czx_fast_end_turn/
