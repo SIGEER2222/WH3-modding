@@ -47,3 +47,13 @@
 - 坦克长颈主要绑到 barrel_/exhaust_ 系骨，开火时随炮管后座摆动。
 - 人工微调入口：`manual_edit/<unit>.blend`（Blender Weight Paint 改权重 → 导出 skinned GLB → 重转）。
   详见 `manual_edit/README.md`。
+
+## 技能挂载回归修复（2026-10-02）
+
+land_units_to_unit_abilites_junctions 两次重建丢行，本次补回 11 行（24→35）：
+
+- 43b6f909 v0→表重建丢 8 行：gou×3（adrenal_glands/metabolic_boost/swarm_frenzy）、cishe×2（grooved_spines/spine_volley）、leishou×3（ultralisk_frenzied/chitinous_plating/leishou_burrow_charge）。leishou 是 Imperial Arbiter 的单位（dependencies 已声明），跨包 junction 合法。
+- d626ba5a（在途暂存顺带提交）删 2 行主动技能：zhanglang_acid_spray→czx_zhanglang、feilong_glaive_storm→czx_feilong。
+- 另按 09-24 决定补 leishou_burrow_charge→czx_mangshou（莽兽同款遁地突袭）。
+
+验证：部署包 35 行齐；WMM 深度冲突报告对本包新增行 0 悬空（ability→unit_abilities、land_unit→land_units 均解析）。
