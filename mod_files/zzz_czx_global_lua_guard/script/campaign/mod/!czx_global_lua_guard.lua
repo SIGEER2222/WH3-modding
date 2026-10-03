@@ -1,4 +1,9 @@
 local G = rawget(_G, "CZX_LUA_GUARD") or {}
+-- 2026-10-02 埋点：69 个会话日志里 czx_lua_guard 零输出——先在 head 打点定因
+--（_campaign_installed 被谁预置 / chunk 是否根本没跑到 emit）。
+out("[czx_lua_guard] file head; preexisting installed=" .. tostring(G._campaign_installed))
+out(string.format("[czx_lua_guard] env: core=%s cm=%s core_object=%s out=%s",
+    type(core), type(cm), type(core_object), type(out)))
 if G._campaign_installed then return end
 G._campaign_installed = true
 G._counts = G._counts or {}
@@ -8,11 +13,11 @@ local unpack_fn = unpack or (table and table.unpack)
 
 local function emit(message)
     local msg = "[czx_lua_guard] " .. tostring(message)
-    local printed = false
-    if type(out) == "function" then
-        printed = pcall(out, msg) == true
-    end
-    if not printed and type(print) == "function" then
+    -- 2026-10-02：WH3 环境里 out 是带 __call 的 table（type=="table"），
+    -- 旧的 type(out)=="function" 判断让全部 emit 落进 print 旁路而哑掉。
+    -- pcall 直接调用即可：function 与 callable table 都能走通。
+    local ok = pcall(out, msg)
+    if not ok and type(print) == "function" then
         pcall(print, msg)
     end
 end
@@ -51,13 +56,22 @@ function G.run(tag, fn, ...)
     return true, a, b, c, d
 end
 
+G._src_map = G._src_map or {}
+
 function G.wrap(tag, fn, fallback)
     if type(fn) ~= "function" then return fn end
-    return function(...)
+    local src = "?"
+    local ok_i, info = pcall(function() return debug.getinfo(fn, "S") end)
+    if ok_i and info then
+        src = tostring(info.short_src) .. ":" .. tostring(info.linedefined)
+    end
+    local w = function(...)
         local ok, a, b, c, d = G.run(tag, fn, ...)
         if not ok then return fallback end
         return a, b, c, d
     end
+    G._src_map[w] = src .. " <" .. tostring(tag) .. ">"
+    return w
 end
 
 function G.try_wrap_method(object, method, callback_index, tag)
@@ -112,6 +126,7 @@ end
 
 G.try_wrap_method(cm, "add_first_tick_callback", 1, "cm:add_first_tick_callback")
 G.try_wrap_method(cm, "callback", 1, "cm:callback")
+emit("mid: method wraps done")
 
 -- §10.40 loading-dismiss 级联窗口：级联逐个内联跑已注册回调时，加载屏析构
 -- 与 intro_movie overlay 创建/销毁并发进行。mod 回调里的原生 UI 操作
@@ -250,6 +265,12 @@ end
 
 local _gate_probe_seq = 0
 local function _run_when_intro_settled(fn)
+    -- 2026-10-02 canary：释放与执行点打出回调来源，崩溃日志断行直接指认元凶 mod
+    local fn_src = "?"
+    local ok_si, si = pcall(function() return debug.getinfo(fn, "S") end)
+    if ok_si and si then
+        fn_src = tostring(si.short_src) .. ":" .. tostring(si.linedefined)
+    end
     _arm_cine_watch()
     local need_cine = false
     local ok_ng, ng = pcall(function() return cm:is_new_game() end)
@@ -289,7 +310,7 @@ local function _run_when_intro_settled(fn)
             -- v4 错峰释放：各回调在同一判定帧集中通过会造成 mod 动作爆发
             -- （0728 实测 draw/overlay/fet 8s 内连发后崩），按注册序错开执行
             local delay = (seq % 6) * 2000
-            emit("intro settled (polls=" .. polls .. ", stable=" .. stable .. ", seq=" .. seq .. ", delay=" .. delay .. "ms); running deferred dismiss callback")
+            emit("intro settled (polls=" .. polls .. ", stable=" .. stable .. ", seq=" .. seq .. ", delay=" .. delay .. "ms) <- " .. fn_src .. "; running deferred dismiss callback")
             -- 错峰尾段复查：只查引擎级危害，忙则改走硬兜底排程
             cm:real_callback(function()
                 if not _engine_clear(_UI_PROBE_AFTER) then
@@ -299,6 +320,7 @@ local function _run_when_intro_settled(fn)
                     cm:real_callback(probe, 2000, key)
                     return
                 end
+                emit("releasing seq=" .. seq .. " <- " .. fn_src)
                 local ok, err = pcall(fn)
                 if not ok then report("polsd:deferred", err) end
             end, delay, key .. "_run")
@@ -359,6 +381,7 @@ if type(core_object) == "table"
     end
 end
 
+emit("pre-tail: polsd wrap block done")
 _arm_cine_watch()
 _G.CZX_LUA_GUARD = G
 emit("campaign guard installed; native engine faults are outside Lua catch scope")

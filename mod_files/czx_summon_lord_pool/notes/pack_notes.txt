@@ -1,1 +1,15 @@
 英灵召唤领主招募池补丁Lin_Summon_Servant.pack恢复旧版领主行为：9/30 工坊更新把英灵召唤从 spawn_character_to_pool("general") 重写为 create_agent（dignitary/wizard/champion 事务官），10 个 lin_all_* 从者全部只能以英雄身份入场。本补丁在 campaign first tick 把全部 10 个从者以 general 注入每个人类派系的领主招募池（saved_value 幂等，每战役一次，旧档读档也会补放），并补回新版删掉的名字表（names_name_789930001-010）。原版抽奖/召唤事务官功能不受影响，领主版与英雄版可同时存在。排在 Lin_Summon_Servant.pack 之后。
+2026-10-02 增补 agent_subtypes 覆盖行：Lin_Summon_Servant 的 10 行胜出但字段按"仅地图事务官"配置（show_in_ui=false、无 recruitment_category、saving_settings=cannot_be_loaded_in_campaign），塞入领主池后招募面板枚举时读空 category 崩 +0x22bf668。覆盖行改 show_in_ui=true、recruitment_category=legendary_lords、contributes_to_agent_cap=true、can_be_loaned=true、saving_settings=can_be_saved_loaded（对齐 saber_lord/czx_kerrigan_lord 的可招募领主配置），其余字段（模型 override/VO/cost/is_caster）保持原值。
+
+2026-10-02 深夜勘误：22:15 那次重构建把诊断探针 zzz_probe_suppress.lua 混回了包（源文件当时
+未删干净），导致新战役 FirstTickAfterWorldCreated 后 ~1s 确定性原生崩 +0x244e223（3/3 复现，
+寄存器指纹逐位相同；无探针会话 first tick 全存活）。探针已从源删除（副本在
+scratch/_zzz_probe_suppress.lua），换名部署为 zzz_czx_summon_lord_pool2.pack
+（local:data:33a6491bfbd2576f1c）。DB 覆盖行（agent_subtypes 等）不变——那部分是招募面板
+枚举崩 +0x22bf668 的修复，必须保留。旧 czx_summon_lord_pool.pack 是含探针孤儿文件，待删。
+
+2026-10-03 派系类别行职责划归 czx_lin_servant_culture_fix.pack（播放集 pos70）：原版 5 个可玩
+文化缺事务官类别行（斯卡文/混沌矮人/震旦缺 dignitary，吸血鬼海岸/恐虐缺 wizard），由该补丁
+以 agent_culture_details 新行补齐（789930101-107，recruitable_in_ui=true；矮人 wizard 与
+基斯里夫 champion 原版已有任务角色行，该补丁另加正规 true 行）。本包不再重复加行，仅保留
+领主池/agent_subtypes 覆盖/names/loc 职责。
