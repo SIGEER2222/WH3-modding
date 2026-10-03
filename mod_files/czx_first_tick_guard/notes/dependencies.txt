@@ -1,5 +1,2 @@
 wh3_confid_get.pack
 wyc_choujiang1.pack
-wyccc_starting_characters.pack
-czx_summon_lord_pool.pack
-zzz_psw_merged.pack

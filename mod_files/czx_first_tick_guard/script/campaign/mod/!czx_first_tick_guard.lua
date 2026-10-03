@@ -10,6 +10,9 @@
 local TAG = "[czx_ft_guard] ";
 
 local function callback_source(cb)
+    local g = rawget(_G, "CZX_LUA_GUARD");
+    local mapped = g and g._src_map and g._src_map[cb];
+    if mapped then return mapped end;
     local info = debug and debug.getinfo and debug.getinfo(cb, "S");
     if info then
         return tostring(info.short_src or info.source) .. ":" .. tostring(info.linedefined or 0);
@@ -17,28 +20,59 @@ local function callback_source(cb)
     return "?";
 end;
 
+-- 2026-10-02 二分支持：CZX_SKIP_PAT（逗号分隔 short_src 子串）命中即跳过；
+-- CZX_GUARD_TRACE 为真时逐回调 out() 来源（定位崩前最后一个回调）。
+local SKIP = {};
+local function load_skip()
+    local raw = rawget(_G, "CZX_SKIP_PAT");
+    if type(raw) == "string" then
+        for pat in string.gmatch(raw, "[^,]+") do
+            SKIP[#SKIP + 1] = pat;
+        end;
+    end;
+end;
+local TRACE = rawget(_G, "CZX_GUARD_TRACE") ~= false;
+
+local function should_skip(src)
+    for _, pat in ipairs(SKIP) do
+        if string.find(src, pat, 1, true) then
+            return true;
+        end;
+    end;
+    return false;
+end;
+
 local function guarded_call_each(list, list_name, context)
     if type(list) ~= "table" then
         out(TAG .. "list " .. list_name .. " is " .. type(list) .. ", skipped");
         return;
     end;
+    load_skip();
     local total = #list;
     local done = 0;
     for i = 1, total do
         local cb = list[i];
         if type(cb) == "function" then
-            local ok, err = xpcall(
-                function()
-                    cb(context);
-                end,
-                function(e)
-                    return tostring(e) .. "\n" .. tostring(debug.traceback("", 2));
-                end
-            );
-            if ok then
-                done = done + 1;
+            local src = callback_source(cb);
+            if should_skip(src) then
+                out(TAG .. list_name .. "[" .. i .. "/" .. total .. "] SKIPPED " .. src);
             else
-                out(TAG .. list_name .. "[" .. i .. "/" .. total .. "] " .. callback_source(cb) .. " threw: " .. tostring(err));
+                if TRACE then
+                    out(TAG .. list_name .. "[" .. i .. "/" .. total .. "] run <- " .. src);
+                end;
+                local ok, err = xpcall(
+                    function()
+                        cb(context);
+                    end,
+                    function(e)
+                        return tostring(e) .. "\n" .. tostring(debug.traceback("", 2));
+                    end
+                );
+                if ok then
+                    done = done + 1;
+                else
+                    out(TAG .. list_name .. "[" .. i .. "/" .. total .. "] " .. src .. " threw: " .. tostring(err));
+                end;
             end;
         else
             out(TAG .. list_name .. "[" .. i .. "/" .. total .. "] is " .. type(cb) .. ", skipped");
