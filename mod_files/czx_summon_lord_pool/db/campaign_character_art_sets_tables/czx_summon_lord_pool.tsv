@@ -1,0 +1,12 @@
+﻿agent_type	art_set_id	culture	subculture	faction	is_custom	is_male	agent_subtype	campaign_map_scale	prebattle_separation_offset
+#campaign_character_art_sets_tables;7;db/campaign_character_art_sets_tables/czx_summon_lord_pool																																																												
+general	lin_art_set_all_artoria_lancer_0				false	true	lin_all_artoria_lancer	1.0	0.0
+general	lin_art_set_all_artoria_alter_lancer_0				false	true	lin_all_artoria_alter_lancer	1.0	0.0
+general	lin_art_set_all_kerrigan_base_0				false	true	lin_all_kerrigan_zerg	1.0	0.0
+general	lin_art_set_all_hydaelyn_venat_0				false	true	lin_all_hydaelyn_venat	1.0	0.0
+general	lin_art_set_all_nael_deus_darnus_0				false	true	lin_all_nael_deus_darnus	0.5	0.0
+general	lin_art_set_all_surtr_base_0				false	true	lin_all_surtr_arts_fighter	1.0	0.0
+general	lin_art_set_all_queen_marika_0				false	true	lin_all_queen_marika	1.0	0.0
+general	lin_art_set_all_jeanne_ruler_0				false	true	lin_all_jeanne_ruler	1.0	0.0
+general	lin_art_set_all_jeanne_alter_avenger_0				false	true	lin_all_jeanne_alter_avenger	1.0	0.0
+general	lin_art_set_all_scathach_lancer_0				false	true	lin_all_scathach_lancer	1.0	0.0
