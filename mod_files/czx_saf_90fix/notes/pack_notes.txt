@@ -2,13 +2,23 @@ czx_saf_90fix — StrongerAndFairerAI 9.0 兼容补丁
 
 问题：@StrongerAndFairerAI 的 !add_horde_cap.lua 在新战役 first tick 执行
 saf_buff_ai -> chaosCap，其中 cm:force_declare_war("wh2_dlc13_wef_laurelorn_forest", ...)
-的派系键在 WH3 9.0 地图上不存在，引擎直接抛错。该回调注册在
-add_first_tick_callback_new（sp_new 列表），而引擎的 call_each 没有错误隔离——
-一个回调抛错会跳过 sp_each/shared/post 所有后续 first-tick 回调，导致全部
-mod 按钮（女神抽奖/召唤等）、开局英雄发放、领主招募池注入集体失效。
+的派系键在 WH3 9.0 地图上不存在（Laurelorn 现键为 wh3_main_wef_laurelorn），
+引擎直接抛错。该回调注册在 add_first_tick_callback_new（sp_new 列表），而引擎
+的 call_each 没有错误隔离——一个回调抛错会跳过 sp_each/shared/post 所有后续
+first-tick 回调，导致全部 mod 按钮（女神抽奖/召唤等）、开局英雄发放、领主招募
+池注入集体失效。2026-10-02 Neferata 新档精锐兽栏无按钮即此因：该次 playset
+调整把本包与 czx_first_tick_guard 移出，SAF 原版文件裸奔，sp_new 抛错后
+czx_mod_pool 所在 shared 列表从未执行。
 
-修复：整文件遮蔽原版脚本，给全部 157 处 force_declare_war 调用套 pcall 护栏
-（saf_force_declare_war），失效派系键只跳过那一次宣战并打印日志，不再中断
-first_tick 队列。其余逻辑零改动；saf_buff_ai_mid（第 32 回合触发）不受影响。
+修复：整文件遮蔽原版脚本。2026-10-03 起双层防护：
+1) 直接删除已知的 WH2-only 派系键行 wh2_dlc13_wef_laurelorn_forest
+   （wh3_main_wef_laurelorn 对同目标的宣战已存在，消灭错误而非包住错误）；
+2) 保留全部 force_declare_war 的 pcall 护栏（saf_force_declare_war），未知的
+   失效派系键只跳过那一次宣战并打印 "[czx_saf_90fix] force_declare_war
+   skipped"，不再中断 first_tick 队列。其余逻辑零改动；
+   saf_buff_ai_mid（第 32 回合触发）不受影响。
+日志出现 skipped 行 = 文件里还有未发现的失效键，按同样方式删除该对宣战。
 
 必须排在 @StrongerAndFairerAI.pack 之前（同路径文件级遮蔽，靠前生效）。
+部署名 2026-10-03 起为 czx_saf_90fix2.pack（游戏运行锁旧文件名，换名部署；
+旧 czx_saf_90fix.pack 为孤儿文件，游戏关闭后清理）。

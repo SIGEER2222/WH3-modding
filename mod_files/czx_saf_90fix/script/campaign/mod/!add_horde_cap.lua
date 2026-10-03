@@ -1,10 +1,14 @@
 
 -- czx_saf_90fix: engine force_declare_war() hard-errors on faction keys that
--- don't exist on this map/version (e.g. wh2_dlc13_wef_laurelorn_forest is
--- WH2-only), and this file's saf_buff_ai() runs inside a first-tick callback
--- whose abort kills every later first-tick callback of every mod (buttons,
--- starting heroes, lord pools). Wrap each call so a stale key only skips that
--- one war declaration instead of cascading.
+-- don't exist on this map/version, and this file's saf_buff_ai() runs inside a
+-- first-tick callback whose abort kills every later first-tick callback of
+-- every mod (buttons, starting heroes, lord pools). Wrap each call so a stale
+-- key only skips that one war declaration instead of cascading.
+-- 2026-10-03: the known-stale WH2-only key wh2_dlc13_wef_laurelorn_forest has
+-- been REMOVED (wh3_main_wef_laurelorn already declares the same war); the
+-- pcall wrapper stays as a guard for any stale key not yet discovered. If a
+-- "[czx_saf_90fix] force_declare_war skipped" line ever shows up in
+-- script_log, prune that pair the same way.
 local function saf_force_declare_war(faction_a, faction_b, p3, p4)
 	local ok, err = pcall(cm.force_declare_war, cm, faction_a, faction_b, p3, p4);
 	if not ok then
@@ -286,7 +290,6 @@ local function chaosCap()
             saf_force_declare_war("wh3_main_grn_drippin_fangs", "wh3_dlc23_chd_astragoth", false, false)
             
             saf_force_declare_war("wh3_main_wef_laurelorn", "wh_dlc03_bst_beastmen", false, false)
-            saf_force_declare_war("wh2_dlc13_wef_laurelorn_forest", "wh_dlc03_bst_beastmen", false, false)
             saf_force_declare_war("wh_dlc05_wef_torgovann", "wh_dlc03_bst_beastmen", false, false)
             saf_force_declare_war("wh_dlc05_wef_wydrioth", "wh_dlc03_bst_beastmen", false, false)
             saf_force_declare_war("wh_dlc05_wef_torgovann", "wh_dlc05_bst_morghur_herd", false, false)
