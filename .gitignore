@@ -41,3 +41,4 @@
 *.ivf
 *.bnk
 __pycache__/
+!/mod_files/zzz_czx_mortarch_diag/

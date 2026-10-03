@@ -1,0 +1,10 @@
+DLC29 死亡统帅（Mortarch）面板诊断 + 强制收服
+背景：原版面板招募按钮（button_dominate）的可见性由 twui 绑定控制：
+IsComplete==false && ExNagashConfederationRitual_IsOwnedByOtherPlayer==false
+&& (IsContextValid(mission) && mission.IsCancelled==false)，任一不满足按钮整体消失。
+用户实测：条件全绿（面板勾）但按钮消失，日志确认关联任务未完成、未取消。
+功能：
+1. 面板打开时输出 5 条吞并型仪式的 CanPerformRitual/IsComplete/OwnedByOtherPlayer 真实值
+2. footer 注入「强制收服」按钮：点选死亡统帅头像后点击，吞并型走引擎 Perform，
+   失败回退 cm:force_confederation（映射表来自原版 wh3_dlc29_nag_mortarchs.lua）
+依赖：无（vanilla DLC29）
