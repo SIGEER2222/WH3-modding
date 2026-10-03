@@ -1,0 +1,26 @@
+character_level	unit	faction_override
+#campaign_mercenary_unit_character_level_restrictions_tables;1;db/campaign_mercenary_unit_character_level_restrictions_tables/!!dgm_megas
+15	dgm_chr359_lillymon	
+15	dgm_chr027_blackwargreymon	
+15	dgm_chr105_gallantmon_cm	
+15	dgm_chr329_ancientgreymon	
+15	dgm_chr331_ancientgarurumon	
+15	dgm_chr013_gallantmon	
+15	dgm_chr749_mr_jesmon_alt	
+15	dgm_chr019_dorugoramon	
+15	dgm_chr213_slayerdramon	
+15	dgm_chr350_examon	
+15	dgm_chr215_examon_alt	
+15	dgm_chr036_barbamon	
+15	dgm_chr600_venommyotismon	
+15	dgm_chr675_magnagarurumon	
+15	dgm_chr678_magnagarurumon_sv	
+15	dgm_chr733_dianamon	
+15	dgm_chr734_craniamon	
+15	dgm_chr737_justimon	
+15	dgm_chr738_dynasmon	
+15	dgm_chr740_ravemon	
+15	dgm_chr742_lotosmon	
+15	dgm_chr766_alphamon_alt	
+15	dgm_chr773_valkyrimon	
+15	dgm_chr118_chaosmon	

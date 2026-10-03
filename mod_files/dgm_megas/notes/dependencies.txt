@@ -1,0 +1,2 @@
+# 究极体招募从各派系精英池迁移至独立池 czx_mod_pool（精锐兽栏按钮）
+czx_mod_pool4.pack

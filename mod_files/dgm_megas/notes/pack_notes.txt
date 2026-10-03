@@ -2,3 +2,4 @@ Digimon dgm_megas (upstream dgm build) — standalone digimon units.
 Converted from C:\Users\22448\Downloads\dgm_megas.pack (RPFM TSV-source export).
 Namespace dgm_* / chrXXX; independent of zzz_czx_digimon_v2 (czx_*).
 Recruitment: v2-style fan-out (tier1->512 bldgs, tier2->165, tier3+/5->45; 104 military groups; 25 custom-battle factions; 28 culture animpacks).
+Campaign recruitment: all 24 megas moved from per-subculture units_of_renown_pool junctions to dedicated pool czx_mod_pool（精锐兽栏独立招募按钮，依赖 czx_mod_pool.pack）; cap 1, partial replenish 0.34/turn, initial 1; lord rank >=15 required (campaign_mercenary_unit_character_level_restrictions).
