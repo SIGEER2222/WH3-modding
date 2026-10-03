@@ -86,14 +86,27 @@ core:add_listener(
         local character = cm:get_character_by_cqi(context:faction_cqi())
         if not character or not character:faction():is_human() then return end
         cm:callback(function()
-            local mf = character:military_force()
-            if not mf then return end
-            local unit_list = mf:unit_list()
-            -- item_at(0) is the commander's own unit; keep it
-            for i = 1, unit_list:num_items() - 1 do
-                cm:remove_unit_from_character(cm:char_lookup_str(character), unit_list:item_at(i):unit_key())
+            -- 原版 for 循环持一次抓取的 unit_list 逐个 remove——每删一个底层容器
+            -- 即变，后续 item_at 读悬空槽（与 starting_units RemoveStartingArmy 同款
+            -- 隐患，2026-10-02 修复）。改为每 tick 重取列表、固定删 item_at(1)
+            --（item_at(0) 是将领亲卫位，引擎也保护），角色接口失效即停。
+            local char_str = cm:char_lookup_str(character)
+            local function step_disband()
+                local ok, left = pcall(function()
+                    local mf = character:military_force()
+                    if not mf then return 0 end
+                    local ul = mf:unit_list()
+                    if not ul or ul:num_items() <= 1 then return 0 end
+                    cm:remove_unit_from_character(char_str, ul:item_at(1):unit_key())
+                    return ul:num_items()
+                end)
+                if ok and left and left > 1 then
+                    cm:callback(step_disband, 0.15)
+                elseif ok then
+                    out(">>> czx_disband >>> disbanded all units of " .. tostring(character:character_type_key()))
+                end
             end
-            out(">>> czx_disband >>> disbanded all units of " .. tostring(character:character_type_key()))
+            step_disband()
         end, 0)
     end,
     true
