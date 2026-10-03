@@ -1,0 +1,18 @@
+chance_to_replenish	key	max_count	unit_record	use_partial_replenishment	max_replenish_per_turn	ui_order
+#mercenary_unit_groups_tables;3;db/mercenary_unit_groups_tables/czx_swarm_pool
+100.0	czx_pool_gou	20	gou	true	0.5	0
+100.0	czx_pool_baochong	20	czx_baochong	true	0.5	1
+100.0	czx_pool_inf_marine	20	czx_inf_marine	true	0.5	2
+100.0	czx_pool_cishe	10	cishe	true	0.5	3
+100.0	czx_pool_zhanglang	10	czx_zhanglang	true	0.5	4
+100.0	czx_pool_feilong	10	czx_feilong	true	0.5	5
+0.0	czx_pool_jibian	10	czx_jibian	false	0.0	6
+0.0	czx_pool_inf_diamondback	10	czx_inf_diamondback	false	0.0	7
+0.0	czx_pool_hd_green	10	czx_hd_green	false	0.0	8
+0.0	czx_pool_hd_white	10	czx_hd_white	false	0.0	9
+0.0	czx_pool_hd_black	10	czx_hd_black	false	0.0	10
+0.0	czx_pool_mangshou	8	czx_mangshou	false	0.0	11
+0.0	czx_pool_hd_dblack	4	czx_hd_dblack	false	0.0	12
+0.0	czx_pool_baolongshou	4	czx_baolongshou	false	0.0	13
+0.0	czx_pool_inf_tank	4	czx_inf_tank	false	0.0	14
+0.0	czx_pool_dehaka	4	czx_dehaka	false	0.0	15

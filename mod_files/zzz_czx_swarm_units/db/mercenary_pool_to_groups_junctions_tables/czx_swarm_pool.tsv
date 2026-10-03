@@ -1,0 +1,18 @@
+group	initial_unit_count	key	pool	faction_requirement	subculture_requirement	tech_requirement
+#mercenary_pool_to_groups_junctions_tables;3;db/mercenary_pool_to_groups_junctions_tables/czx_swarm_pool
+czx_pool_gou	2	1988000001	czx_mod_pool			
+czx_pool_baochong	2	1988000002	czx_mod_pool			
+czx_pool_inf_marine	2	1988000003	czx_mod_pool			
+czx_pool_cishe	2	1988000004	czx_mod_pool			
+czx_pool_zhanglang	1	1988000005	czx_mod_pool			
+czx_pool_feilong	1	1988000006	czx_mod_pool			
+czx_pool_jibian	0	1988000007	czx_mod_pool			
+czx_pool_inf_diamondback	0	1988000008	czx_mod_pool			
+czx_pool_hd_green	0	1988000009	czx_mod_pool			
+czx_pool_hd_white	0	1988000010	czx_mod_pool			
+czx_pool_hd_black	0	1988000011	czx_mod_pool			
+czx_pool_mangshou	0	1988000012	czx_mod_pool			
+czx_pool_hd_dblack	0	1988000013	czx_mod_pool			
+czx_pool_baolongshou	0	1988000014	czx_mod_pool			
+czx_pool_inf_tank	0	1988000015	czx_mod_pool			
+czx_pool_dehaka	0	1988000016	czx_mod_pool			
