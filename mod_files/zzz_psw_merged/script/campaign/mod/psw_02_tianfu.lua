@@ -876,16 +876,22 @@ end
 -- ERE WE GO
 
 local function psw_faction_button_created(pswyoFactionName, ui_tooltip, ui_button, ui_button_image_path)
+    -- §10.40：CreateComponent/Layout/SetImagePath 全是原生写，UI 持锁期（干预/
+    -- 面板重建）进来会读死节点；锁即弃本轮，由 ensure 重试链兜底。
+    local ok_lock, locked = pcall(function() return cm:get_campaign_ui_manager().ui_locked end)
+    if ok_lock and locked then return end
     local button_group_management = find_uicomponent(ui_root, "hud_campaign", "faction_buttons_docker", "button_group_management")
     if not button_group_management then return end
     local main_faction_dilemma_button = find_uicomponent(button_group_management, ui_button)
     if not main_faction_dilemma_button then
+        out("[psw] ensure_btn create enter")
         main_faction_dilemma_button = UIComponent(button_group_management:CreateComponent(ui_button, "ui/templates/round_large_button"))
         ---@diagnostic disable-next-line: undefined-field
         button_group_management:Layout()
         local localized_main_tooltip = common.get_localised_string(ui_tooltip)
         main_faction_dilemma_button:SetTooltipText(localized_main_tooltip, localized_main_tooltip, true)
         main_faction_dilemma_button:SetImagePath(ui_button_image_path, 0)
+        out("[psw] ensure_btn create done")
     end
     if not main_faction_dilemma_button then return end
     main_faction_dilemma_button:SetVisible(true)
@@ -995,6 +1001,14 @@ cm:add_first_tick_callback(
             -- 上限 ~10min（按钮已存在时 psw_faction_button_created 仅置 visible）
             local btn_tries = 0
             local function psw_ensure_button()
+                -- §10.40：UI 持锁期连 find_uicomponent 都可能读死节点——锁即重排、
+                -- 不消耗重试次数；每 6 次心跳一行，崩后日志可直接指认窗内活动。
+                local ok_lock, locked = pcall(function() return cm:get_campaign_ui_manager().ui_locked end)
+                if ok_lock and locked then
+                    out("[psw] ensure_btn locked, defer")
+                    cm:real_callback(psw_ensure_button, 5000, "psw_ensure_button")
+                    return
+                end
                 btn_tries = btn_tries + 1
                 local missing = true
                 local ok = pcall(function()
@@ -1007,6 +1021,9 @@ cm:add_first_tick_callback(
                         missing = not find_uicomponent(bgm, ui_button)
                     end
                 end)
+                if btn_tries % 6 == 1 then
+                    out("[psw] ensure_btn try#" .. btn_tries .. " missing=" .. tostring(missing))
+                end
                 if (not ok or missing) and btn_tries < 120 then
                     cm:real_callback(psw_ensure_button, 5000, "psw_ensure_button")
                 end

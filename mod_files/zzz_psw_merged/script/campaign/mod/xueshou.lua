@@ -1,6 +1,8 @@
 --以下本地函数用于实现向派系添加精英部队招募
 local function xueshou()
-    if cm:get_saved_value("xueshou") == nil then
+    local original_pending = cm:get_saved_value("xueshou") == nil;
+    local vampire_pending = cm:get_saved_value("xueshou_vampire_compat_v1") == nil;
+    if original_pending or vampire_pending then
         local cror_list = {
             {faction_key = "wh_main_grn_orcs_of_the_bloody_hand",source = "renown",unit = "wh_dlc06_grn_inf_da_warlords_boyz_0",
             	count = 0, rcp = 100, munits = 20, murpt = 2, frr = "", srr = "", trr = "",
@@ -63,13 +65,42 @@ local function xueshou()
             --frr、srr、trr分别是派系限定、子文化限定和科技限定
             --mercenary_group填mercenary_unit_groups_tables里的key代码，需要自己新建，还要分配在mercenary_pool_to_groups_junctions_tables到对应的派系招募池；
             	}--到这里结束，如果要给多个派系添加精英部队的话，加个逗号，后面再填一轮即可
+
+        -- The original list only targeted Bloody Hand. Mirror the same pool
+        -- for a human vampire player, including custom factions that reuse
+        -- the vanilla Vampire Counts/Coast subcultures.
+        if vampire_pending then
+            local vampire_subcultures = {
+                wh_main_sc_vmp_vampire_counts = true,
+                wh2_dlc11_sc_cst_vampire_coast = true,
+            };
+            local human_factions = cm:get_human_factions() or {};
+            for i = 1, #human_factions do
+                local faction = cm:get_faction(human_factions[i]);
+                if faction and not faction:is_null_interface()
+                    and vampire_subcultures[faction:subculture()]
+                then
+                    for _, template in ipairs(cror_list) do
+                        if template.faction_key == "wh_main_grn_orcs_of_the_bloody_hand" then
+                            local row = {};
+                            for key, value in pairs(template) do
+                                row[key] = value;
+                            end;
+                            row.faction_key = faction:name();
+                            table.insert(cror_list, row);
+                        end;
+                    end;
+                end;
+            end;
+        end;
             	 
          for i = 1,#cror_list do  
         	local faction_name = cror_list[i].faction_key;  
-        	local faction = cm:get_faction(faction_name);
+            local faction = cm:get_faction(faction_name);
+            if original_pending or faction_name ~= "wh_main_grn_orcs_of_the_bloody_hand" then
             local source_key = "renown";
-        	local unit_key = cror_list[i].unit;
-        	local unit_count = cror_list[i].count;
+            local unit_key = cror_list[i].unit;
+            local unit_count = cror_list[i].count;
         	local rcp = 100;
         	local munits = cror_list[i].munits;
         	local murpt = 0.3;
@@ -86,9 +117,15 @@ local function xueshou()
             
             
             
-        	cm:add_unit_to_faction_mercenary_pool(faction, unit_key,source_key, unit_count, rcp, munits, murpt, frr, srr, trr, replen,group_key);
+            cm:add_unit_to_faction_mercenary_pool(faction, unit_key,source_key, unit_count, rcp, munits, murpt, frr, srr, trr, replen,group_key);
+            end;
         end;
-        cm:set_saved_value("xueshou", true);
+        if original_pending then
+            cm:set_saved_value("xueshou", true);
+        end;
+        if vampire_pending then
+            cm:set_saved_value("xueshou_vampire_compat_v1", true);
+        end;
     end;
 end;
 cm:add_first_tick_callback(function() xueshou() end);
