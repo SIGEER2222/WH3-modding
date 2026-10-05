@@ -7,6 +7,7 @@
 
 local _repick_topup = 99
 local _max_ex_shangxian = 20
+local _resonance_crystal_per_turn = 1
 
 local function _apply_ex_shangxian_bundles(faction_name)
     local faction = cm:get_faction(faction_name)
@@ -86,7 +87,10 @@ cm:add_first_tick_callback(function()
         function(context)
             -- 接上原作者漏接线的每回合水晶 +1（DB 里有 huihe 因子但从未调用）
             cm:faction_add_pooled_resource(
-                context:faction():name(), "psw_main_gmsj", "psw_main_gmsj_huihe_get_good", 1)
+                context:faction():name(),
+                "psw_main_gmsj",
+                "psw_main_gmsj_huihe_get_good",
+                _resonance_crystal_per_turn)
             _repick_topup_all()
         end,
         true
