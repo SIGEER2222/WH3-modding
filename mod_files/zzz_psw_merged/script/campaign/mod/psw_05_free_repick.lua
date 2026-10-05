@@ -8,6 +8,53 @@
 local _repick_topup = 99
 local _max_ex_shangxian = 20
 local _resonance_crystal_per_turn = 1
+local _tfmw_progress_callback_delay = 5.5
+
+local function _tfmw_progress_value()
+    local global_data = psw_main_data and psw_main_data.global_data
+    local mowang_key = psw_mowang_data and psw_mowang_data.mowang_faction_key
+    local mowang_data = mowang_key and psw_mowang_data[mowang_key]
+    if not global_data or not mowang_data then
+        return nil
+    end
+    return mowang_data.progress
+end
+
+local function _advance_tfmw_progress_once(start_progress, turn_number)
+    local global_data = psw_main_data and psw_main_data.global_data
+    if not global_data or not global_data.tfmw_is_start
+        or global_data.set_tfmw_end
+        or global_data.set_mowang_progress_hh
+    then
+        return
+    end
+
+    local current_progress = _tfmw_progress_value()
+    -- The original delayed callback may already have advanced the value but
+    -- failed before setting its guard flag. Treat that as this turn's advance.
+    if start_progress ~= nil and current_progress ~= nil
+        and current_progress > start_progress
+    then
+        global_data.set_mowang_progress_hh = true
+        return
+    end
+
+    if type(psw_main_mowang_progress_change_effect) ~= "function" then
+        out("[psw_repick] WARN: tfmw progress function is unavailable")
+        return
+    end
+
+    local before = current_progress
+    local ok, err = pcall(psw_main_mowang_progress_change_effect, 1)
+    local after = _tfmw_progress_value()
+    if after ~= nil and before ~= nil and after > before then
+        global_data.set_mowang_progress_hh = true
+        out("[psw_repick] tfmw progress advanced at turn "
+            .. tostring(turn_number) .. " to " .. tostring(after))
+    elseif not ok then
+        out("[psw_repick] tfmw progress fallback error: " .. tostring(err))
+    end
+end
 
 local function _apply_ex_shangxian_bundles(faction_name)
     local faction = cm:get_faction(faction_name)
@@ -85,6 +132,8 @@ cm:add_first_tick_callback(function()
             return f and not f:is_null_interface() and f:is_human()
         end,
         function(context)
+            local turn_number = cm:turn_number()
+            local start_progress = _tfmw_progress_value()
             -- 接上原作者漏接线的每回合水晶 +1（DB 里有 huihe 因子但从未调用）
             cm:faction_add_pooled_resource(
                 context:faction():name(),
@@ -92,7 +141,34 @@ cm:add_first_tick_callback(function()
                 "psw_main_gmsj_huihe_get_good",
                 _resonance_crystal_per_turn)
             _repick_topup_all()
+            -- Keep the original five-second turn routine intact. This delayed
+            -- fallback only fills the progress gap if that routine is absent
+            -- or errors before setting its once-per-turn guard.
+            cm:callback(function()
+                _advance_tfmw_progress_once(start_progress, turn_number)
+            end, _tfmw_progress_callback_delay)
         end,
         true
     )
+
+    core:add_listener(
+        "psw_tfmw_progress_reset",
+        "FactionTurnEnd",
+        function(context)
+            local f = context:faction()
+            return f and not f:is_null_interface() and f:is_human()
+        end,
+        function()
+            if psw_main_data and psw_main_data.global_data then
+                psw_main_data.global_data.set_mowang_progress_hh = false
+            end
+        end,
+        true
+    )
+
+    -- A loaded save can retain the original guard from the previous session.
+    -- The next FactionTurnStart must be allowed to advance normally.
+    if psw_main_data and psw_main_data.global_data then
+        psw_main_data.global_data.set_mowang_progress_hh = false
+    end
 end)
