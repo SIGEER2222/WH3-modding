@@ -3364,6 +3364,9 @@ cm:add_first_tick_callback(
 function psw_start_game_all_factions()
 	out("psw_start_game_all_factions() called");
 	out.inc_tab();
+    if is_function(psw_tfmw_recover_stale_boss_challenge) then
+        psw_tfmw_recover_stale_boss_challenge()
+    end
 	psw_lmyx_tfjh_jjdmn()
 	lmyx_mfsn_lhjs_hh()
 	alxy_lznl_hh()
@@ -3475,8 +3478,6 @@ function psw_start_game_all_factions()
     psw_main_CharacterRankUp_listner()
     out.dec_tab();
 end
-
-
 
 
 

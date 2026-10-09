@@ -11,7 +11,379 @@ local function psw_leader_anchor_valid(faction_leader)
         and not faction_leader:region():is_null_interface()
 end
 
-local function psw_hero_creat_impl(faction_name, hero_key)
+-- create_force_with_existing_general() requires a non-empty unit list even
+-- when the intended result is a general-only force.  This unit is only a
+-- bootstrap entry; it is removed after the existing family member is attached.
+local psw_restore_bootstrap_unit = "wh_main_emp_inf_spearmen_0"
+local psw_restore_pending = {}
+local psw_no_movement_bundle = "wh3_main_bundle_military_upkeep_free_force_no_movement"
+
+-- The merged pack does not always include the original music helper.  A
+-- missing optional sound effect must not abort hero creation.
+if type(psw_play_dlc_music) ~= "function" then
+    function psw_play_dlc_music(key)
+        local ok, error_message = pcall(function()
+            common.trigger_soundevent("Play_" .. tostring(key))
+        end)
+        if not ok then
+            out("[psw_debug] optional hero music skipped key="
+                .. tostring(key) .. " error=" .. tostring(error_message))
+        end
+    end
+    out("[psw_debug] installed fallback psw_play_dlc_music")
+end
+
+local function psw_restore_log(message)
+    out("[psw_debug] hero force restore: " .. tostring(message))
+end
+
+local function psw_restore_valid_character(character)
+    return character ~= nil
+        and character ~= false
+        and not character:is_null_interface()
+end
+
+local function psw_restore_movement_for_character(character, reason)
+    if not psw_restore_valid_character(character) then
+        return false
+    end
+
+    local char_cqi = character:command_queue_index()
+    local char_lookup = cm:char_lookup_str(character)
+    local has_force = false
+    local has_no_movement_bundle = false
+    local action_points_before = "n/a"
+
+    pcall(function()
+        action_points_before = character:action_points_remaining_percent()
+    end)
+    pcall(function()
+        has_force = character:has_military_force()
+    end)
+    if has_force then
+        pcall(function()
+            has_no_movement_bundle = character:military_force():has_effect_bundle(
+                psw_no_movement_bundle
+            )
+        end)
+    end
+
+    local removed_bundle = false
+    if has_no_movement_bundle then
+        local remove_ok = pcall(function()
+            cm:remove_effect_bundle_from_characters_force(
+                psw_no_movement_bundle,
+                char_cqi
+            )
+        end)
+        removed_bundle = remove_ok
+    end
+
+    local enable_ok = pcall(function()
+        cm:enable_movement_for_character(char_lookup)
+    end)
+    local replenish_ok = pcall(function()
+        cm:replenish_action_points(char_lookup)
+    end)
+
+    psw_restore_log(
+        "movement repair reason=" .. tostring(reason)
+        .. " cqi=" .. tostring(char_cqi)
+        .. " has_force=" .. tostring(has_force)
+        .. " no_movement_bundle=" .. tostring(has_no_movement_bundle)
+        .. " removed_bundle=" .. tostring(removed_bundle)
+        .. " ap_before=" .. tostring(action_points_before)
+        .. " enable_ok=" .. tostring(enable_ok)
+        .. " replenish_ok=" .. tostring(replenish_ok)
+    )
+
+    cm:callback(function()
+        local refreshed = cm:get_character_by_cqi(char_cqi)
+        if not psw_restore_valid_character(refreshed) then
+            psw_restore_log(
+                "movement verify character missing cqi=" .. tostring(char_cqi)
+            )
+            return
+        end
+
+        local verify_has_force = false
+        local verify_has_no_movement_bundle = false
+        local action_points_after = "n/a"
+        pcall(function()
+            action_points_after = refreshed:action_points_remaining_percent()
+        end)
+        pcall(function()
+            verify_has_force = refreshed:has_military_force()
+        end)
+        if verify_has_force then
+            pcall(function()
+                verify_has_no_movement_bundle = refreshed:military_force():has_effect_bundle(
+                    psw_no_movement_bundle
+                )
+            end)
+        end
+        psw_restore_log(
+            "movement verify reason=" .. tostring(reason)
+            .. " cqi=" .. tostring(char_cqi)
+            .. " has_force=" .. tostring(verify_has_force)
+            .. " no_movement_bundle=" .. tostring(verify_has_no_movement_bundle)
+            .. " ap_after=" .. tostring(action_points_after)
+        )
+    end, 0.5)
+
+    return true
+end
+
+local function psw_restore_get_main_character(faction_name, subtype)
+    local character = nil
+    if type(psw_get_main_character) == "function" then
+        local ok, result = pcall(psw_get_main_character, faction_name)
+        if ok then
+            character = result
+        end
+    end
+
+    if psw_restore_valid_character(character) then
+        return character
+    end
+
+    local faction = cm:get_faction(faction_name)
+    if faction == nil or faction:is_null_interface() then
+        return nil
+    end
+
+    local characters = faction:character_list()
+    for index = 0, characters:num_items() - 1 do
+        local candidate = characters:item_at(index)
+        local candidate_subtype = nil
+        local ok = pcall(function()
+            candidate_subtype = candidate:character_subtype_key()
+        end)
+        if ok and candidate_subtype == subtype then
+            return candidate
+        end
+    end
+
+    return nil
+end
+
+local function psw_restore_poll(faction_name, family_member_cqi, attempt)
+    if psw_restore_pending[faction_name] ~= family_member_cqi then
+        return
+    end
+
+    local character = cm:get_character_by_fm_cqi(family_member_cqi)
+    if psw_restore_valid_character(character)
+        and not character:is_wounded()
+        and cm:char_is_general_with_army(character)
+    then
+        local remove_ok, removed_count = pcall(function()
+            return cm:remove_all_units_from_general(character)
+        end)
+        if remove_ok then
+            psw_restore_movement_for_character(character, "revival")
+            psw_restore_log(
+                "restored existing family member fm_cqi=" .. tostring(family_member_cqi)
+                .. " cqi=" .. tostring(character:command_queue_index())
+                .. " force_cqi=" .. tostring(character:military_force():command_queue_index())
+                .. " bootstrap_units_removed=" .. tostring(removed_count)
+            )
+        else
+            psw_restore_log(
+                "force restored but bootstrap cleanup failed fm_cqi="
+                .. tostring(family_member_cqi) .. " error=" .. tostring(removed_count)
+            )
+        end
+
+        -- The force/unit mutation is command queued.  Verify after it settles
+        -- before allowing another recovery attempt on the next faction turn.
+        cm:callback(function()
+            local settled = cm:get_character_by_fm_cqi(family_member_cqi)
+            local has_army = psw_restore_valid_character(settled)
+                and cm:char_is_general_with_army(settled)
+            psw_restore_log(
+                "settled fm_cqi=" .. tostring(family_member_cqi)
+                .. " has_army=" .. tostring(has_army)
+            )
+            psw_restore_pending[faction_name] = nil
+        end, 0.5)
+        return
+    end
+
+    if attempt < 12 then
+        cm:callback(function()
+            psw_restore_poll(faction_name, family_member_cqi, attempt + 1)
+        end, 0.25)
+    else
+        psw_restore_pending[faction_name] = nil
+        psw_restore_log(
+            "existing-general force creation did not settle fm_cqi="
+            .. tostring(family_member_cqi)
+        )
+    end
+end
+
+local function psw_restore_main_hero_force(faction_name)
+    if psw_restore_pending[faction_name] then
+        return
+    end
+
+    local faction = cm:get_faction(faction_name)
+    if faction == nil or faction:is_null_interface() or faction:is_dead() then
+        return
+    end
+
+    local player_data = psw_main_data
+        and psw_main_data.player_data
+        and psw_main_data.player_data[faction_name]
+    local subtype = player_data and player_data.yx_subtype
+    if subtype == nil or not faction:has_effect_bundle("t_hero_lmyx") then
+        return
+    end
+
+    local character = psw_restore_get_main_character(faction_name, subtype)
+    if not psw_restore_valid_character(character)
+        or character:character_subtype_key() ~= subtype
+        or character:is_wounded()
+        or character:is_at_sea()
+        or cm:char_is_general_with_army(character)
+    then
+        return
+    end
+
+    local family_member_cqi = 0
+    local family_ok = pcall(function()
+        family_member_cqi = character:family_member():command_queue_index()
+    end)
+    if not family_ok or tonumber(family_member_cqi) == nil or family_member_cqi <= 0 then
+        psw_restore_log("cannot identify family member for subtype=" .. tostring(subtype))
+        return
+    end
+
+    local region = faction:home_region()
+    if region == nil or region:is_null_interface() then
+        local regions = faction:region_list()
+        if regions:num_items() > 0 then
+            region = regions:item_at(0)
+        end
+    end
+    if region == nil or region:is_null_interface() then
+        psw_restore_log("no settlement available for fm_cqi=" .. tostring(family_member_cqi))
+        return
+    end
+
+    local region_key = region:name()
+    local x, y = cm:find_valid_spawn_location_for_character_from_settlement(
+        faction_name, region_key, false, true, distance_from_shoudu
+    )
+    if tonumber(x) == nil or tonumber(y) == nil or x < 0 or y < 0 then
+        psw_restore_log("no valid spawn location for fm_cqi=" .. tostring(family_member_cqi))
+        return
+    end
+
+    local character_lookup = cm:char_lookup_str(character)
+    psw_restore_pending[faction_name] = family_member_cqi
+    local create_ok, create_error = pcall(function()
+        cm:create_force_with_existing_general(
+            character_lookup,
+            faction_name,
+            psw_restore_bootstrap_unit,
+            region_key,
+            x,
+            y,
+            function()
+                psw_restore_poll(faction_name, family_member_cqi, 1)
+            end
+        )
+    end)
+    if not create_ok then
+        psw_restore_pending[faction_name] = nil
+        psw_restore_log(
+            "create_force_with_existing_general failed fm_cqi="
+            .. tostring(family_member_cqi) .. " error=" .. tostring(create_error)
+        )
+        return
+    end
+
+    psw_restore_log(
+        "queued existing-general force fm_cqi=" .. tostring(family_member_cqi)
+        .. " subtype=" .. tostring(subtype)
+    )
+    cm:callback(function()
+        psw_restore_poll(faction_name, family_member_cqi, 1)
+    end, 2.0)
+end
+
+local function psw_restore_all_main_hero_forces()
+    if psw_main_data == nil or psw_main_data.player_data == nil then
+        return
+    end
+    for faction_name, player_data in pairs(psw_main_data.player_data) do
+        if player_data ~= nil and player_data.yx_subtype ~= nil then
+            psw_restore_main_hero_force(faction_name)
+        end
+    end
+end
+
+local psw_initial_hero_pool = {
+    "yx_lmyx",
+    "yx_hero_sllh",
+    "yx_hero_edu",
+    "yx_hero_niao",
+    "yx_hero_fuxuan",
+    "yx_hero_feibi",
+    "yx_hero_xueli",
+    "yx_hero_mika",
+}
+
+local psw_hero_creat_impl
+
+local function psw_retry_interrupted_initial_hero_selection()
+    if psw_main_data == nil
+        or psw_main_data.player_data == nil
+        or psw_main_data.global_data == nil
+        or psw_main_data.global_data.psw_hero_pool == nil
+    then
+        return
+    end
+
+    for faction_name, player_data in pairs(psw_main_data.player_data) do
+        if player_data ~= nil
+            and player_data.hero_have_select == true
+            and player_data.yx_subtype == nil
+        then
+            local selected_key = nil
+            local zero_count = 0
+            for i = 1, #psw_initial_hero_pool do
+                local hero_key = psw_initial_hero_pool[i]
+                local pool_entry = psw_main_data.global_data.psw_hero_pool[hero_key]
+                if pool_entry ~= nil and tonumber(pool_entry.num) ~= nil
+                    and pool_entry.num <= 0
+                then
+                    selected_key = hero_key
+                    zero_count = zero_count + 1
+                end
+            end
+
+            if zero_count == 1 and not cm:get_faction(faction_name):has_effect_bundle("t_hero_lmyx") then
+                local pool_entry = psw_main_data.global_data.psw_hero_pool[selected_key]
+                pool_entry.num = pool_entry.num + 1
+                psw_restore_log(
+                    "retrying interrupted initial hero selection faction="
+                    .. tostring(faction_name) .. " hero=" .. tostring(selected_key)
+                )
+                psw_hero_creat_impl(faction_name, selected_key)
+            else
+                psw_restore_log(
+                    "interrupted initial hero selection ambiguous faction="
+                    .. tostring(faction_name) .. " zero_count=" .. tostring(zero_count)
+                )
+            end
+        end
+    end
+end
+
+psw_hero_creat_impl = function(faction_name, hero_key)
     local faction = cm:get_faction(faction_name)
     local culture = faction:culture()
 
@@ -193,6 +565,7 @@ local function psw_hero_creat_impl(faction_name, hero_key)
 
                         cm:change_character_custom_name(character, yx_name, "","","")
                         cm:set_character_immortality(cqi, true)
+                        psw_restore_movement_for_character(character, "initial_spawn")
                     end
                 );
 
@@ -217,6 +590,7 @@ local function psw_hero_creat_impl(faction_name, hero_key)
 
                         cm:change_character_custom_name(character, yx_name, "","","")
                         cm:set_character_immortality(cqi, true)
+                        psw_restore_movement_for_character(character, "initial_spawn")
                     end
                 );
 
@@ -235,7 +609,18 @@ local function psw_hero_creat_impl(faction_name, hero_key)
 
             psw_main_data.player_data[faction_name].region_name = region_name
 
-            cm:add_foreign_slot_set_to_region_for_faction(faction_cqi, region_cqi, "psw_cult_slot_set_key")
+            if faction:culture() == "wh2_main_skv_skaven" then
+                -- Skaven home regions can already contain an Under-Empire
+                -- manager. Let the shared helper allocate PSW's own manager
+                -- on an owned, otherwise-unused region instead of reusing it.
+                if type(psw_get_talent_slot_manager) == "function" then
+                    psw_get_talent_slot_manager(faction_name)
+                else
+                    out("[psw_skaven_slots] helper unavailable during hero spawn; skipping unsafe slot setup")
+                end
+            else
+                cm:add_foreign_slot_set_to_region_for_faction(faction_cqi, region_cqi, "psw_cult_slot_set_key")
+            end
 
 
             psw_delete_shanbi_effect(faction_name, "jn_main_shanbi")
@@ -303,4 +688,30 @@ cm:add_first_tick_callback(function()
         psw_hero_creat_impl(faction_name, yx_name_zixuan)
     end
     out("[psw_debug] hero spawn fix installed at first_tick")
+end)
+
+cm:add_first_tick_callback(function()
+    core:remove_listener("psw_restore_main_hero_force")
+    core:add_listener(
+        "psw_restore_main_hero_force",
+        "FactionTurnStart",
+        function(context)
+            local faction = context:faction()
+            return faction ~= nil
+                and not faction:is_null_interface()
+                and psw_main_data ~= nil
+                and psw_main_data.player_data ~= nil
+                and psw_main_data.player_data[faction:name()] ~= nil
+        end,
+        function(context)
+            psw_restore_main_hero_force(context:faction():name())
+        end,
+        true
+    )
+
+    -- Also repair a save that was already past convalescence before this fix
+    -- was installed.  The short delay lets the loaded campaign finish settling.
+    cm:callback(psw_restore_all_main_hero_forces, 2.0)
+    cm:callback(psw_retry_interrupted_initial_hero_selection, 2.5)
+    out("[psw_debug] hero force restore listener installed at first_tick")
 end)

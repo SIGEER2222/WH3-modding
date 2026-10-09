@@ -21,6 +21,197 @@ local effect_scope_pool = {
     "faction_to_faction_own_unseen",--派系范围（科技）
     "faction_to_province_own_factionwide",
 }
+
+local PSW_TALENT_SLOT_SET_KEY = "psw_cult_slot_set_key"
+local PSW_SKAVEN_CULTURE = "wh2_main_skv_skaven"
+
+local function psw_slot_interface_is_live(value)
+    if value == nil or value == false then
+        return false
+    end
+    local ok, is_null = pcall(function() return value:is_null_interface() end)
+    return not ok or is_null ~= true
+end
+
+local function psw_slot_manager_key(manager)
+    local ok, key = pcall(function() return manager:slot_set_key() end)
+    if ok and type(key) == "string" then
+        return key
+    end
+    return nil
+end
+
+local function psw_region_is_owned_by(region, faction_name)
+    if not psw_slot_interface_is_live(region) then
+        return false
+    end
+    local ok_owner, owner = pcall(function() return region:owning_faction() end)
+    if not ok_owner or not psw_slot_interface_is_live(owner) then
+        return false
+    end
+    local ok_name, owner_name = pcall(function() return owner:name() end)
+    return ok_name and owner_name == faction_name
+end
+
+local function psw_existing_slot_manager(region, faction_name)
+    local ok, manager = pcall(function()
+        return region:foreign_slot_manager_for_faction(faction_name)
+    end)
+    if not ok then
+        return nil, false
+    end
+    if not psw_slot_interface_is_live(manager) then
+        return nil, true
+    end
+    return manager, true
+end
+
+local function psw_add_talent_slot_manager(region, faction)
+    local ok, manager = pcall(function()
+        return cm:add_foreign_slot_set_to_region_for_faction(
+            faction:command_queue_index(),
+            region:cqi(),
+            PSW_TALENT_SLOT_SET_KEY
+        )
+    end)
+    if not ok then
+        return nil
+    end
+    if psw_slot_interface_is_live(manager) then
+        return manager
+    end
+    local refreshed = psw_existing_slot_manager(region, faction:name())
+    return refreshed
+end
+
+-- PSW 与斯卡文地下城都会使用 FOREIGN_SLOT_MANAGER_SCRIPT_INTERFACE。
+-- 不能仅凭 manager 存在就把它当成 PSW 天赋槽：先核对 slot_set_key；
+-- 鼠人只在自己拥有、且没有其他 foreign slot set 的地区建立独立天赋槽。
+function psw_get_talent_slot_manager(faction_name)
+    local faction = cm:get_faction(faction_name)
+    if not psw_slot_interface_is_live(faction) then
+        return nil
+    end
+
+    local player_data = psw_main_data
+        and psw_main_data.player_data
+        and psw_main_data.player_data[faction_name]
+    local is_skaven = faction:culture() == PSW_SKAVEN_CULTURE
+
+    if not is_skaven then
+        local region = nil
+        if player_data and player_data.region_name then
+            region = cm:get_region(player_data.region_name)
+        end
+        if not psw_slot_interface_is_live(region) then
+            region = faction:home_region()
+        end
+        if not psw_slot_interface_is_live(region) then
+            return nil
+        end
+
+        local manager, readable = psw_existing_slot_manager(region, faction_name)
+        if manager then
+            return manager, region
+        end
+        if not readable then
+            return nil
+        end
+
+        manager = psw_add_talent_slot_manager(region, faction)
+        if not psw_slot_interface_is_live(manager) then
+            return nil
+        end
+        return manager, region
+    end
+
+    -- Older saves may already have a valid PSW manager on the recorded region.
+    -- Reuse it only when its actual set key proves it is not an Under-Empire.
+    local recorded_region_name = player_data
+        and (player_data.psw_slot_region_name or player_data.region_name)
+    if recorded_region_name then
+        local recorded_region = cm:get_region(recorded_region_name)
+        if psw_slot_interface_is_live(recorded_region) then
+            local recorded_manager = psw_existing_slot_manager(recorded_region, faction_name)
+            if recorded_manager
+                and psw_slot_manager_key(recorded_manager) == PSW_TALENT_SLOT_SET_KEY
+            then
+                player_data.psw_slot_region_name = recorded_region:name()
+                return recorded_manager, recorded_region
+            end
+        end
+    end
+
+    local candidates = {}
+    local seen_regions = {}
+    local function add_owned_candidate(region)
+        if not psw_region_is_owned_by(region, faction_name) then
+            return
+        end
+        local ok_name, region_name = pcall(function() return region:name() end)
+        if not ok_name or type(region_name) ~= "string" or seen_regions[region_name] then
+            return
+        end
+        seen_regions[region_name] = true
+        candidates[#candidates + 1] = region
+    end
+
+    if player_data then
+        local saved_slot_region = player_data.psw_slot_region_name
+        if saved_slot_region then
+            add_owned_candidate(cm:get_region(saved_slot_region))
+        end
+    end
+    add_owned_candidate(faction:home_region())
+    if player_data and player_data.region_name then
+        add_owned_candidate(cm:get_region(player_data.region_name))
+    end
+
+    local ok_regions, regions = pcall(function() return faction:region_list() end)
+    if ok_regions and psw_slot_interface_is_live(regions) then
+        for i = 0, regions:num_items() - 1 do
+            add_owned_candidate(regions:item_at(i))
+        end
+    end
+
+    -- Reuse only an existing PSW manager. An Under-Empire (or any other set)
+    -- is never a valid lottery target.
+    for _, region in ipairs(candidates) do
+        local manager, readable = psw_existing_slot_manager(region, faction_name)
+        if manager and psw_slot_manager_key(manager) == PSW_TALENT_SLOT_SET_KEY then
+            if player_data then
+                player_data.psw_slot_region_name = region:name()
+            end
+            return manager, region
+        end
+        if not readable then
+            out("[psw_skaven_slots] manager query failed; refusing to use region " .. tostring(region:name()))
+        end
+    end
+
+    -- Add the dedicated set only where this faction has no manager at all.
+    -- If there is no safe owned region yet, fail closed instead of overwriting
+    -- the Skaven's Under-Empire buildings.
+    for _, region in ipairs(candidates) do
+        local manager, readable = psw_existing_slot_manager(region, faction_name)
+        if readable and not manager then
+            manager = psw_add_talent_slot_manager(region, faction)
+            if psw_slot_interface_is_live(manager)
+                and psw_slot_manager_key(manager) == PSW_TALENT_SLOT_SET_KEY
+            then
+                if player_data then
+                    player_data.psw_slot_region_name = region:name()
+                end
+                out("[psw_skaven_slots] dedicated lottery slots ready in " .. tostring(region:name()))
+                return manager, region
+            end
+        end
+    end
+
+    out("[psw_skaven_slots] no safe owned region; lottery skipped for " .. tostring(faction_name))
+    return nil
+end
+
 function psw_jichu_effect_nandu4(faction_name)
     local faction = cm:get_faction(faction_name)
     local culture = faction:culture()
@@ -114,6 +305,11 @@ local nor_get_sound = {
 
 function psw_main_pickup(faction_name)
     local faction = cm:get_faction(faction_name)
+    local talent_slot_manager = psw_get_talent_slot_manager(faction_name)
+    if not talent_slot_manager then
+        out("[psw] lottery cancelled: no safe talent slot manager for " .. tostring(faction_name))
+        return false
+    end
     local xy_xingyun = faction:pooled_resource_manager():resource("psw_xingyun"):value()
     local psw_ewai_xingyun = psw_main_data.player_data[faction_name].psw_ewai_xingyun
     local main_xingyunzhi = (psw_ewai_xingyun + xy_xingyun)
@@ -551,23 +747,8 @@ function psw_main_nor_pool(faction_name, slot_number)
     
     local index_normal
     local psw_nor_tf
-    local region_name = psw_main_data.player_data[faction_name].region_name
-    local tf_region = cm:get_region(region_name)
-    if not tf_region or tf_region:is_null_interface() then
-        local _home_region = faction:home_region()
-        if _home_region and not _home_region:is_null_interface() then
-            tf_region = _home_region
-            region_name = _home_region:name()
-        else
-            return
-        end
-    end
-    local _fsm = tf_region:foreign_slot_manager_for_faction(faction_name)
-    if not _fsm or _fsm:is_null_interface() then
-        cm:add_foreign_slot_set_to_region_for_faction(faction:command_queue_index(), tf_region:cqi(), "psw_cult_slot_set_key")
-        _fsm = tf_region:foreign_slot_manager_for_faction(faction_name)
-        if not _fsm or _fsm:is_null_interface() then return end
-    end
+    local _fsm = psw_get_talent_slot_manager(faction_name)
+    if not _fsm then return end
     local slot_n_list = _fsm:slots()
     if not slot_n_list or slot_n_list:num_items() < slot_number then return end
     local slot = slot_n_list:item_at(slot_number-1)
@@ -1431,23 +1612,8 @@ function psw_main_ex_pool(faction_name, slot_number, is_zhongduan, zhongduan_nam
     
     local yx_subtype = psw_main_data.player_data[faction_name].yx_subtype or "yx_lmyx"
     local psw_main_character = cm:get_most_recently_created_character_of_type(faction, "general", yx_subtype)
-    local region_name = psw_main_data.player_data[faction_name].region_name
-    local tf_region = cm:get_region(region_name)
-    if not tf_region or tf_region:is_null_interface() then
-        local _home_region = faction:home_region()
-        if _home_region and not _home_region:is_null_interface() then
-            tf_region = _home_region
-            region_name = _home_region:name()
-        else
-            return
-        end
-    end
-    local _fsm = tf_region:foreign_slot_manager_for_faction(faction_name)
-    if not _fsm or _fsm:is_null_interface() then
-        cm:add_foreign_slot_set_to_region_for_faction(faction:command_queue_index(), tf_region:cqi(), "psw_cult_slot_set_key")
-        _fsm = tf_region:foreign_slot_manager_for_faction(faction_name)
-        if not _fsm or _fsm:is_null_interface() then return end
-    end
+    local _fsm = psw_get_talent_slot_manager(faction_name)
+    if not _fsm then return end
     local slot_n_list = _fsm:slots()
     if not slot_n_list or slot_n_list:num_items() < slot_number then return end
     local slot = slot_n_list:item_at(slot_number-1)
@@ -2094,6 +2260,358 @@ function delete_boss_limit()
     end
 end
 
+-- Boss 部队在结算过程中可能已经失效，不能只依赖 military_force:has_effect_bundle。
+-- 先保留原效果包判定，再用当前挑战阶段和 Boss 派系做缓存兜底。
+local psw_tfmw_boss_stage_defs = {
+    [1] = {
+        flag = "psw_tfmw_is_tp_boss1",
+        force_bundle = "psw_dlc7_boss_pd_bandle_1",
+        factions = {
+            wh3_dlc23_chd_chaos_dwarfs_qb2 = true,
+            wh_main_chs_chaos_qb2 = true,
+        },
+    },
+    [2] = {
+        flag = "psw_tfmw_is_tp_boss2",
+        force_bundle = "psw_dlc7_boss_pd_bandle_2",
+        factions = {
+            wh_main_grn_greenskins_qb1 = true,
+            wh_dlc05_wef_wood_elves_qb2 = true,
+        },
+    },
+    [3] = {
+        flag = "psw_tfmw_is_tp_boss3",
+        force_bundle = "psw_dlc7_boss_pd_bandle_3",
+        factions = {
+            wh2_main_hef_high_elves_qb1 = true,
+            wh3_dlc23_chd_chaos_dwarfs_qb1 = true,
+        },
+    },
+    [4] = {
+        flag = "psw_tfmw_is_tp_boss_end",
+        force_bundle = "psw_dlc7_boss_pd_bandle_end",
+        factions = {},
+    },
+}
+
+local function psw_tfmw_force_has_effect_bundle(force, effect_bundle)
+    if not force or force == false then
+        return false
+    end
+
+    local ok, result = pcall(function()
+        if force:is_null_interface() then
+            return false
+        end
+        return force:has_effect_bundle(effect_bundle)
+    end)
+    return ok and result == true
+end
+
+local function psw_tfmw_boss_stage_matches_faction(stage, loser_faction_name)
+    local stage_def = psw_tfmw_boss_stage_defs[stage]
+    if not stage_def then
+        return false
+    end
+
+    if stage == 4 then
+        local mowang_faction_key = psw_mowang_data and psw_mowang_data.mowang_faction_key
+        return mowang_faction_key ~= nil and loser_faction_name == mowang_faction_key
+    end
+
+    return stage_def.factions[loser_faction_name] == true
+end
+
+local function psw_tfmw_boss_stage_matches_battle(stage, loser_faction_name, loser_force_cqi)
+    local global_data = psw_main_data and psw_main_data.global_data
+    local stage_def = psw_tfmw_boss_stage_defs[stage]
+    if not global_data or not stage_def or not global_data[stage_def.flag] then
+        return false
+    end
+
+    local loser_force = nil
+    if loser_force_cqi ~= nil then
+        loser_force = cm:get_military_force_by_cqi(loser_force_cqi)
+    end
+    if psw_tfmw_force_has_effect_bundle(loser_force, stage_def.force_bundle) then
+        return true
+    end
+
+    return psw_tfmw_boss_stage_matches_faction(stage, loser_faction_name)
+end
+
+local function psw_tfmw_resolve_boss_victory(winner_faction_name, loser_faction_name, loser_force_cqi, human_is_win, stage_hint)
+    if not human_is_win then
+        return false
+    end
+
+    local global_data = psw_main_data and psw_main_data.global_data
+    if not global_data or psw_faction_has_effect_bundle(winner_faction_name, "psw_dlc7_boss_pd_cd") then
+        return false
+    end
+
+    local defeated_stage = nil
+    local stage_hint_def = stage_hint and psw_tfmw_boss_stage_defs[stage_hint]
+    if stage_hint_def and global_data[stage_hint_def.flag] then
+        -- Turn-end recovery can prove the Boss army is gone without retaining
+        -- the defeated faction or force CQI in the save.
+        if not loser_faction_name
+            or psw_tfmw_boss_stage_matches_faction(stage_hint, loser_faction_name) then
+            defeated_stage = stage_hint
+        end
+    end
+    if not defeated_stage then
+        for stage = 1, 4 do
+            if psw_tfmw_boss_stage_matches_battle(stage, loser_faction_name, loser_force_cqi) then
+                defeated_stage = stage
+                break
+            end
+        end
+    end
+
+    if not defeated_stage then
+        return false
+    end
+
+    if defeated_stage == 1 then
+        global_data.psw_boss_create_lhz = false
+        global_data.psw_boss_create_jwsq = false
+        global_data.psw_tfmw_is_tp_boss1 = false
+    elseif defeated_stage == 2 then
+        global_data.psw_boss_create_sznw = false
+        global_data.psw_boss_create_slzz = false
+        global_data.psw_tfmw_is_tp_boss2 = false
+    elseif defeated_stage == 3 then
+        global_data.psw_boss_create_lyzm = false
+        global_data.psw_boss_create_lyjl = false
+        global_data.psw_tfmw_is_tp_boss3 = false
+    elseif defeated_stage == 4 then
+        global_data.psw_tfmw_is_tp_boss_end = false
+        local mowang_faction_key = psw_mowang_data and psw_mowang_data.mowang_faction_key
+        psw_tfmw_win_check(mowang_faction_key)
+    end
+    if global_data.psw_tfmw_active_boss_stage == defeated_stage then
+        global_data.psw_tfmw_active_boss_stage = false
+        global_data.psw_tfmw_active_boss_faction = false
+    end
+
+    out("[psw_boss] victory recognized stage=" .. tostring(defeated_stage)
+        .. " loser=" .. tostring(loser_faction_name)
+        .. " force=" .. tostring(loser_force_cqi))
+
+    psw_apply_non_effect_bundle_to_all_player_with_time("psw_dlc7_boss_pd_cd", 1)
+
+    cm:callback(function()
+        psw_dlc7_boss_reward_apply()
+    end, 2)
+
+    return true
+end
+
+local psw_tfmw_boss_recovery_defs = {
+    [1] = {
+        flag = "psw_tfmw_is_tp_boss1",
+        candidates = {
+            {created_flag = "psw_boss_create_lhz", faction = "wh3_dlc23_chd_chaos_dwarfs_qb2"},
+            {created_flag = "psw_boss_create_jwsq", faction = "wh_main_chs_chaos_qb2"},
+        },
+    },
+    [2] = {
+        flag = "psw_tfmw_is_tp_boss2",
+        candidates = {
+            {created_flag = "psw_boss_create_sznw", faction = "wh_main_grn_greenskins_qb1"},
+            {created_flag = "psw_boss_create_slzz", faction = "wh_dlc05_wef_wood_elves_qb2"},
+        },
+    },
+    [3] = {
+        flag = "psw_tfmw_is_tp_boss3",
+        candidates = {
+            {created_flag = "psw_boss_create_lyzm", faction = "wh2_main_hef_high_elves_qb1"},
+            {created_flag = "psw_boss_create_lyjl", faction = "wh3_dlc23_chd_chaos_dwarfs_qb1"},
+        },
+    },
+}
+
+function psw_tfmw_record_active_boss_challenge(stage)
+    local global_data = psw_main_data and psw_main_data.global_data
+    if not global_data or not psw_tfmw_boss_stage_defs[stage] then
+        return
+    end
+
+    local faction_name = nil
+    if stage == 4 then
+        faction_name = psw_mowang_data and psw_mowang_data.mowang_faction_key
+    else
+        local recovery_def = psw_tfmw_boss_recovery_defs[stage]
+        if recovery_def then
+            for _, candidate in ipairs(recovery_def.candidates) do
+                if global_data[candidate.created_flag] then
+                    faction_name = candidate.faction
+                    break
+                end
+            end
+        end
+    end
+
+    global_data.psw_tfmw_active_boss_stage = stage
+    global_data.psw_tfmw_active_boss_faction = faction_name or false
+    out("[psw_boss] challenge recorded stage=" .. tostring(stage)
+        .. " faction=" .. tostring(faction_name))
+end
+
+local function psw_tfmw_faction_has_boss_force(faction_name, force_bundle)
+    if not faction_name then
+        return false
+    end
+
+    local ok, result = pcall(function()
+        local faction = cm:get_faction(faction_name)
+        if not faction or faction:is_null_interface() then
+            return false
+        end
+
+        local force_list = faction:military_force_list()
+        for i = 0, force_list:num_items() - 1 do
+            if psw_tfmw_force_has_effect_bundle(force_list:item_at(i), force_bundle) then
+                return true
+            end
+        end
+        return false
+    end)
+    return ok and result == true
+end
+
+local function psw_tfmw_get_active_boss_faction(stage)
+    local global_data = psw_main_data and psw_main_data.global_data
+    if not global_data then
+        return nil
+    end
+
+    if global_data.psw_tfmw_active_boss_stage == stage
+        and global_data.psw_tfmw_active_boss_faction then
+        return global_data.psw_tfmw_active_boss_faction
+    end
+
+    local recovery_def = psw_tfmw_boss_recovery_defs[stage]
+    if recovery_def then
+        for _, candidate in ipairs(recovery_def.candidates) do
+            if global_data[candidate.created_flag] then
+                return candidate.faction
+            end
+        end
+    end
+
+    if stage == 4 then
+        return psw_mowang_data and psw_mowang_data.mowang_faction_key
+    end
+    return nil
+end
+
+local function psw_tfmw_stage_has_live_boss_force(stage)
+    local stage_def = psw_tfmw_boss_stage_defs[stage]
+    if not stage_def then
+        return false
+    end
+
+    local checked = {}
+    local active_faction = psw_tfmw_get_active_boss_faction(stage)
+    if active_faction then
+        checked[active_faction] = true
+        if psw_tfmw_faction_has_boss_force(active_faction, stage_def.force_bundle) then
+            return true
+        end
+    end
+
+    for faction_name, _ in pairs(stage_def.factions) do
+        if not checked[faction_name] then
+            checked[faction_name] = true
+            if psw_tfmw_faction_has_boss_force(faction_name, stage_def.force_bundle) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function psw_tfmw_resolve_missing_boss_at_turn_end(winner_faction_name, stage)
+    local boss_force_present = psw_tfmw_stage_has_live_boss_force(stage)
+    local active_faction = psw_tfmw_get_active_boss_faction(stage)
+    out("[psw_boss] turn-end inspect stage=" .. tostring(stage)
+        .. " faction=" .. tostring(active_faction)
+        .. " boss_force_present=" .. tostring(boss_force_present))
+    if boss_force_present then
+        return false
+    end
+
+    if psw_tfmw_resolve_boss_victory(
+        winner_faction_name,
+        active_faction,
+        nil,
+        true,
+        stage
+    ) then
+        out("[psw_boss] turn-end resolved missing boss stage=" .. tostring(stage)
+            .. " loser=" .. tostring(active_faction))
+        return true
+    end
+    return false
+end
+
+-- 兼容修复前已经击败 Boss、但旧存档还保留挑战标记的情况。
+function psw_tfmw_recover_stale_boss_challenge()
+    local global_data = psw_main_data and psw_main_data.global_data
+    if not global_data or not global_data.tfmw_is_start then
+        return
+    end
+
+    local winner_faction_name = nil
+    local faction_list = cm:model():world():faction_list()
+    for i = 0, faction_list:num_items() - 1 do
+        local faction = faction_list:item_at(i)
+        if faction:is_human() then
+            winner_faction_name = faction:name()
+            break
+        end
+    end
+    if not winner_faction_name then
+        return
+    end
+
+    for stage = 1, 4 do
+        local stage_def = psw_tfmw_boss_stage_defs[stage]
+        local recovery_def = psw_tfmw_boss_recovery_defs[stage]
+        if global_data[stage_def.flag] then
+            local stale_faction_name = nil
+
+            if stage == 4 then
+                stale_faction_name = psw_mowang_data and psw_mowang_data.mowang_faction_key
+            elseif recovery_def then
+                for _, candidate in ipairs(recovery_def.candidates) do
+                    if global_data[candidate.created_flag]
+                        and not psw_tfmw_faction_has_boss_force(candidate.faction, stage_def.force_bundle) then
+                        stale_faction_name = candidate.faction
+                        break
+                    end
+                end
+            end
+
+            if stale_faction_name
+                and not psw_tfmw_faction_has_boss_force(stale_faction_name, stage_def.force_bundle) then
+                if psw_tfmw_resolve_boss_victory(
+                    winner_faction_name,
+                    stale_faction_name,
+                    nil,
+                    true
+                ) then
+                    out("[psw_boss] recovered stale challenge stage=" .. tostring(stage)
+                        .. " loser=" .. tostring(stale_faction_name))
+                end
+                return
+            end
+        end
+    end
+end
+
 function psw_main_CharacterBattleCompleted_listner()
     core:remove_listener("psw_main_CharacterBattleCompleted_listner")
     core:add_listener(
@@ -2336,31 +2854,7 @@ function psw_main_CharacterBattleCompleted_listner()
         
         
         ---BOSS击败判定
-        if lose_mf:has_effect_bundle("psw_dlc7_boss_pd_bandle") and human_is_win and not psw_faction_has_effect_bundle(faction_name, "psw_dlc7_boss_pd_cd") then
-            if lose_mf:has_effect_bundle("psw_dlc7_boss_pd_bandle_1") then
-                psw_main_data.global_data.psw_boss_create_lhz = false
-                psw_main_data.global_data.psw_boss_create_jwsq = false
-                psw_main_data.global_data.psw_tfmw_is_tp_boss1 = false
-            elseif lose_mf:has_effect_bundle("psw_dlc7_boss_pd_bandle_2") then
-                psw_main_data.global_data.psw_boss_create_sznw = false
-                psw_main_data.global_data.psw_boss_create_slzz = false
-                psw_main_data.global_data.psw_tfmw_is_tp_boss2 = false
-            elseif lose_mf:has_effect_bundle("psw_dlc7_boss_pd_bandle_3") then
-                psw_main_data.global_data.psw_boss_create_lyzm = false
-                psw_main_data.global_data.psw_boss_create_lyjl = false
-                psw_main_data.global_data.psw_tfmw_is_tp_boss3 = false
-            elseif lose_mf:has_effect_bundle("psw_dlc7_boss_pd_bandle_end") then
-                psw_main_data.global_data.psw_tfmw_is_tp_boss_end = false
-                psw_tfmw_win_check(mowang_faction_key)
-            end
-            
-            psw_apply_non_effect_bundle_to_all_player_with_time("psw_dlc7_boss_pd_cd", 1)
-            
-            cm:callback(function()
-                ---boss奖励
-                psw_dlc7_boss_reward_apply()
-            end, 2)
-        end
+        psw_tfmw_resolve_boss_victory(faction_name, lose_faction:name(), lose_mf_cqi, human_is_win)
         
         
         
@@ -2548,6 +3042,7 @@ function psw_main_BattleCompleted_listner()
         end
         local unit_list = cm:pending_battle_cache_get_defender_units(1)
         local lose_faction_name = lose_faction:name()
+        psw_tfmw_resolve_boss_victory(faction_name, lose_faction_name, lose_mf_cqi, human_is_win)
         local faction_leader = faction:faction_leader()
         
         local psw_xingyun =  faction:pooled_resource_manager():resource("psw_xingyun"):value()
@@ -2845,7 +3340,11 @@ function psw_main_BattleCompleted_listner()
             psw_dlc7_event_battle_effect(faction_name)
             ---战斗获得水晶
             local add_qysj = math.floor(#unit_list/2)
-            psw_main_battle_effect(faction_name, add_qysj)
+            if type(czx_psw_grant_battle_qysj) == "function" then
+                czx_psw_grant_battle_qysj(faction_name, add_qysj, "original listener")
+            else
+                psw_main_battle_effect(faction_name, add_qysj)
+            end
         end
         
         ---
@@ -2926,7 +3425,20 @@ function psw_main_turn_effect(faction_name, turn)
     ---每回合祈愿水晶奖励
     local qysj_turn_num = psw_main_data.player_data[faction_name].qysj_turn_num
     if qysj_turn_num > 0 then
-        cm:faction_add_pooled_resource(faction_name, "psw_main_qysj", "psw_main_qysj_huihe_get_good", qysj_turn_num)
+        if type(czx_psw_add_qysj) == "function" then
+            czx_psw_add_qysj(
+                faction_name,
+                qysj_turn_num,
+                "psw_main_qysj_huihe_get_good",
+                "original turn effect",
+                "czx_psw_qysj_turn_done_" .. faction_name)
+        else
+            cm:faction_add_pooled_resource(
+                faction_name,
+                "psw_main_qysj",
+                "psw_main_qysj_huihe_get_good",
+                qysj_turn_num)
+        end
     end
     
     ---事件开始效果
@@ -3731,7 +4243,8 @@ function psw_main_FactionTurnEnd_listner()
         
         ---BOSS未挑战成功
         local boss_faction_name = nil
-        if psw_main_data.global_data.psw_tfmw_is_tp_boss1 then
+        if psw_main_data.global_data.psw_tfmw_is_tp_boss1
+            and not psw_tfmw_resolve_missing_boss_at_turn_end(faction_name, 1) then
             psw_main_data.global_data.psw_tfmw_is_tp_boss1 = false
             psw_main_mowang_progress_change_effect(1)
             psw_tfmw_all_AI_atk_up(3)
@@ -3745,9 +4258,12 @@ function psw_main_FactionTurnEnd_listner()
                 boss_faction_name = "wh_main_chs_chaos_qb2"
             end
             
-            custom_starts:kill_faction(boss_faction_name)
+            if boss_faction_name then
+                custom_starts:kill_faction(boss_faction_name)
+            end
             alice_tfmw_boss_defeat()
-        elseif psw_main_data.global_data.psw_tfmw_is_tp_boss2 then
+        elseif psw_main_data.global_data.psw_tfmw_is_tp_boss2
+            and not psw_tfmw_resolve_missing_boss_at_turn_end(faction_name, 2) then
             psw_main_data.global_data.psw_tfmw_is_tp_boss2 = false
             psw_main_mowang_progress_change_effect(1)
             psw_tfmw_all_AI_def_up(3)
@@ -3762,9 +4278,12 @@ function psw_main_FactionTurnEnd_listner()
                 boss_faction_name = "wh_dlc05_wef_wood_elves_qb2"
             end
             
-            custom_starts:kill_faction(boss_faction_name)
+            if boss_faction_name then
+                custom_starts:kill_faction(boss_faction_name)
+            end
             alice_tfmw_boss_defeat()
-        elseif psw_main_data.global_data.psw_tfmw_is_tp_boss3 then
+        elseif psw_main_data.global_data.psw_tfmw_is_tp_boss3
+            and not psw_tfmw_resolve_missing_boss_at_turn_end(faction_name, 3) then
             psw_main_data.global_data.psw_tfmw_is_tp_boss3 = false
             psw_main_mowang_progress_change_effect(1)
             psw_tfmw_all_AI_def_atk_up(3)
@@ -3779,11 +4298,14 @@ function psw_main_FactionTurnEnd_listner()
                 boss_faction_name = "wh3_dlc23_chd_chaos_dwarfs_qb1"
             end
             
-            custom_starts:kill_faction(boss_faction_name)
+            if boss_faction_name then
+                custom_starts:kill_faction(boss_faction_name)
+            end
             alice_tfmw_boss_defeat()
         end
         
-        if psw_main_data.global_data.psw_tfmw_is_tp_boss_end then
+        if psw_main_data.global_data.psw_tfmw_is_tp_boss_end
+            and not psw_tfmw_resolve_missing_boss_at_turn_end(faction_name, 4) then
             psw_main_data.global_data.psw_tfmw_is_tp_boss_end = false
             psw_main_mowang_progress_change_effect(1)
             psw_tfmw_all_AI_def_atk_up(1)
@@ -4929,4 +5451,3 @@ psw_main_pickup = function(faction_name)
         end, 0.1)
     end
 end
-

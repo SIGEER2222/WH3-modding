@@ -21,6 +21,10 @@ local pickup_use = -1
 local psw_tooltip = "psw_button_tooltip_key"
 local psw_button = "psw_mazdamundi_dilemma_button"
 local psw_button_image_path = "ui/skins/wh2_main_lizardmen/psw_chouka.png"
+local psw_lottery_event_handler
+local psw_lottery_pending_request = 0
+local psw_lottery_request_seen = false
+local psw_lottery_ignore_next_event = false
 
 -- 兜底工具：安全调用回调，记录错误但不中断
 local function psw_pcall_wrapper(fn)
@@ -846,6 +850,337 @@ local function psw_tp_commander(faction)
     return fallback
 end
 
+-- 记录玩家最后选中的可派遣军队，供世界 Boss dilemma 选择时的缓存兜底使用。
+local psw_last_selected_army_cqi = nil
+core:remove_listener("psw_boss_tp_track_selected_army")
+core:add_listener(
+    "psw_boss_tp_track_selected_army",
+    "CharacterSelected",
+    true,
+    function(context)
+        local ok, character = pcall(function() return context:character() end)
+        if not ok or not psw_char_deployable(character) then
+            return
+        end
+
+        local ok_faction, selected_faction = pcall(function()
+            return character:faction():name()
+        end)
+        local local_faction = cm:get_local_faction_name(true)
+        if ok_faction and selected_faction == local_faction then
+            psw_last_selected_army_cqi = character:command_queue_index()
+            out("[psw_boss_tp] selected army cached cqi="
+                .. tostring(psw_last_selected_army_cqi))
+        end
+    end,
+    true
+)
+
+local function psw_tp_selected_or_fallback_commander(faction)
+    local function resolve_selected(cqi, source)
+        cqi = tonumber(cqi)
+        if not cqi or cqi <= 0 then
+            return nil
+        end
+        local ok, selected, is_same_faction = pcall(function()
+            local character = cm:get_character_by_cqi(cqi)
+            if not psw_char_deployable(character) then
+                return nil, false
+            end
+            return character, character:faction():name() == faction:name()
+        end)
+        if ok and selected and is_same_faction then
+            return selected, source
+        end
+        out("[psw_boss_tp] selected army unavailable cqi="
+            .. tostring(cqi) .. " source=" .. tostring(source))
+        return nil
+    end
+
+    -- Read the live campaign UI selection at the moment the dilemma choice is
+    -- made; the cached CharacterSelected event remains the compatibility fallback.
+    local ok_ui, selected_cqi = pcall(function()
+        if cuim and cuim.get_char_selected_cqi then
+            return cuim:get_char_selected_cqi()
+        end
+        return nil
+    end)
+    if ok_ui then
+        local selected = resolve_selected(selected_cqi, "current_ui")
+        if selected then
+            return selected, "current_ui"
+        end
+    else
+        out("[psw_boss_tp] current UI selection lookup failed: " .. tostring(selected_cqi))
+    end
+
+    if psw_last_selected_army_cqi then
+        local selected = resolve_selected(psw_last_selected_army_cqi, "cached_selection")
+        if selected then
+            return selected, "cached_selection"
+        end
+        out("[psw_boss_tp] cached army unavailable; trying non-leader army fallback")
+    end
+
+    -- If selection tracking was unavailable, prefer another field army before
+    -- the faction leader. The old fallback chose the faction leader first.
+    local leader = faction:faction_leader()
+    local leader_cqi = nil
+    if leader and not leader:is_null_interface() then
+        local ok_leader_cqi, value = pcall(function()
+            return leader:command_queue_index()
+        end)
+        if ok_leader_cqi then
+            leader_cqi = value
+        end
+    end
+    local ok_list, mf_list = pcall(function()
+        return faction:military_force_list()
+    end)
+    if ok_list and mf_list then
+        local first_other_army = nil
+        for i = 0, mf_list:num_items() - 1 do
+            local ok_force, gen = pcall(function()
+                local force = mf_list:item_at(i)
+                if force:is_null_interface() or force:is_armed_citizenry()
+                    or not force:has_general() then
+                    return nil
+                end
+                local general = force:general_character()
+                if not psw_char_deployable(general)
+                    or general:command_queue_index() == leader_cqi then
+                    return nil
+                end
+                return general
+            end)
+            if ok_force and gen then
+                local ok_type, force_type = pcall(function()
+                    return mf_list:item_at(i):force_type():key()
+                end)
+                if ok_type and force_type == "ARMY" then
+                    out("[psw_boss_tp] commander fallback=first_field_army cqi="
+                        .. tostring(gen:command_queue_index()))
+                    return gen, "first_field_army_fallback"
+                end
+                if not first_other_army then
+                    first_other_army = gen
+                end
+            end
+        end
+        if first_other_army then
+            out("[psw_boss_tp] commander fallback=first_non_leader_force cqi="
+                .. tostring(first_other_army:command_queue_index()))
+            return first_other_army, "first_non_leader_force_fallback"
+        end
+    end
+
+    if psw_char_deployable(leader) then
+        out("[psw_boss_tp] commander fallback=faction_leader cqi="
+            .. tostring(leader:command_queue_index()))
+        return leader, "faction_leader_fallback"
+    end
+
+    local commander = psw_tp_commander(faction)
+    if commander then
+        out("[psw_boss_tp] commander fallback=other_deployable cqi="
+            .. tostring(commander:command_queue_index()))
+        return commander, "other_deployable_fallback"
+    end
+    return nil, "no_deployable_army"
+end
+
+local psw_tp_boss_stage_defs = {
+    [1] = {
+        force_bundle = "psw_dlc7_boss_pd_bandle_1",
+        coord_x = "jws_boss_location_x",
+        coord_y = "jws_boss_location_y",
+        candidates = {
+            {created_flag = "psw_boss_create_lhz", faction = "wh3_dlc23_chd_chaos_dwarfs_qb2"},
+            {created_flag = "psw_boss_create_jwsq", faction = "wh_main_chs_chaos_qb2"},
+        },
+    },
+    [2] = {
+        force_bundle = "psw_dlc7_boss_pd_bandle_2",
+        coord_x = "sznw_boss_location_x",
+        coord_y = "sznw_boss_location_y",
+        candidates = {
+            {created_flag = "psw_boss_create_sznw", faction = "wh_main_grn_greenskins_qb1"},
+            {created_flag = "psw_boss_create_slzz", faction = "wh_dlc05_wef_wood_elves_qb2"},
+        },
+    },
+    [3] = {
+        force_bundle = "psw_dlc7_boss_pd_bandle_3",
+        coord_x = "lyzm_boss_location_x",
+        coord_y = "lyzm_boss_location_y",
+        candidates = {
+            {created_flag = "psw_boss_create_lyzm", faction = "wh2_main_hef_high_elves_qb1"},
+            {created_flag = "psw_boss_create_lyjl", faction = "wh3_dlc23_chd_chaos_dwarfs_qb1"},
+        },
+    },
+    [4] = {
+        force_bundle = "psw_dlc7_boss_pd_bandle_end",
+        candidates = {},
+    },
+}
+
+local function psw_tp_position_is_valid(x, y)
+    return type(x) == "number" and type(y) == "number"
+        and x == x and y == y and x > 0 and y > 0
+end
+
+local function psw_tp_boss_candidate_factions(stage)
+    local stage_def = psw_tp_boss_stage_defs[stage]
+    if not stage_def then
+        return {}
+    end
+
+    local result = {}
+    local seen = {}
+    local function add_faction(faction_name)
+        if type(faction_name) == "string" and faction_name ~= ""
+            and not seen[faction_name] then
+            seen[faction_name] = true
+            result[#result + 1] = faction_name
+        end
+    end
+
+    local global_data = psw_main_data and psw_main_data.global_data
+    if global_data and global_data.psw_tfmw_active_boss_stage == stage then
+        add_faction(global_data.psw_tfmw_active_boss_faction)
+    end
+    if stage == 4 then
+        add_faction(psw_mowang_data and psw_mowang_data.mowang_faction_key)
+    end
+
+    for _, candidate in ipairs(stage_def.candidates) do
+        if global_data and global_data[candidate.created_flag] then
+            add_faction(candidate.faction)
+        end
+    end
+    for _, candidate in ipairs(stage_def.candidates) do
+        add_faction(candidate.faction)
+    end
+    return result
+end
+
+local function psw_tp_find_live_boss_commander(stage)
+    local stage_def = psw_tp_boss_stage_defs[stage]
+    if not stage_def then
+        return nil, nil
+    end
+
+    for _, faction_name in ipairs(psw_tp_boss_candidate_factions(stage)) do
+        local ok_faction, boss_faction = pcall(function()
+            return cm:get_faction(faction_name)
+        end)
+        if ok_faction and boss_faction and not boss_faction:is_null_interface() then
+            local ok_list, force_list = pcall(function()
+                return boss_faction:military_force_list()
+            end)
+            if ok_list and force_list then
+                for i = 0, force_list:num_items() - 1 do
+                    local force = force_list:item_at(i)
+                    local ok_force, general = pcall(function()
+                        if force:is_null_interface()
+                            or not force:has_effect_bundle(stage_def.force_bundle)
+                            or not force:has_general() then
+                            return nil
+                        end
+                        return force:general_character()
+                    end)
+                    if ok_force and psw_char_deployable(general) then
+                        return general, faction_name
+                    end
+                end
+            end
+
+            -- 终末 Boss 本身就是魔王派系领袖；旧档若缺 force marker，
+            -- 仍可把存活、带军的领袖作为实时目标。
+            if stage == 4 then
+                local ok_leader, leader = pcall(function()
+                    return boss_faction:faction_leader()
+                end)
+                if ok_leader and psw_char_deployable(leader) then
+                    return leader, faction_name
+                end
+            end
+        end
+    end
+    return nil, nil
+end
+
+local function psw_tp_spawn_near_character(faction_name, character, radius)
+    if not psw_char_deployable(character) then
+        return nil, nil
+    end
+    local ok, x, y = pcall(function()
+        return cm:find_valid_spawn_location_for_character_from_character(
+            faction_name,
+            cm:char_lookup_str(character),
+            true,
+            radius
+        )
+    end)
+    if ok and psw_tp_position_is_valid(x, y) then
+        return x, y
+    end
+    return nil, nil
+end
+
+local function psw_tp_resolve_boss_destination(faction_name, stage)
+    local boss_character, boss_faction_name = psw_tp_find_live_boss_commander(stage)
+    if boss_character then
+        local x, y = psw_tp_spawn_near_character(faction_name, boss_character, 10)
+        if x and y then
+            out("[psw_boss_tp] destination=live_boss faction="
+                .. tostring(boss_faction_name)
+                .. " cqi=" .. tostring(boss_character:command_queue_index())
+                .. " xy=" .. tostring(x) .. "," .. tostring(y))
+            return x, y, "live_boss", boss_faction_name
+        end
+        out("[psw_boss_tp] live Boss found but nearby spawn lookup failed; trying saved spawn")
+    else
+        out("[psw_boss_tp] no live marked Boss force for stage="
+            .. tostring(stage) .. "; trying saved spawn")
+    end
+
+    local stage_def = psw_tp_boss_stage_defs[stage]
+    local global_data = psw_main_data and psw_main_data.global_data
+    if stage_def and stage_def.coord_x and global_data then
+        local saved_x = global_data[stage_def.coord_x]
+        local saved_y = global_data[stage_def.coord_y]
+        if psw_tp_position_is_valid(saved_x, saved_y) then
+            local ok, x, y = pcall(function()
+                return cm:find_valid_spawn_location_for_character_from_position(
+                    faction_name, saved_x, saved_y, true, 10)
+            end)
+            if ok and psw_tp_position_is_valid(x, y) then
+                out("[psw_boss_tp] destination=saved_spawn_fallback stage="
+                    .. tostring(stage) .. " xy=" .. tostring(x) .. "," .. tostring(y))
+                return x, y, "saved_spawn_fallback", boss_faction_name
+            end
+        end
+    end
+
+    out("[psw_boss_tp] no safe destination for stage=" .. tostring(stage)
+        .. "; teleport skipped")
+    return nil, nil, nil, boss_faction_name
+end
+
+local function psw_tp_get_origin(character, faction_name)
+    local x, y = psw_tp_spawn_near_character(faction_name, character, 1)
+    if psw_tp_position_is_valid(x, y) then
+        return x, y
+    end
+    local ok, logical_x, logical_y = pcall(function()
+        return character:logical_position_x(), character:logical_position_y()
+    end)
+    if ok and psw_tp_position_is_valid(logical_x, logical_y) then
+        return logical_x, logical_y
+    end
+    return nil, nil
+end
+
 -- 阻止重生仪式目标兜底：存储的传奇领主 cqi 失效时，按 subtype 扫描魔王派系在图的传奇领主军队
 local psw_tfmw_wef_legend_pool = {
     psw_tfmw_wef_boss_jiemei = true,
@@ -913,8 +1248,39 @@ local function psw_faction_button_pressed_listener(ui_button)
             local local_faction = cm:get_local_faction_name(true);
 			local faction = cm:model():world():faction_by_key(local_faction);
 			local faction_cqi = faction:command_queue_index();
-            
-            CampaignUI.TriggerCampaignScriptEvent(faction_cqi, ui_button);
+
+            -- 在部分战役 UI 状态下，TriggerCampaignScriptEvent 不会回送
+            -- UITrigger；保留原事件路径，并在短暂等待后直接调用同一个处理器。
+            psw_lottery_pending_request = psw_lottery_pending_request + 1
+            local request_id = psw_lottery_pending_request
+            psw_lottery_request_seen = false
+            local sent, send_error = pcall(function()
+                CampaignUI.TriggerCampaignScriptEvent(faction_cqi, ui_button);
+            end)
+            if not sent then
+                out("[psw] lottery event dispatch failed: " .. tostring(send_error))
+            end
+            cm:callback(function()
+                if request_id ~= psw_lottery_pending_request or psw_lottery_request_seen then
+                    return
+                end
+                psw_lottery_request_seen = true
+                psw_lottery_ignore_next_event = true
+                if type(psw_lottery_event_handler) ~= "function" then
+                    out("[psw] lottery direct dispatch unavailable")
+                    return
+                end
+                out("[psw] lottery direct dispatch fallback")
+                psw_lottery_event_handler({
+                    _psw_direct_dispatch = true,
+                    faction_cqi = function()
+                        return faction_cqi
+                    end
+                })
+                cm:callback(function()
+                    psw_lottery_ignore_next_event = false
+                end, 5)
+            end, 0.2)
         end,
     true)
 end
@@ -1196,12 +1562,17 @@ end
 
 core:remove_listener("psw_lizardmen_mazda_uitrigger_for_button")
 out("########## PSW PATCH tianfu.lua loaded, lottery fix active ##########")
-core:add_listener("psw_lizardmen_mazda_uitrigger_for_button",
-    "UITrigger",
-    function(context)
-        return context:trigger():starts_with(psw_button)
-    end,
-   psw_pcall_wrapper(function(context)
+psw_lottery_event_handler = psw_pcall_wrapper(function(context)
+        if context._psw_direct_dispatch ~= true then
+            if psw_lottery_ignore_next_event then
+                psw_lottery_ignore_next_event = false
+                out("[psw] duplicate lottery UITrigger ignored")
+                return
+            end
+            psw_lottery_request_seen = true
+            psw_lottery_pending_request = psw_lottery_pending_request + 1
+            out("[psw] lottery UITrigger received")
+        end
 
         local main_turn_number = cm:turn_number()
         local faction = cm:model():faction_for_command_queue_index(context:faction_cqi())
@@ -1949,7 +2320,13 @@ if not p.set_psw_hero_select then
             end
         end
 
-    end),
+    end)
+core:add_listener("psw_lizardmen_mazda_uitrigger_for_button",
+    "UITrigger",
+    function(context)
+        return context:trigger():starts_with(psw_button)
+    end,
+    psw_lottery_event_handler,
     true
 )
 
@@ -2497,57 +2874,105 @@ core:add_listener(
             
 ------------------ 世界BOSS传送 --------------------
         elseif dilemma_key == "dilemma_tf_duoren_tp" and choice == "FIRST" then
-            local tp_commander = psw_tp_commander(faction)
+            local tp_commander, commander_source = psw_tp_selected_or_fallback_commander(faction)
             if not tp_commander then
                 out("### PSW duoren_tp FIRST skipped: no deployable army for " .. faction_name .. " ###")
             else
-                local faction_leader_x, faction_leader_y = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(tp_commander), true, 1)
+                local boss_tp_num = tonumber(psw_mowang_data and psw_mowang_data.tp_boss_num)
+                local tp_to_boss_x, tp_to_boss_y, destination_source, boss_faction_name =
+                    psw_tp_resolve_boss_destination(faction_name, boss_tp_num)
+                local origin_x, origin_y = psw_tp_get_origin(tp_commander, faction_name)
 
-                local boss_current_x = psw_main_data.global_data.jws_boss_location_x
-                local boss_current_y = psw_main_data.global_data.jws_boss_location_y
-                local boss_tp_num = psw_mowang_data.tp_boss_num
-                if boss_tp_num == 2 then
-                    boss_current_x = psw_main_data.global_data.sznw_boss_location_x
-                    boss_current_y = psw_main_data.global_data.sznw_boss_location_y
-                    psw_main_data.global_data.psw_tfmw_is_tp_boss2 = true
-                elseif boss_tp_num == 3 then
-                    boss_current_x = psw_main_data.global_data.lyzm_boss_location_x
-                    boss_current_y = psw_main_data.global_data.lyzm_boss_location_y
-                    psw_main_data.global_data.psw_tfmw_is_tp_boss3 = true
-                elseif boss_tp_num == 4 then
-                    local mw_commander = mw_faction and psw_tp_commander(mw_faction)
-                    if mw_commander then
-                        local mwx , mwy = cm:find_valid_spawn_location_for_character_from_character(faction_name, cm:char_lookup_str(mw_commander), true, 10)
-                        boss_current_x = mwx
-                        boss_current_y = mwy
-                    end
-                    psw_main_data.global_data.psw_tfmw_is_tp_boss_end = true
+                if not tp_to_boss_x or not tp_to_boss_y then
+                    out("[psw_boss_tp] FIRST skipped: no safe Boss destination")
+                elseif not origin_x or not origin_y then
+                    out("[psw_boss_tp] FIRST skipped: cannot save a safe return position")
                 else
-                    psw_main_data.global_data.psw_tfmw_is_tp_boss1 = true
+                    if boss_tp_num == 2 then
+                        psw_main_data.global_data.psw_tfmw_is_tp_boss2 = true
+                    elseif boss_tp_num == 3 then
+                        psw_main_data.global_data.psw_tfmw_is_tp_boss3 = true
+                    elseif boss_tp_num == 4 then
+                        psw_main_data.global_data.psw_tfmw_is_tp_boss_end = true
+                    elseif boss_tp_num == 1 then
+                        psw_main_data.global_data.psw_tfmw_is_tp_boss1 = true
+                    end
+                    if psw_tfmw_record_active_boss_challenge then
+                        psw_tfmw_record_active_boss_challenge(boss_tp_num)
+                    end
+                    psw_boss_main_ms_smsx_add(faction_name)
+                    psw_main_miansicf(faction_name)
+
+                    psw_main_data.player_data[faction_name].faction_leader_x = origin_x
+                    psw_main_data.player_data[faction_name].faction_leader_y = origin_y
+                    psw_main_data.player_data[faction_name].boss_tp_commander_cqi =
+                        tp_commander:command_queue_index()
+
+                    out("[psw_boss_tp] teleport commander_cqi="
+                        .. tostring(tp_commander:command_queue_index())
+                        .. " commander_source=" .. tostring(commander_source)
+                        .. " stage=" .. tostring(boss_tp_num)
+                        .. " boss_faction=" .. tostring(boss_faction_name)
+                        .. " destination_source=" .. tostring(destination_source))
+                    cm:teleport_to(
+                        cm:char_lookup_str(tp_commander),
+                        tp_to_boss_x,
+                        tp_to_boss_y
+                    )
                 end
-                psw_boss_main_ms_smsx_add(faction_name)
-                psw_main_miansicf(faction_name)
-                local tp_to_boss_x, tp_to_boss_y = cm:find_valid_spawn_location_for_character_from_position(faction_name, boss_current_x, boss_current_y, true, 10)
-
-                cm:teleport_to(cm:char_lookup_str(tp_commander), tp_to_boss_x, tp_to_boss_y)
-
-                psw_main_data.player_data[faction_name].faction_leader_x = faction_leader_x
-                psw_main_data.player_data[faction_name].faction_leader_y = faction_leader_y
-                psw_main_data.player_data[faction_name].boss_tp_commander_cqi = tp_commander:command_queue_index()
             end
 
         elseif dilemma_key == "dilemma_tf_duoren_tp" and choice == "SECOND" then
             local faction_leader_current_x = psw_get_num(faction_name, "faction_leader_x")
             local faction_leader_current_y = psw_get_num(faction_name, "faction_leader_y")
-            local tp_commander = cm:get_character_by_cqi(psw_get_num(faction_name, "boss_tp_commander_cqi"))
-            if not psw_char_deployable(tp_commander) then
+            local saved_commander_cqi = psw_get_num(faction_name, "boss_tp_commander_cqi")
+            local tp_commander = nil
+            if saved_commander_cqi > 0 then
+                local ok_commander, commander = pcall(function()
+                    return cm:get_character_by_cqi(saved_commander_cqi)
+                end)
+                if ok_commander and psw_char_deployable(commander) then
+                    local ok_faction, commander_faction = pcall(function()
+                        return commander:faction():name()
+                    end)
+                    if ok_faction and commander_faction == faction_name then
+                        tp_commander = commander
+                    end
+                end
+            else
+                -- Legacy saves did not persist the army CQI; retain their old
+                -- leader/army fallback, but never substitute a different army
+                -- when a newer save already recorded the exact commander.
                 tp_commander = psw_tp_commander(faction)
             end
-            psw_boss_main_ms_smsx_delete(faction_name)
-            if tp_commander then
-                local tp_to_boss_1_x, tp_to_boss_2_x = cm:find_valid_spawn_location_for_character_from_position(faction_name, faction_leader_current_x, faction_leader_current_y, true, 1)
-                local m, n = cm:find_valid_spawn_location_for_character_from_position(faction_name, tp_to_boss_1_x, tp_to_boss_2_x, true, 1)
-                cm:teleport_to(cm:char_lookup_str(tp_commander), m, n)
+            if not psw_tp_position_is_valid(faction_leader_current_x, faction_leader_current_y) then
+                out("[psw_boss_tp] return skipped: no saved origin position")
+            elseif not tp_commander then
+                out("[psw_boss_tp] return skipped: original commander unavailable cqi="
+                    .. tostring(saved_commander_cqi))
+            else
+                local ok, return_x, return_y = pcall(function()
+                    return cm:find_valid_spawn_location_for_character_from_position(
+                        faction_name,
+                        faction_leader_current_x,
+                        faction_leader_current_y,
+                        true,
+                        1
+                    )
+                end)
+                if ok and psw_tp_position_is_valid(return_x, return_y) then
+                    psw_boss_main_ms_smsx_delete(faction_name)
+                    out("[psw_boss_tp] return commander_cqi="
+                        .. tostring(tp_commander:command_queue_index())
+                        .. " xy=" .. tostring(return_x) .. "," .. tostring(return_y))
+                    cm:teleport_to(
+                        cm:char_lookup_str(tp_commander),
+                        return_x,
+                        return_y
+                    )
+                else
+                    out("[psw_boss_tp] return skipped: spawn lookup failed")
+                end
             end
         elseif dilemma_key == "dilemma_tf_duoren_tp" and choice == "THIRD" then
 
@@ -2907,17 +3332,24 @@ end
 
 
 function psw_main_only_dismantle_tf(faction_name)
-    local region_name = psw_get_any(faction_name, "region_name")
-    local tf_region = cm:get_region(region_name)
-    local slot_n_list = tf_region:foreign_slot_manager_for_faction(faction_name):slots()
-    local slot_1 = slot_n_list:item_at(0)
-    local slot_2 = slot_n_list:item_at(1)
-    local slot_3 = slot_n_list:item_at(2)
-    local slot_4 = slot_n_list:item_at(3)
-    cm:foreign_slot_instantly_dismantle_building(slot_1)
-    cm:foreign_slot_instantly_dismantle_building(slot_2)
-    cm:foreign_slot_instantly_dismantle_building(slot_3)
-    cm:foreign_slot_instantly_dismantle_building(slot_4)
+    local slot_manager = type(psw_get_talent_slot_manager) == "function"
+        and psw_get_talent_slot_manager(faction_name)
+        or nil
+    if not slot_manager or slot_manager:is_null_interface() then
+        out("[psw_skaven_slots] cannot clear talents: no dedicated slot manager for " .. tostring(faction_name))
+        return
+    end
+    local slot_n_list = slot_manager:slots()
+    if not slot_n_list or slot_n_list:num_items() < 4 then
+        out("[psw_skaven_slots] cannot clear talents: expected four PSW slots for " .. tostring(faction_name))
+        return
+    end
+    for i = 0, 3 do
+        local slot = slot_n_list:item_at(i)
+        if slot and not slot:is_null_interface() and slot:has_building() then
+            cm:foreign_slot_instantly_dismantle_building(slot)
+        end
+    end
     psw_aplly_costom_effect_bundle_hidden_fn("main_yi_pick", faction_name)
 end
 
@@ -8398,15 +8830,26 @@ ui_psw_main_tfxz_merged_cb = psw_pcall_wrapper(function(context)
                     .. " jishu_ex_count=" .. tostring(psw_get_num(faction_name, "jishu_ex_count")))
 
                 advice_alice_tf_yyytf()
-                local region_name = psw_get_any(faction_name, "region_name")
-                local tf_region = cm:get_region(region_name)
-                local slot_n_list = tf_region:foreign_slot_manager_for_faction(faction_name):slots()
-                local slot_1 = slot_n_list:item_at(0)
-                local slot_2 = slot_n_list:item_at(1)
-                local slot_3 = slot_n_list:item_at(2)
-                cm:foreign_slot_instantly_dismantle_building(slot_1)
-                cm:foreign_slot_instantly_dismantle_building(slot_2)
-                cm:foreign_slot_instantly_dismantle_building(slot_3)
+                local slot_manager = type(psw_get_talent_slot_manager) == "function"
+                    and psw_get_talent_slot_manager(faction_name)
+                    or nil
+                if slot_manager and not slot_manager:is_null_interface() then
+                    local slot_n_list = slot_manager:slots()
+                    if slot_n_list and slot_n_list:num_items() >= 3 then
+                        for i = 0, 2 do
+                            local slot = slot_n_list:item_at(i)
+                            if slot and not slot:is_null_interface() and slot:has_building() then
+                                cm:foreign_slot_instantly_dismantle_building(slot)
+                            end
+                        end
+                    else
+                        out("[psw_skaven_slots] fallback cleanup skipped: insufficient dedicated slots for "
+                            .. tostring(faction_name))
+                    end
+                else
+                    out("[psw_skaven_slots] fallback cleanup skipped: no dedicated manager for "
+                        .. tostring(faction_name))
+                end
                 should_add_pick_zhongmo = false
                 --[merged] 兜底拆空后延时补抽一轮，避免天赋槽全空
                 --（必须延时：同事件还有同名监听器要靠 main_yi_pick 锁去重，同步重抽会先解锁）
