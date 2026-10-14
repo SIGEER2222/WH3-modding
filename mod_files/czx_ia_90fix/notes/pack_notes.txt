@@ -1,1 +1,1 @@
-9.0 兼容补丁：Imperial Arbiter（虫群帝国）的 db/missile_weapons_tables/skv_chongzu 仍是 9.0 之前的 v11 布局（5 列），原版已升至 v12（新增 hide_secondary_range_ammo_statistics_ui 列）。本补丁以同内部路径遮蔽原文件、按 v12 重编码该行，需排在 Imperial Arbiter.pack 之前加载。
+9.0 兼容补丁：Imperial Arbiter（虫群帝国）的 db/missile_weapons_tables/skv_chongzu 仍是 9.0 之前的 v11 布局（5 列），原版已升至 v12（新增 hide_secondary_range_ammo_statistics_ui 列）。本补丁以同内部路径遮蔽原文件、按 v12 重编码该行，需排在 Imperial Arbiter.pack 之前加载。另覆盖 db/variants_tables/skv_chongzu，保留跳虫/刺蛇记录并将雷兽 leishou 的 scale 从 1.65 调整为 1.155（原值的 70%）。

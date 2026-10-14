@@ -1,2 +1,8 @@
 虫群基础部队包：SC2 风格虫群兵种与本地化（含跳虫、刺蛇、雷兽、德哈卡、被感染坦克/响尾蛇/枪兵等），保留各兵种主动/被动特性并补齐自定义动画文化映射。战役内凯瑞甘由「英灵召唤」(Lin_Summon_Servant.pack) 提供 lin_all_kerrigan_zerg；本包不再加载旧 czx_kerrigan/czx_kerrigan_lord 直刷脚本。旧 subtype/权限数据保留用于历史存档兼容。
-2026-10-01 新增精锐兽栏招募入口：16 个非英雄虫群单位挂入 czx_mod_pool 佣兵池（依赖 czx_mod_pool.pack），独立招募按钮。上限：杂兵20/中坚10/巨兽4，回补0.5/回合，高级单位需领主等级（混元体8、莽兽10、单体巨兽/坦克/德哈卡15）。原有 vmp_unlock 招募补丁不受影响。
+2026-10-01 新增精锐兽栏招募入口：17 个非英雄虫群单位挂入 czx_mod_pool 佣兵池（依赖 czx_mod_pool.pack），独立招募按钮。上限：杂兵20/中坚10/巨兽4，雷兽10；回补0.5/回合，高级单位需领主等级（混元体8、莽兽10、雷兽/单体巨兽/坦克/德哈卡15）。原有 vmp_unlock 招募补丁不受影响。
+2026-10-05 补齐雷兽 leishou 的佣兵组、池连接、15 级限制和脚本重型/播种记录；雷兽与 Imperial Arbiter.pack 的单位定义保持跨包依赖。
+2026-10-04 数值调整：加强被感染枪兵的近战攻防、生命和弹药；加强莽兽的生命、攻防、冲锋和专用近战武器，不修改共享原版 donor 武器。
+Hydralisk cishe now uses the dedicated czx_cishe_spines -> czx_cishe_projectile chain with projectile effective range 350.
+
+2026-10-07 雷兽池修复包版本：依赖 czx_mod_pool7_leishou10_fix.pack；雷兽首个库存为 1，
+池上限为 10。

@@ -7,10 +7,10 @@
 | key | 中文名 | 骨架/动画集 | 供体 | 定位 |
 |---|---|---|---|---|
 | czx_baolongshou | 暴龙兽 | heavyquadruped01 / hq1_feral_stegadon | lzd_stegadon_02.rmv2 | 单体巨兽，46攻/70冲锋/9600血/2000金/T4 |
-| czx_inf_tank | 被感染的坦克 | steamtank01 / wm_steam_tank01 | emp_steam_tank_01.rmv2 | 战车引擎单位，主炮40弹+冲撞，2200金/T4 |
-| czx_dehaka | 德哈卡 | humanoid11b / hu11b_dlc17_ghorgon | bst_ghorgon_01.rmv2 | 单体巨兽英雄级，62攻/11800血/2400金/T5 |
+| czx_inf_tank | 被感染的坦克 | czx_stank01 / czx_steamtank01 | emp_steam_tank_01.rmv2 | 战车引擎单位，主炮40弹+冲撞，2200金/T4 |
+| czx_dehaka | 德哈卡 | czx_dehaka1 / czx_dlc17_ghorgon01 | bst_ghorgon_01.rmv2 | 单体巨兽英雄级，62攻/11800血/2400金/T5 |
 | czx_inf_diamondback | 被感染的响尾蛇 | spider01 / sp1_giant_spider | grn_giant_spider_body_01.rmv2 | 16模型怪步，游走侧翼，1200金/T3 |
-| czx_inf_marine | 被感染的枪兵 | humanoid01 / hu1_empire_sword_rifle | emp_volkmar_body_01.rmv2 | 90模型步枪步，650金/T2 |
+| czx_inf_marine | 被感染的枪兵 | czx_marine / czx_empire_sword_rifle | emp_volkmar_body_01.rmv2 | 90模型步枪步，650金/T2 |
 
 ### 坦克链路（与生物单位不同）
 
@@ -47,6 +47,17 @@
 - 坦克长颈主要绑到 barrel_/exhaust_ 系骨，开火时随炮管后座摆动。
 - 人工微调入口：`manual_edit/<unit>.blend`（Blender Weight Paint 改权重 → 导出 skinned GLB → 重转）。
   详见 `manual_edit/README.md`。
+
+### 模型与动作骨架回归（2026-10-03）
+
+- `czx_mangshou` 的 RMV2 内嵌骨架是 `czx_ms`，因此 `land_units.man_animation`
+  必须使用 `czx_cst_promethean`。
+- `czx_dehaka` 的 RMV2 内嵌骨架是 `czx_dehaka1`，因此必须使用
+  `czx_dlc17_ghorgon01`。
+- `czx_inf_marine` 的 RMV2 内嵌骨架是 `czx_marine`，因此必须使用
+  `czx_empire_sword_rifle`。
+- 其余本批自定义模型继续使用与内嵌原版 donor 骨架一致的原版动作族；仅凭外观语义
+  更换 donor 会引入新的骨架错配，暂不这样处理。
 
 ## 技能挂载回归修复（2026-10-02）
 

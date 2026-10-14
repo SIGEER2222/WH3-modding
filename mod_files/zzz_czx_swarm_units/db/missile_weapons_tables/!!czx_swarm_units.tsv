@@ -1,3 +1,5 @@
-﻿key	precursor	default_projectile	audio_type	use_secondary_ammo_pool
-#missile_weapons_tables;12;db/missile_weapons_tables/!!czx_swarm_units				
-czx_mutalisk_glaive	false	czx_mutalisk_glaive	javelin	false
+key	precursor	default_projectile	audio_type	use_secondary_ammo_pool	hide_secondary_range_ammo_statistics_ui
+#missile_weapons_tables;12;db/missile_weapons_tables/!!czx_swarm_units					
+czx_mutalisk_glaive	false	czx_mutalisk_glaive	javelin	false	false
+czx_inf_marine_rifle	false	czx_inf_marine_bullet	repeater_gun	false	false
+czx_cishe_spines	false	czx_cishe_projectile		false	false

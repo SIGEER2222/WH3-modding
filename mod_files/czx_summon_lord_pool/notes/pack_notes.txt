@@ -13,3 +13,17 @@ scratch/_zzz_probe_suppress.lua），换名部署为 zzz_czx_summon_lord_pool2.p
 以 agent_culture_details 新行补齐（789930101-107，recruitable_in_ui=true；矮人 wizard 与
 基斯里夫 champion 原版已有任务角色行，该补丁另加正规 true 行）。本包不再重复加行，仅保留
 领主池/agent_subtypes 覆盖/names/loc 职责。
+
+2026-10-03 为领主池中的 lin_all_kerrigan_zerg 增加 general 技能树绑定，复用
+Lin_Summon_Servant.pack 的凯瑞甘 39 个技能节点；保留其原 wizard 技能树。
+
+2026-10-05 撤销 general 技能树绑定（character_skill_node_sets + character_skill_node_set_items
+两表整删）：上述"复用"让 40 个 lin_skill_node_kerrigan_zerg_* 节点同时被依赖包
+（lin_skill_node_set_all_kerrigan_zerg，agent_key=wizard）与本包
+（czx_skill_node_set_lin_kerrigan_general，agent_key=general）两个 set 引用。原版 273 个
+data 包内"同一节点被 ≥2 条 set_items 引用"为 0 例（wh3index ref_rows 实证），属引擎未知
+结构。实测（10-04 21:35-22:37，纳迦什军团战役）在招募面板打开/选中军队/战斗转场的角色
+数据枚举窗引发 0xc0000005 三族签名（+0x244d4f3/+0x244df53/+0x1811525），用户 A/B 禁用
+本包+czx_lin_servant_culture_fix 后同一战役完整打完战斗（script_log_041026_2238，无
+dump）。撤表=领主无技能树回退；如需恢复，须给 general 复制独立 key 的
+character_skill_nodes 副本，不得共享依赖包节点。[实测/需随版本复查]

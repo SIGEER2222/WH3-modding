@@ -16,3 +16,4 @@ chance_to_replenish	key	max_count	unit_record	use_partial_replenishment	max_repl
 0.0	czx_pool_baolongshou	4	czx_baolongshou	false	0.0	13
 0.0	czx_pool_inf_tank	4	czx_inf_tank	false	0.0	14
 0.0	czx_pool_dehaka	4	czx_dehaka	false	0.0	15
+0.0	czx_pool_leishou	10	leishou	false	0.0	16

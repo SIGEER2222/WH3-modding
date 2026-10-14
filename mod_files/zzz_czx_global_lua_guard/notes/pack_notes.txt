@@ -1,1 +1,7 @@
-全局 Lua 回调防护：包住 core 监听器及可替换的 campaign/battle callback，异常限流记录并阻止单个脚本回调中断事件泵；不能捕获 Warhammer3.exe 原生访问违例。
+全局 Lua 回调防护：覆盖可替换的 campaign/battle callback，异常限流记录并阻止单个脚本回调中断事件泵；保留原生 core.add_listener，不改变其它 MOD 的监听器身份和生命周期；不能捕获 Warhammer3.exe 原生访问违例。
+2026-10-04：guard 在加载时保存原始 pcall/xpcall，避免 RLH 全局错误记录器二次包装 guard 自身；对已确认会访问 psw_main_data.player_data 的 PSW FactionTurnStart/FactionTurnEnd 条件，在空接口、非玩家派系或缺少玩家数据时提前返回 false，减少 AI 回合错误洪峰。只匹配 psw_英雄.lua、psw_天赋效果.lua、psw_第六批.lua，不覆盖第三方脚本文件。
+2026-10-04：移除 campaign 初始化阶段的顶层 CinematicTrigger 监听注册；改由首次使用 intro 延迟门控时再注册，避免读档/启动早期事件系统尚未完成时触发原生空指针。
+2026-10-04：补充 `is_valid`/`is_alive`/`call`/`find_ui`/`ui_call` 安全接口，并修正战斗侧 `out` 可调用表；Lua 可见的 nil/null/dead/缺方法/显式回调异常会限流记录并早退，native UAF/访问违例仍不可由 Lua 捕获。原生 callback 注册方法不再全局代理。
+2026-10-04：移除全局 `core.add_listener` 包装；PSW 护栏已在自身调用点处理。全局包装曾在 `!sfai_ai_garbage_cleanup.lua` 加载阶段触发 `0xc0000409`，会影响所有 MOD 的监听器注册。
+2026-10-04：两侧提供显式 `CZX_LUA_GUARD.add_listener`，只包裹调用方自己的监听器；默认保留所有原生注册 API，避免改变引擎回调身份/生命周期。
+2026-10-04：`G.add_listener` 保存原生注册函数后再支持 opt-in，避免显式全局代理模式递归调用自身。

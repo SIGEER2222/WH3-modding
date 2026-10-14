@@ -1,1 +1,52 @@
-装备管理增强补丁：装备面板内出售——出售选中/双击装备直接出售/勾选批量出售/一键出售当前筛选全部未装备件（已装备与传奇/锻造豁免、服务端校验）+ "只看已拥有"筛选开关 + 部队面板一键撤编按钮。
+装备管理增强补丁：装备面板内出售——出售选中/双击装备直接出售/勾选批量出售/一键出售当前筛选全部未装备件（已装备与传奇/锻造豁免、服务端校验）+ "只看已拥有"筛选开关 + 部队面板一键撤编按钮（真·全撤含领主，将领受伤回池不删档）。
+2026-10-07：修复面板子组件查找 helper 的 Lua vararg 闭包语法错误；改为捕获参数后兼容传递，避免脚本在启动期整文件加载失败。
+2026-10-07(v3)：一键撤编重写——选人改 uim:get_char_selected_cqi()/get_mf_selected_cqi() 权威接口+随军英雄反查宿主军（修复 v2 用 SelectedOrContainedCharacter.CQI 选到英雄/孤立角色导致"tick1 假完成"）；撤编改 wound_character 主路径（将领回池、装备保留、部队连座解散）+ 0.6s 校验未消失则 kill_character(destroy_force) 兜底（临时不死→杀伤→恢复 immortality）；驻军将领拒绝。
+2026-10-07(v4)：三国式"撤编+军备池"——撤编时快照全部非将领/英雄单位（key+兵力%+经验等级+成本）入派系军备池（save_named_value 随存档持久化）；部队面板新增[＋]重组按钮，对选中军队 grant_unit_to_character 逐队补编至满20格，并按快照恢复兵力（set_unit_hp_to_unary_of_maximum）与经验（add_experience_to_unit）；发放失败保留池内条目，发放前已有同key单位不被误恢复。
+2026-10-07(v5)：重组按成本扣国库——计费=get_unit_custom_battle_cost×兵力%×系数（REMUSTER_COST_FACTOR=1.0，可调0免费），treasury_mod 逐队扣；国库不足的队跳过留在池里。
+2026-10-10(v6)：两个生产日志实证 bug 修复——① 快照枚举 and/or 多返回值截断（local okn,n_units = okl and pcall(...) or false → n_units 恒 nil → 快照循环永不执行 → 军备池恒空，sell7 日志 units=nil stored=0 实证）；② 撤编兜底杀错人——wound_character 只伤将领，军队失去将领后引擎自动补位新将领接管（"领主替换"），旧代码 kill 原 cqi 静默失败（cqi 已不可解析），改 mf_key 反查 general_character() 杀当前将领 destroy_force=true，若查到仍是原将领则临时永生挡死杀完还原。
+2026-10-10(v7) 实测通过（sell9，script_log_101026_2153.txt）：野战军伊姆瑞克(cqi63/mf35)撤编→units=20 stored=16（英雄不入池）→wound_character ok conv=1→引擎补位将 cqi8865 被兜底 destroy_force 击杀→军队整队消失、将领回池负伤可再召、零 no such character。艾斯林(cqi65/mf36)重组→granted 10 failed 0 cost 7670 pool left 6（20格上限截断，未发放条目留池）→hp/rank 恢复、国库 6893036→6885366 精确-7670。已知小瑕疵：重组按钮 tooltip"在库N队"为开面板时刻值，发放后不即时刷新（仅显示，无功能影响）。
+2026-10-10(v8) 设计修正：重组改"三国式驻城征召"——守卫翻转，仅 has_garrison_residence 的驻扎军可从军备池补员，野战军点击拒绝并弹 feed「军备池」提示（旧版任意野战军可补=免费远程补员绕开征募体系）；撤编仍拒绝驻军（走原生定居点撤编）。拒绝路径补 show_message_event 玩家可见反馈（need_garrison/empty/garrison_disband 三条 loc）。顺手修 collect_selection 第三个实测 bug：uim 无选中返回 -1 被当合法 cqi 且顶掉 CQI 兜底→点击随机哑火，改 type(x)=="number" and x>0（resolve 侧同步）。舰船边界：港口驻泊舰队的 garrison_residence 待验证，若不计则龙船类暂不能重组。
+
+=== sell10 实测进度 (2026-10-11, script_log_111026_0604.txt) ===
+已验证:
+- 野战军撤编: Aislinn cqi=65/mf=36, units=10 stored=8, 补位将 cqi8839 destroy_force 击杀, 零报错
+- 野战军 [+] 拒绝: Hemara cqi=2581/mf=2217 -> "field army, refuse (remuster requires garrisoned army)" + event_feed 播报
+- -1 选择 bug 修复后无哑火
+- 按钮坐标(2560x1440 fullscreen): disband≈(1433,1407) remuster≈(1497,1407), 以 [ui] dump 为准(visual 偏右)
+- appoint_new_general 撤编后自动弹出的 hire 指向已销毁 force => 静默失败, 不算驻军来源
+未验证: 真驻军 [+] 补员 (银行8队已存但reload归零)
+阻塞: 游戏三连死(2337定居点面板/0604塔拉夸定居点面板UIDestroyed/0629 init 120s静默死),
+       wh3diag crashes 显示本装长期 0xffffffffffffffff UI teardown 野指针家族, 与新65th祈愿补丁时序重合待查
+
+=== sell10 驻军重组 实测通过 (2026-10-11, script_log_111026_0637.txt) ===
+全流程闭环验证:
+- 新招将领: 定居点小栏 skull图标(button_create_army)=招募领主面板; 新领主出生在城外(野战军), 需右键入城才变驻军
+- 驻军确认: Character selected 日志带 "garrisoned in settlement:<key>" 标记
+- 空库拒绝: 驻军+空库 -> "reserve pool empty" + feed播报
+- 撤编: Aislinn cqi=65/mf=36 stored=8, 补位将cqi8839 destroy_force击杀, convalescence=4
+- 驻军发放: 阿法泽尔 cqi=6363/mf=4411 @tor_elasor -> "granted 8 units, failed 0, cost 6500, pool left 0" + "restored hp/rank on 8 units"
+- 视觉确认: 兵牌 1/20->9/20 带勋级; 国库 6893036->6886536 精确-6500
+- 幂等: 二次点击 -> reserve pool empty, 无重复发放无二次扣款
+- 军队面板将领名右侧 ◀▶ 箭头可轮替全部角色(含驻防将/英雄)
+遗留(显示瑕疵): 重组tooltip的"在库N队"是开面板时刻值, 发放后不即时刷新
+
+=== sell12 军备池浏览/勾选面板 (2026-10-11, 源码实装待实测) ===
+需求: "得给个浏览和选择的界面吧？不能点一下就召出来了"
+实现:
+- 城卡 [+] 不再直接发兵, 改开运行时拼装面板 czx_bank_panel(script_dummy@ui_root, priority300, 监狱同款套路, 无twui)
+- 面板: 标题(城名)/状态行(在库/已选/预计军费/国库)/10行/页×翻页/行=图标+名+兵%+★级+军费/
+  底栏[全选/清空][重组所选][◀▶翻页][X关闭]
+- 勾选态 bank_ui.sel 以池下标为键(同名兵不同血量/勋级=独立条目); 默认全选
+- 确认发 czx_remuster_pick|mf_cqi|idx,idx,... → 服务端按下标快照条目对象→共享
+  grant_bank_entries 发放(冻结下标防遍历时删池漂移; 条目对象rawequal去重)
+- 发放后 bank_panel_refresh(true) 全清勾选——剩余条目下标前移, 旧勾选失真必须清
+- 发放核心重构: 原内联循环抽成 grant_bank_entries(force,general,fname,bank,entries),
+  remuster_army(全发)与remuster_pick(勾选)共用; bank_remove_ref 按对象引用删条目
+- 校验链: 开面板要 mf_cqi(城内有本派系驻军) → 确认时服务端重查 has_garrison_residence
+  +池非空+下标有效; ESC=release+steal 关闭(tower同款); PanelClosedCampaign(settlement_panel)
+  自动隐藏; 新 loc: czx_bank_pick_none(未勾选提示)
+- 模板实证: square_medium_text_button_toggle 状态集 active/selected/selected_hover…文本
+  子件dy_province; square_medium_text_button 文本子件button_txt; 图皮肤路径 panel_back_tile/
+  border/0_placeholder/icon_cross 均原版已用
+- 修复顺带bug: csv提取改 czx_remuster_pick|%d+|(.+)$ (旧|(.+)$会把mf_cqi误当勾选下标)
+待测: 面板开/空库态/勾选发放/翻页/ESC关/发放后刷新/存档重载

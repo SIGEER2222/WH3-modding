@@ -2,6 +2,6 @@ PSW 独特能力全局点击安全补丁：同路径遮蔽 !!Prayer_of_star_witc
 
 原版 10 个独特能力回调注册全局 ComponentLClickUp 监听（condition 恒 return true），对每一次 UI 点击——包括引擎在面板构建/拆除期合成的 tab_details 等点击——裸调 GetContextObject / Call。组件半销毁时该调用读写死 context 数组，即 +0x22c0f80 读 / +0x132c34c 写崩族（09-29 13:19、13:42 两次 dump；崩前 4s RLH 日志捕获同批回调连续 'ccc nil' 报错，证明其在回合级联窗内被合成点击触发）。
 
-修补：condition 改为 psw_ctx_safe()——ui_locked / blocking 面板 / 最近 0.6s 内有 PanelOpenedCampaign 时拒绝进入回调（纯 Lua 字段读，点击派发期安全）；回调体内补 is_uicomponent 存活检查与 cco nil 防护（顺带消除 'ccc nil' pcall 报错刷屏）。
+修补：condition 改为 psw_ctx_safe()——ui_locked / blocking 面板 / 最近 0.6s 内有 PanelOpenedCampaign 或 PanelClosedCampaign 时拒绝进入回调；teleport_sea_lane 直接跳过（纯 Lua 字段读，点击派发期安全）；回调体内补 is_uicomponent 存活检查与 cco nil 防护（顺带消除 'ccc nil' pcall 报错刷屏）。
 
 注意：本包必须排在 !!Prayer_of_star_witch.pack 之前（同路径文件遮蔽靠前胜出）；dependencies.txt 仅记录关系，不能当排序手段。原版功能（点击特定建筑槽触发独特能力 dilemma）完全保留，仅屏蔽级联窗内的风险点击。

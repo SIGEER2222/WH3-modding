@@ -9,8 +9,8 @@
 -- 回合级联窗内被合成点击触发）。
 -- 修补：condition 换 psw_ctx_safe()——ui_locked / blocking 面板 /
 -- 最近 0.6s 内有面板开合时拒绝进入回调（纯 Lua 字段读，零原生调用，
--- 点击派发期安全）；回调体内再补 is_uicomponent 存活检查与 cco nil
--- 防护（顺带消除 'ccc nil' pcall 报错）。
+-- 点击派发期安全）；海上航行按钮不属于本 MOD，直接跳过；回调体内
+-- 再补 is_uicomponent 存活检查与 cco nil 防护（顺带消除 'ccc nil' 报错）。
 local psw_last_panel_clock = -10
 core:remove_listener("psw_click_guard_stamp")
 core:add_listener(
@@ -20,8 +20,19 @@ core:add_listener(
     function() psw_last_panel_clock = os.clock() end,
     true
 )
+core:remove_listener("psw_click_guard_close_stamp")
+core:add_listener(
+    "psw_click_guard_close_stamp",
+    "PanelClosedCampaign",
+    true,
+    function() psw_last_panel_clock = os.clock() end,
+    true
+)
 
-local function psw_ctx_safe()
+local function psw_ctx_safe(context)
+    if context and context.string == "teleport_sea_lane" then
+        return false
+    end
     local ok_uim, uim = pcall(function() return cm:get_campaign_ui_manager() end)
     if not ok_uim or not uim or uim.ui_locked then return false end
     local ok_bp, bp = pcall(function() return uim:get_open_blocking_panel() end)
@@ -51,7 +62,7 @@ local function psw_xxdqj_qjdmf_1(psw_tf_sp_xxdqj_ex)
         "psw_xxdqj_qjdmf_1",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -82,7 +93,7 @@ local function psw_btmmfs_sjgx_1(psw_tf_ex_btmmfs_1)
         "psw_btmmfs_sjgx",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -113,7 +124,7 @@ local function psw_btmmfs_sjgx_2(psw_tf_ex_btmmfs_2)
         "psw_btmmfs_sjgx_2",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -144,7 +155,7 @@ local function psw_btmmfs_sjgx_3(psw_tf_ex_btmmfs_3)
         "psw_btmmfs_sjgx_3",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -177,7 +188,7 @@ local function psw_bszzw_xxqy(psw_tf_nor_bszzw_nor)
         "psw_bszzw_xxqy",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -210,7 +221,7 @@ local function psw_yjzzf_slyj(psw_tf_nor_yjdzf_nor)
         "psw_yjzzf_slyj",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -243,7 +254,7 @@ local function psw_jsdjy_zt(psw_tf_ex_you_ex)
         "psw_jsdjy_zt",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -276,7 +287,7 @@ local function psw_zhenbu_thwg(psw_tf_ex_zhenbu_2)
         "psw_zhenbu_thwg",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -313,7 +324,7 @@ local function psw_fia_fydzf_click(psw_tf_ex_fia_3)
         "psw_fia_fydzf_click",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)
@@ -348,7 +359,7 @@ local function psw_amly_jx_click(psw_tf_ex_amly_1)
         "psw_amly_jx_click",
         "ComponentLClickUp",
         function(context)
-            return psw_ctx_safe()
+            return psw_ctx_safe(context)
         end,
         function(context)
             local uic = UIComponent(context.component)

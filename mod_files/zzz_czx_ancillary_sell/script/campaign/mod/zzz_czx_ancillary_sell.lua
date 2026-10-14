@@ -161,11 +161,30 @@ local function attach(ancillary_panel)
         return fresh
     end
 
-    local function panel_visible()
+    -- 可见且同代的 fresh 面板，否则 nil（调用方本 tick 放弃）
+    local function panel_open()
         local fresh = fresh_panel()
-        if not fresh then return false end
+        if not fresh then return nil end
         local ok, v = pcall(function() return fresh:Visible() end)
-        return ok and v == true
+        if ok and v == true then return fresh end
+        return nil
+    end
+
+    local function panel_visible()
+        return panel_open() ~= nil
+    end
+
+    -- §10.40：面板本体同代不代表子树未重建——xyz 面板自管行列表/按钮的创建销毁（切角色、
+    -- 买卖刷新），捕获的子组件 wrapper 裸调是确定性原生 UAF（2231 会话 +0x244d4f3 实锤：
+    -- panel_visible 通过后 150ms tick 裸调旧 list_box，pcall 兜不住原生崩）。因此子组件
+    -- 一律从 panel_open() 的 fresh 面板现查，不持久持有；查不到=子树正在刷新，本 tick 放弃。
+    local unpack_fn = unpack or (table and table.unpack)
+    local function sub(fresh, ...)
+        local args = {...}
+        local ok, comp = pcall(function()
+            return find_uicomponent(fresh, unpack_fn(args))
+        end)
+        return (ok and comp) or nil
     end
 
     local selected_key = ""
@@ -195,6 +214,8 @@ local function attach(ancillary_panel)
     -- only items currently visible in the panel list (respects its category/rarity/search filters)
     local function owned_unequipped_keys()
         local keys = {}
+        local fresh = panel_open()
+        local list_box = fresh and sub(fresh, "list", "list_clip", "list_box")
         local faction = cm:get_local_faction(true)
         if not faction or not list_box then return keys end
         for i = 0, list_box:ChildCount() - 1 do
@@ -253,28 +274,34 @@ local function attach(ancillary_panel)
     btn_owned:SetTooltipText(owned_on_txt, true)
 
     local function refresh_sell_one()
+        local fresh = panel_open()
+        local btn = fresh and sub(fresh, "ancillary_detail", "czx_button_sell_one")
+        if not btn then return end
         local faction = cm:get_local_faction(true)
         if selected_key == "" or not faction or not faction:ancillary_exists(selected_key) then
-            btn_sell_one:SetState("inactive")
-            btn_sell_one:SetTooltipText(sell_not_owned_txt, true)
+            btn:SetState("inactive")
+            btn:SetTooltipText(sell_not_owned_txt, true)
             return
         end
         if is_equipped(selected_key) then
-            btn_sell_one:SetState("inactive")
-            btn_sell_one:SetTooltipText(sell_equipped_txt, true)
+            btn:SetState("inactive")
+            btn:SetTooltipText(sell_equipped_txt, true)
             return
         end
         if is_protected(selected_key) then
-            btn_sell_one:SetState("inactive")
-            btn_sell_one:SetTooltipText(sell_protected_txt, true)
+            btn:SetState("inactive")
+            btn:SetTooltipText(sell_protected_txt, true)
             return
         end
         local price = sell_price(cco("CcoAncillaryRecord", selected_key))
-        btn_sell_one:SetState("active")
-        btn_sell_one:SetTooltipText(sell_one_txt .. "\n" .. sell_gain_txt .. price, true)
+        btn:SetState("active")
+        btn:SetTooltipText(sell_one_txt .. "\n" .. sell_gain_txt .. price, true)
     end
 
     local function refresh_sell_checked()
+        local fresh = panel_open()
+        local btn = fresh and sub(fresh, "ancillary_detail", "czx_button_sell_checked")
+        if not btn then return end
         local faction = cm:get_local_faction(true)
         local n, total = 0, 0
         for key in pairs(checked) do
@@ -284,11 +311,11 @@ local function attach(ancillary_panel)
             end
         end
         if n == 0 then
-            btn_sell_checked:SetState("inactive")
-            btn_sell_checked:SetTooltipText(sell_checked_txt, true)
+            btn:SetState("inactive")
+            btn:SetTooltipText(sell_checked_txt, true)
         else
-            btn_sell_checked:SetState("active")
-            btn_sell_checked:SetTooltipText(sell_checked_txt .. "\n" .. n .. " x " .. sell_gain_txt .. total, true)
+            btn:SetState("active")
+            btn:SetTooltipText(sell_checked_txt .. "\n" .. n .. " x " .. sell_gain_txt .. total, true)
         end
     end
 
@@ -304,11 +331,14 @@ local function attach(ancillary_panel)
             return context.string == "czx_sell_ui_tick"
         end,
         function(context)
-            if not panel_visible() then return end
+            local fresh = panel_open()
+            if not fresh then return end
             if dbl_ticks > 0 then
                 dbl_ticks = dbl_ticks - 1
                 if dbl_ticks == 0 then last_click_key = "" end
             end
+            local list_box = sub(fresh, "list", "list_clip", "list_box")
+            if not list_box then return end
             for i = 0, list_box:ChildCount() - 1 do
                 local child = UIComponent(list_box:Find(i))
                 local id = child:Id()
@@ -382,8 +412,12 @@ local function attach(ancillary_panel)
             for _, key in ipairs(keys) do
                 total = total + sell_price(cco("CcoAncillaryRecord", key))
             end
-            btn_sell_checked:SetState("inactive")
-            btn_sell_checked:SetTooltipText(string.format(sell_result_txt, #keys, total), true)
+            local fresh = panel_open()
+            local btn = fresh and sub(fresh, "ancillary_detail", "czx_button_sell_checked")
+            if btn then
+                btn:SetState("inactive")
+                btn:SetTooltipText(string.format(sell_result_txt, #keys, total), true)
+            end
             out(">>> czx_sell >>> selling " .. #keys .. " checked items for " .. total)
         end,
         true
@@ -401,7 +435,9 @@ local function attach(ancillary_panel)
             return context.string == "czx_owned_filter_tick"
         end,
         function(context)
-            if not panel_visible() then return end
+            local fresh = panel_open()
+            local btn_owned = fresh and sub(fresh, "button_list", "czx_button_owned")
+            if not btn_owned then return end
             if not btn_owned:CurrentState():starts_with("selected") then return end
             local faction = cm:get_local_faction(true)
             if not faction then return end
@@ -429,6 +465,9 @@ local function attach(ancillary_panel)
             return context.string == "search_set" and panel_visible()
         end,
         function(context)
+            local fresh = panel_open()
+            local btn_owned = fresh and sub(fresh, "button_list", "czx_button_owned")
+            if not btn_owned then return end
             if btn_owned:CurrentState():starts_with("selected") then
                 btn_owned:SetState("active")
                 btn_owned:SetTooltipText(owned_on_txt, true)
@@ -445,6 +484,9 @@ local function attach(ancillary_panel)
             return context.string == "czx_button_owned" and panel_visible()
         end,
         function(context)
+            local fresh = panel_open()
+            local btn_owned = fresh and sub(fresh, "button_list", "czx_button_owned")
+            if not btn_owned then return end
             if btn_owned:CurrentState():starts_with("selected") then
                 local faction = cm:get_local_faction(true)
                 if faction then
@@ -498,7 +540,9 @@ local function attach(ancillary_panel)
             local faction = cm:get_local_faction(true)
             if selected_key ~= "" and can_sell(selected_key, faction) then
                 CampaignUI.TriggerCampaignScriptEvent(faction:command_queue_index(), "czx_sell_item:" .. selected_key)
-                btn_sell_one:SetState("inactive")
+                local fresh = panel_open()
+                local btn = fresh and sub(fresh, "ancillary_detail", "czx_button_sell_one")
+                if btn then btn:SetState("inactive") end
             end
         end,
         true
@@ -522,7 +566,11 @@ local function attach(ancillary_panel)
             for _, key in ipairs(keys) do
                 total = total + sell_price(cco("CcoAncillaryRecord", key))
             end
-            btn_sell_all:SetTooltipText(string.format(sell_result_txt, #keys, total), true)
+            local fresh = panel_open()
+            local btn = fresh and sub(fresh, "ancillary_detail", "czx_button_sell_all")
+            if btn then
+                btn:SetTooltipText(string.format(sell_result_txt, #keys, total), true)
+            end
             out(">>> czx_sell >>> selling " .. #keys .. " items for " .. total)
         end,
         true

@@ -11,3 +11,10 @@ czx_ancillary_sell_protected	Legendary/crafted items cannot be sold
 czx_ancillary_sell_result	Sold %d items for [[img:icon_treasury]][[/img]]%d	
 czx_ancillary_sell_owned_on	Show only owned items (stacks with category/rarity/search)	
 czx_ancillary_sell_owned_off	Show the full item catalogue	
+event_feed_strings_text_czx_bank_title	军备池	
+event_feed_strings_text_czx_bank_need_garrison	仅驻扎在定居点内的军队可从军备池补员	
+event_feed_strings_text_czx_bank_empty	军备池已空——先撤编一支军队把部队存入	
+event_feed_strings_text_czx_bank_garrison_disband	驻军将领请经定居点界面撤编（此按钮仅用于野战军）	
+event_feed_strings_text_czx_bank_no_army	该定居点内没有驻军部队，无法从军备池补员
+event_feed_strings_text_czx_bank_pick_none	未勾选任何部队——在军备池面板中勾选要补入的单位	
+event_feed_strings_text_czx_bank_full	目标军队已满编（20/20），无法补入更多部队	
