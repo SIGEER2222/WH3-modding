@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>战锤3 · 战役进度</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="brand">
+    <span class=" rune">⚔</span>
+    <h1>战锤3 · 战役进度</h1>
+  </div>
+  <div class="controls">
+    <label for="save-select">存档</label>
+    <select id="save-select"></select>
+    <button id="reload-btn" title="重新扫描存档目录">刷新</button>
+  </div>
+</header>
+
+<main id="app">
+  <div id="loading" class="panel loading hidden">
+    <div class="spinner"></div>
+    <p id="loading-text">正在读取存档…</p>
+    <p class="hint">首次解析一个存档约需 10~20 秒，之后走本地缓存。</p>
+  </div>
+
+  <div id="error" class="panel error hidden"></div>
+
+  <div id="content" class="hidden">
+    <section class="hero">
+      <div class="turn-box">
+        <div class="turn-label">回合</div>
+        <div class="turn-num" id="turn">–</div>
+        <div class="season" id="season"></div>
+      </div>
+      <div class="hero-main">
+        <div class="player-line">
+          <span class="player-name" id="player-name"></span>
+          <span class="player-key" id="player-key"></span>
+        </div>
+        <div class="meta-line">
+          <span id="campaign"></span> · <span id="version"></span>
+        </div>
+        <div class="meta-line dim" id="save-meta"></div>
+      </div>
+    </section>
+
+    <section class="cards" id="cards"></section>
+
+    <section class="panel" id="brief-panel">
+      <h2>LLM 简报 <span class="dim">中文 · 可直接粘贴给模型判断下一步</span></h2>
+      <div class="tl-controls">
+        <button id="brief-btn">生成简报</button>
+        <button id="brief-copy" class="hidden">复制全文</button>
+        <span class="dim">API：<code>/api/brief?id=&lt;存档&gt;&amp;format=md</code>（JSON 去掉 format）</span>
+      </div>
+      <pre id="brief-text" class="brief-text"></pre>
+    </section>
+
+    <section class="panel" id="timeline-panel">
+      <h2>战役时间线 <span class="dim">跨存档差分 · 编年史</span></h2>
+      <div class="tl-controls">
+        <button id="tl-build">构建全历史时间线</button>
+        <select id="tl-session" class="hidden"></select>
+        <span id="tl-status" class="dim"></span>
+      </div>
+      <div class="tl-filters-row">
+        <div class="tl-filters" id="tl-filters"></div>
+        <label class="tl-onlyme"><input type="checkbox" id="tl-only-player" checked> 只看玩家相关</label>
+        <span class="tl-viewswitch">
+          <button id="tl-mode-flow" class="active">事件流</button>
+          <button id="tl-mode-chapters">章节战报</button>
+        </span>
+      </div>
+      <div id="tl-latest"></div>
+      <div id="tl-charts"></div>
+      <div id="tl-events" class="tl-events"></div>
+      <div id="tl-chapters" class="hidden"></div>
+      <div class="tl-bottom-row">
+        <button id="tl-more" class="hidden">显示更多事件</button>
+      </div>
+      <div class="grid-2" id="tl-bottom">
+        <div>
+          <h3>兴衰概要</h3>
+          <div id="tl-summary"></div>
+        </div>
+        <div>
+          <h3>当前战争与外交 <span class="dim" id="tl-war-count"></span></h3>
+          <div id="tl-wars"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h2>派系金库排行 <span class="dim">Top 12</span></h2>
+        <div id="rank-treasury" class="rank"></div>
+      </div>
+      <div class="panel">
+        <h2>派系兵力排行 <span class="dim">按单位数 · Top 12</span></h2>
+        <div id="rank-units" class="rank"></div>
+      </div>
+    </section>
+
+    <section class="grid-2">
+      <div class="panel">
+        <h2>玩家军团 <span class="dim" id="force-count"></span></h2>
+        <div id="forces" class="forces"></div>
+      </div>
+      <div class="panel">
+        <h2>角色 <span class="dim" id="char-count"></span></h2>
+        <div id="characters"></div>
+      </div>
+    </section>
+
+    <section class="grid-2" id="snap-extra">
+      <div class="panel">
+        <h2>任务与胜利目标 <span class="dim" id="snap-mission-count"></span></h2>
+        <div id="snap-missions"></div>
+      </div>
+      <div class="panel">
+        <h2>装备库 <span class="dim" id="snap-anc-count"></span></h2>
+        <div id="snap-ancillaries" class="force-units"></div>
+        <h2>世界状态</h2>
+        <div id="snap-world" class="dim"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>已加载 MOD <span class="dim" id="mod-count"></span></h2>
+      <details>
+        <summary>展开列表</summary>
+        <div id="mods" class="mods"></div>
+      </details>
+    </section>
+
+    <footer>
+      数据来自战役存档（ESF CBAB 格式，本机解析）·
+      格式参考 <a href="https://github.com/Frodo45127/rpfm">RPFM</a>（MIT）
+      · 仅读取，不修改存档
+    </footer>
+  </div>
+</main>
+
+<script src="/static/app.js"></script>
+<script src="/static/army_detail.js"></script>
+</body>
+</html>
