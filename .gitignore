@@ -42,3 +42,6 @@
 *.bnk
 __pycache__/
 !/mod_files/zzz_czx_mortarch_diag/
+!/mod_files/zzz_czx_psw_initial_movement_fix/
+web_progress/cache/
+!/web_progress/
