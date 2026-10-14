@@ -1,0 +1,3 @@
+building	culture	description	icon	subculture	faction	disables	short_description	display_tooltip	building_frame_override
+#building_culture_variants_tables;5;db/building_culture_variants_tables/zzz_psw_doctrine
+psw_doct_menu		wh_main_PLACEHOLDER	alu_nor			false	psw_doct_menu	true	

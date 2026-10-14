@@ -1,0 +1,36 @@
+﻿dilemma_key	id	option_key	value	target
+#cdir_events_dilemma_option_junctions_tables;1;db/cdir_events_dilemma_option_junctions_tables/zzz_psw_tower				
+psw_dilemma_tower_opening	888900101	VAR_CHANCE	100	default
+psw_dilemma_tower_opening	888900102	GEN_TARGET_NONE		default
+psw_dilemma_tower_node	888900103	VAR_CHANCE	100	default
+psw_dilemma_tower_node	888900104	GEN_TARGET_NONE		default
+psw_dilemma_tower_battle	888900105	VAR_CHANCE	100	default
+psw_dilemma_tower_battle	888900106	GEN_TARGET_NONE		default
+psw_dilemma_tower_reward	888900107	VAR_CHANCE	100	default
+psw_dilemma_tower_reward	888900108	GEN_TARGET_NONE		default
+psw_dilemma_tower_shop	888900109	VAR_CHANCE	100	default
+psw_dilemma_tower_shop	888900110	GEN_TARGET_NONE		default
+psw_dilemma_tower_event	888900111	VAR_CHANCE	100	default
+psw_dilemma_tower_event	888900112	GEN_TARGET_NONE		default
+psw_dilemma_tower_defeat	888900113	VAR_CHANCE	100	default
+psw_dilemma_tower_defeat	888900114	GEN_TARGET_NONE		default
+psw_dilemma_tower_victory	888900115	VAR_CHANCE	100	default
+psw_dilemma_tower_victory	888900116	GEN_TARGET_NONE		default
+psw_dilemma_doct_link2	888900117	VAR_CHANCE	100	default
+psw_dilemma_doct_link2	888900118	GEN_TARGET_NONE		default
+psw_dilemma_tower_boon	888900119	VAR_CHANCE	100	default
+psw_dilemma_tower_boon	888900120	GEN_TARGET_NONE		default
+psw_dilemma_tower_rest	888900121	VAR_CHANCE	100	default
+psw_dilemma_tower_rest	888900122	GEN_TARGET_NONE		default
+psw_dilemma_tower_cd	888900123	VAR_CHANCE	100	default
+psw_dilemma_tower_cd	888900124	GEN_TARGET_NONE		default
+psw_dilemma_tower_school	888900130	VAR_CHANCE	100	default
+psw_dilemma_tower_school	888900131	GEN_TARGET_NONE		default
+psw_dilemma_tower_school2	888900132	VAR_CHANCE	100	default
+psw_dilemma_tower_school2	888900133	GEN_TARGET_NONE		default
+psw_dilemma_tower_digong	888900134	VAR_CHANCE	100	default
+psw_dilemma_tower_digong	888900135	GEN_TARGET_NONE		default
+psw_dilemma_tower_cards	888900136	VAR_CHANCE	100	default
+psw_dilemma_tower_cards	888900137	GEN_TARGET_NONE		default
+psw_dilemma_tower_dbg	888900140	VAR_CHANCE	100	default
+psw_dilemma_tower_dbg	888900141	GEN_TARGET_NONE		default

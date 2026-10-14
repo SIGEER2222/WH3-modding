@@ -1,0 +1,7 @@
+effect	icon	priority	icon_negative	category	is_positive_value_good
+#effects_tables;0;db/effects_tables/zzz_psw_doctrine
+psw_doct_eff_missile	icon_stat_damage_base_force.png	420	icon_stat_damage_base_force.png	battle	true
+psw_doct_eff_bulwark	defence.png	450	defence.png	battle	true
+psw_doct_eff_charge	melee.png	420	melee.png	battle	true
+psw_doct_eff_arcane	magic.png	430	magic.png	battle	true
+psw_doct_eff_beast	icon_stat_damage_base_force.png	420	icon_stat_damage_base_force.png	battle	true

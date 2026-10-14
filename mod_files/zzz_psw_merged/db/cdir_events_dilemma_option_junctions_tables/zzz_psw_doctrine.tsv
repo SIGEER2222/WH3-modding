@@ -1,0 +1,8 @@
+dilemma_key	id	option_key	value	target
+#cdir_events_dilemma_option_junctions_tables;1;db/cdir_events_dilemma_option_junctions_tables/zzz_psw_doctrine
+psw_dilemma_doct_main	888800101	VAR_CHANCE	100	default
+psw_dilemma_doct_main	888800102	GEN_TARGET_NONE		default
+psw_dilemma_doct_more	888800105	VAR_CHANCE	100	default
+psw_dilemma_doct_more	888800106	GEN_TARGET_NONE		default
+psw_dilemma_doct_link	888800103	VAR_CHANCE	100	default
+psw_dilemma_doct_link	888800104	GEN_TARGET_NONE		default

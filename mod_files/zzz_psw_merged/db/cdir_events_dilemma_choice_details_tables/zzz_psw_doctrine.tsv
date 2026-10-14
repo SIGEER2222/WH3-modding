@@ -1,0 +1,17 @@
+choice_key	dilemma_key	audio_event_hover	audio_choice_vo
+#cdir_events_dilemma_choice_details_tables;4;db/cdir_events_dilemma_choice_details_tables/zzz_psw_doctrine
+FIRST	psw_dilemma_doct_main		
+SECOND	psw_dilemma_doct_main		
+THIRD	psw_dilemma_doct_main		
+FOURTH	psw_dilemma_doct_main		
+FIFTH	psw_dilemma_doct_main		
+FIRST	psw_dilemma_doct_more		
+SECOND	psw_dilemma_doct_more		
+THIRD	psw_dilemma_doct_more		
+FOURTH	psw_dilemma_doct_more		
+FIFTH	psw_dilemma_doct_more		
+FIRST	psw_dilemma_doct_link		
+SECOND	psw_dilemma_doct_link		
+THIRD	psw_dilemma_doct_link		
+FOURTH	psw_dilemma_doct_link		
+FIFTH	psw_dilemma_doct_link		

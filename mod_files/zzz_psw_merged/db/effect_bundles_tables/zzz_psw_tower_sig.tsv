@@ -1,0 +1,16 @@
+key	localised_description	localised_title	bundle_target	priority	ui_icon	is_global_effect	show_in_3d_space	owner_only
+#effect_bundles_tables;4;db/effect_bundles_tables/zzz_psw_tower_sig
+psw_twr_sig_beast		psw_twr_sig_beast	force	1		true	false	true
+psw_twr_sig_gun		psw_twr_sig_gun	force	1		true	false	true
+psw_twr_sig_cav		psw_twr_sig_cav	force	1		true	false	true
+psw_twr_sig_melee		psw_twr_sig_melee	force	1		true	false	true
+psw_twr_sig_tank		psw_twr_sig_tank	force	1		true	false	true
+psw_twr_sig_daemon		psw_twr_sig_daemon	force	1		true	false	true
+psw_twr_mut_fury		psw_twr_mut_fury	force	1		true	false	true
+psw_twr_mut_bulwark		psw_twr_mut_bulwark	force	1		true	false	true
+psw_twr_mut_swift		psw_twr_mut_swift	force	1		true	false	true
+psw_twr_mut_blood		psw_twr_mut_blood	force	1		true	false	true
+psw_twr_mut_ward		psw_twr_mut_ward	force	1		true	false	true
+psw_twr_asc1		psw_twr_asc1	force	1		true	false	true
+psw_twr_asc2		psw_twr_asc2	force	1		true	false	true
+psw_twr_asc3		psw_twr_asc3	force	1		true	false	true

@@ -1,0 +1,21 @@
+key	localised_description	localised_title	bundle_target	priority	ui_icon	is_global_effect	show_in_3d_space	owner_only
+#effect_bundles_tables;4;db/effect_bundles_tables/zzz_psw_doctrine
+psw_doct_bundle_missile			faction	1		true	false	true
+psw_doct_bundle_bulwark			faction	1		true	false	true
+psw_doct_bundle_charge			faction	1		true	false	true
+psw_doct_bundle_arcane			faction	1		true	false	true
+psw_doct_bundle_beast			faction	1		true	false	true
+psw_dampen_t1			faction	1		true	false	true
+psw_dampen_t2			faction	1		true	false	true
+psw_dampen_t3			faction	1		true	false	true
+psw_dampen_t4			faction	1		true	false	true
+psw_dampen_t5			faction	1		true	false	true
+psw_dampen_u1			faction	1		true	false	true
+psw_dampen_u2			faction	1		true	false	true
+psw_dampen_u3			faction	1		true	false	true
+psw_dampen_u4			faction	1		true	false	true
+psw_dampen_u5			faction	1		true	false	true
+psw_dampen_u6			faction	1		true	false	true
+psw_dampen_u7			faction	1		true	false	true
+psw_dampen_u8			faction	1		true	false	true
+psw_dampen_u9			faction	1		true	false	true

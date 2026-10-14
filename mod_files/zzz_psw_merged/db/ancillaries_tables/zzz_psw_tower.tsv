@@ -1,0 +1,9 @@
+key	type	applies_to	transferrable	unique_to_world	unique_to_faction	precedence	start_date	end_date	avatar_skill	avatar_special_ability	legendary_item	mp_exclusive	is_wife_ancillary	category	min_starting_age	max_starting_age	min_expiry_age	max_expiry_age	immortal	provided_bodyguard_unit	provided_banner	uniqueness_score	turns_before_swap_allowed	subcategory	randomly_dropped	can_be_stolen	can_be_destroyed	faction_set
+#ancillaries_tables;0;db/ancillaries_tables/zzz_psw_tower																																												
+psw_twr_anc_weapon_starblade	wh_main_anc_weapon	.	true	false	true	1	0	9999			false	false	false	weapon	16	30	30	50	true			150	0		false	false	true	all
+psw_twr_anc_armour_starplate	wh_main_anc_armour	.	true	false	true	1	0	9999			false	false	false	armour	16	30	30	50	true			150	0		false	false	true	all
+psw_twr_anc_talisman_dust	wh_main_anc_talisman	.	true	false	true	1	0	9999			false	false	false	talisman	16	30	30	50	true			150	0		false	false	true	all
+psw_twr_anc_ench_starmap	wh_main_anc_enchanted_item	.	true	false	true	1	0	9999			false	false	false	enchanted_item	16	30	30	50	true			150	0		false	false	true	all
+psw_twr_anc_ench_rival	wh_main_anc_enchanted_item	.	true	false	true	1	0	9999			false	false	false	enchanted_item	16	30	30	50	true			150	0		false	false	true	all
+psw_twr_anc_arcane_starglobe	wh_main_anc_arcane_item	.	true	false	true	1	0	9999			false	false	false	arcane_item	16	30	30	50	true			150	0		false	false	true	all
+psw_twr_anc_weapon_starbow	wh_main_anc_weapon	.	true	false	true	1	0	9999			false	false	false	weapon	16	30	30	50	true			150	0		false	false	true	all

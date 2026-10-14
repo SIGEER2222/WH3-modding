@@ -2322,10 +2322,21 @@ local function psw_tfmw_boss_stage_matches_faction(stage, loser_faction_name)
     return stage_def.factions[loser_faction_name] == true
 end
 
+-- 直接在大地图上击杀 Boss 军队（未点传送挑战）时挑战标记为空，
+-- 用 Boss 派系的生成标记兜底。stage4 魔王派系是常设派系，不走此路径。
+local psw_tfmw_boss_created_flag_by_faction = {
+    wh3_dlc23_chd_chaos_dwarfs_qb2 = "psw_boss_create_lhz",
+    wh_main_chs_chaos_qb2 = "psw_boss_create_jwsq",
+    wh_main_grn_greenskins_qb1 = "psw_boss_create_sznw",
+    wh_dlc05_wef_wood_elves_qb2 = "psw_boss_create_slzz",
+    wh2_main_hef_high_elves_qb1 = "psw_boss_create_lyzm",
+    wh3_dlc23_chd_chaos_dwarfs_qb1 = "psw_boss_create_lyjl",
+}
+
 local function psw_tfmw_boss_stage_matches_battle(stage, loser_faction_name, loser_force_cqi)
     local global_data = psw_main_data and psw_main_data.global_data
     local stage_def = psw_tfmw_boss_stage_defs[stage]
-    if not global_data or not stage_def or not global_data[stage_def.flag] then
+    if not global_data or not stage_def then
         return false
     end
 
@@ -2337,7 +2348,14 @@ local function psw_tfmw_boss_stage_matches_battle(stage, loser_faction_name, los
         return true
     end
 
-    return psw_tfmw_boss_stage_matches_faction(stage, loser_faction_name)
+    if not psw_tfmw_boss_stage_matches_faction(stage, loser_faction_name) then
+        return false
+    end
+    if global_data[stage_def.flag] then
+        return true
+    end
+    local created_flag = psw_tfmw_boss_created_flag_by_faction[loser_faction_name]
+    return created_flag ~= nil and global_data[created_flag] == true
 end
 
 local function psw_tfmw_resolve_boss_victory(winner_faction_name, loser_faction_name, loser_force_cqi, human_is_win, stage_hint)
@@ -2580,7 +2598,18 @@ function psw_tfmw_recover_stale_boss_challenge()
     for stage = 1, 4 do
         local stage_def = psw_tfmw_boss_stage_defs[stage]
         local recovery_def = psw_tfmw_boss_recovery_defs[stage]
-        if global_data[stage_def.flag] then
+        -- 未走传送挑战就在地图上击杀 Boss 的旧档没有挑战标记，
+        -- 但会残留生成标记；同样纳入清理范围。
+        local stage_active = global_data[stage_def.flag] == true
+        if not stage_active and recovery_def then
+            for _, candidate in ipairs(recovery_def.candidates) do
+                if global_data[candidate.created_flag] then
+                    stage_active = true
+                    break
+                end
+            end
+        end
+        if stage_active then
             local stale_faction_name = nil
 
             if stage == 4 then

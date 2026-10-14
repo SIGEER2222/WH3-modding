@@ -294,7 +294,12 @@ cm:add_first_tick_callback(function()
                     return
                 end
                 psw_main_data.player_data[faction_name].free_repick_num = _repick_topup
-                psw_main_pickup(faction_name)
+                psw_main_data.player_data[faction_name].psw_repick_in_progress = true
+                local _ok_repick, _err_repick = pcall(psw_main_pickup, faction_name)
+                psw_main_data.player_data[faction_name].psw_repick_in_progress = nil
+                if not _ok_repick then
+                    out("[psw_repick] repick error: " .. tostring(_err_repick))
+                end
             end
             out("[psw_repick] free repick override installed")
         else

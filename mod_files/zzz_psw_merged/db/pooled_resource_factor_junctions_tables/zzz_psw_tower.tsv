@@ -1,0 +1,4 @@
+﻿unique_id	factor	resource	minimum	maximum	specific_faction_set	sort_order
+#pooled_resource_factor_junctions_tables;3;db/pooled_resource_factor_junctions_tables/zzz_psw_tower						
+psw_tower_stardust_other	other	psw_tower_stardust	-2147483647	2147483647		0
+psw_tower_stardust_events	events	psw_tower_stardust	-2147483647	2147483647		0

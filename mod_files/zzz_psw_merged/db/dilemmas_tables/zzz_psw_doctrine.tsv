@@ -1,0 +1,5 @@
+generate	key	localised_description	localised_title	ui_image	prioritized	event_category	sound_popup_override	sound_click_override	override_icon	is_large_dilemma
+#dilemmas_tables;3;db/dilemmas_tables/zzz_psw_doctrine
+false	psw_dilemma_doct_main			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_doct_more			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_doct_link			hef/dilemma_tf_ex_alxy	false	Event				false

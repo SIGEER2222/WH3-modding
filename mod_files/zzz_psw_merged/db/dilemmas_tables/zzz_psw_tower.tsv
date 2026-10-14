@@ -1,0 +1,19 @@
+﻿generate	key	localised_description	localised_title	ui_image	prioritized	event_category	sound_popup_override	sound_click_override	override_icon	is_large_dilemma
+#dilemmas_tables;3;db/dilemmas_tables/zzz_psw_tower									
+false	psw_dilemma_tower_opening			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_node			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_battle			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_reward			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_shop			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_event			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_defeat			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_victory			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_doct_link2			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_boon			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_rest			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_cd			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_school			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_school2			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_digong			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_cards			hef/dilemma_tf_ex_alxy	false	Event				false
+false	psw_dilemma_tower_dbg			hef/dilemma_tf_ex_alxy	false	Event				false
