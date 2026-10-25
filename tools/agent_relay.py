@@ -45,10 +45,11 @@ DEVIN_FALLBACK = (r"E:\Users\22448\AppData\Local\Programs\Devin\resources\app"
 CHANNEL = "C0CBH3WDXBR"
 HUMAN_ID = "U0CBWG27THC"
 STATUSES = {"handoff", "done", "blocked"}
+DEFAULT_MODEL = "swe-2-max"
 DEFAULT_ROLES = {
-    "生产": {"perm": "smart", "duties": "按任务说明完成工作，可读写 WH3 仓库（遵守 AGENTS.md）；只读任务不得写文件。完成后 status=handoff、to=审计。"},
-    "审计": {"perm": "auto", "duties": "只读审查生产的结论：逐条核对其引用的文件、行号与事实是否属实，有无越界。不得修改文件。通过则 status=handoff、to=验证；不通过则 status=handoff、to=生产，并写清修改点。"},
-    "验证": {"perm": "auto", "duties": "用读取/搜索工具复核关键证据（行号、字段名、路径是否存在、规则文字是否一致）。不得修改文件。证据一致则 status=done、to=none；不一致则 status=handoff、to=生产。"},
+    "生产": {"perm": "smart", "model": DEFAULT_MODEL, "duties": "按任务说明完成工作，可读写 WH3 仓库（遵守 AGENTS.md）；只读任务不得写文件。完成后 status=handoff、to=审计。"},
+    "审计": {"perm": "auto", "model": DEFAULT_MODEL, "duties": "只读审查生产的结论：逐条核对其引用的文件、行号与事实是否属实，有无越界。不得修改文件。通过则 status=handoff、to=验证；不通过则 status=handoff、to=生产，并写清修改点。"},
+    "验证": {"perm": "auto", "model": DEFAULT_MODEL, "duties": "用读取/搜索工具复核关键证据（行号、字段名、路径是否存在、规则文字是否一致）。不得修改文件。证据一致则 status=done、to=none；不一致则 status=handoff、to=生产。"},
 }
 READ_RULE = "本轮只读：只用读取类工具（Read/Grep），文件路径以任务说明为准，直接用 Read 按路径打开；不使用 shell，不联网（不用 webfetch），不查询 memory 服务，不写文件。"
 WRITE_RULE = "本轮可写文件，但只能写任务说明或「归属边界」列出的文件；只读任务不写文件；不联网，不查询 memory 服务，尽量不用 shell。"
@@ -66,10 +67,11 @@ def now():
 def load_board():
     b = json.loads(BOARD.read_text(encoding="utf-8")) if BOARD.exists() else {"roles": {}, "tasks": [], "seq": 0, "cursor": ""}
     for k, v in DEFAULT_ROLES.items():
-        b["roles"].setdefault(k, {}).update(perm=v["perm"], duties=v["duties"])
+        b["roles"].setdefault(k, {}).update(perm=v["perm"], model=v["model"], duties=v["duties"])
     for r in b["roles"].values():
         r.pop("sid", None)
         r.setdefault("perm", "auto")
+        r.setdefault("model", DEFAULT_MODEL)
         r.setdefault("duties", "按任务说明完成工作，只读，不修改文件。")
     return b
 
@@ -264,10 +266,10 @@ def newest_session():
     raise RuntimeError("未找到新建的角色会话")
 
 
-def turn(devin, sid, perm, prompt):
+def turn(devin, sid, perm, model, prompt):
     base = [devin, "-r", sid, "-p"] if sid else [devin, "-p"]
-    r = subprocess.run(base + ["--permission-mode", perm, "--", prompt], cwd=ROOT,
-                       capture_output=True, encoding="utf-8", errors="replace", timeout=1800)
+    r = subprocess.run(base + ["--permission-mode", perm, "--model", model, "--", prompt],
+                       cwd=ROOT, capture_output=True, encoding="utf-8", errors="replace", timeout=1800)
     if r.returncode:
         raise RuntimeError(f"devin 退出码 {r.returncode}：{(r.stderr or '')[-300:]}")
     return r.stdout
@@ -317,7 +319,7 @@ def cmd_run(a):
                 thread_stop(b, tok)
                 if STOP_FILE.exists():
                     break
-                out = turn(devin, sid, r["perm"], prompt)
+                out = turn(devin, sid, r["perm"], r.get("model", DEFAULT_MODEL), prompt)
                 ok = True
                 stem.with_suffix(".out.txt").write_text(out, encoding="utf-8")
                 if not sid:
