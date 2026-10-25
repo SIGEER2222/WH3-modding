@@ -22,6 +22,12 @@
 !/.gitignore
 !/.gitattributes
 
+# Local agent toolchain (Slack multi-role relay + read-only dashboard).
+!/tools/
+/tools/*
+!/tools/agent_relay.py
+!/tools/openab_dashboard.py
+
 # Large binary resources are not versioned (bulky / non-diffable).
 *.dds
 *.rigid_model_v2
