@@ -125,6 +125,7 @@ def main():
         f"MM_URL={BASE}",
         f"MM_CHANNEL={chan_id}",
         f"MM_HUMAN_ID={human_id}",
+        f"MM_HUMAN_TOKEN={adm_tok}",
         f"MM_TEAM={team_id}",
     ]
     for role, uname, desc in BOTS:
