@@ -22,11 +22,15 @@
 !/.gitignore
 !/.gitattributes
 
-# Local agent toolchain (Slack multi-role relay + read-only dashboard).
+# Local agent toolchain (Slack/Mattermost multi-role relay + read-only dashboard).
 !/tools/
 /tools/*
 !/tools/agent_relay.py
 !/tools/openab_dashboard.py
+!/tools/mattermost/
+/tools/mattermost/*
+!/tools/mattermost/docker-compose.yml
+!/tools/mattermost/provision.py
 
 # Large binary resources are not versioned (bulky / non-diffable).
 *.dds

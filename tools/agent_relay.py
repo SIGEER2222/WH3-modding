@@ -1,20 +1,31 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""多角色接力编排：角色 = 本地 devin 会话，共享状态 = board.json，对话面 = Slack 频道。
+"""多角色接力编排：角色 = 本地 devin 会话，共享状态 = board.json，对话面 = Slack 或 Mattermost 频道。
 
-- 角色数量任意（board.json 的 roles），与 Slack app 无关；
-- Slack 只用现有 OpenAB 的 bot 身份发言，消息按角色打标签，每个任务一个线程；
+- 角色数量任意（board.json 的 roles）；
+- 每个角色可配独立 bot 身份（env 里 CHAT_TOKEN_<角色名> / SLACK_TOKEN_<角色名>），以各自 bot 身份发言、可被 @；
+  未配角色 token 时回退为编排器 token 发言 + 【角色】前缀；
 - board.json 只由持锁的命令写入（run 循环，或 task/retry/close），角色只通过固定结尾 RELAY_RESULT 汇报交接；
-- 每个任务里每个角色各自一个独立 devin 会话（cwd = WH3 根目录），权限模式按角色配置；任务之间互不共享会话。
+- 每个任务里每个角色各自一个独立 devin 会话（cwd = WH3 根目录），权限模式按角色配置；任务之间互不共享会话；
+- 人类 @某角色 bot：有进行中任务则把任务派给该角色并把消息进 inbox，没有则以消息内容建新任务交给它。
 
-用法（Windows Python313，在 WH3 根目录）：
+凭据（relay.env 不入库）：依次取 $AGENT_RELAY_ENV、tools/_agent_relay/relay.env、tools/relay.env、旧 openab.env 路径：
+    CHAT_PLATFORM=mattermost|mm|slack         默认 slack
+    CHAT_BOT_TOKEN / SLACK_BOT_TOKEN          编排器 token（必需）
+    CHAT_TOKEN_<角色> / SLACK_TOKEN_<角色>    角色 token（可选；缺省回退编排器身份 + 【角色】前缀）
+    # Mattermost（tools/mattermost/provision.py 一键生成下面全部）：
+    MM_URL=http://127.0.0.1:8065  MM_CHANNEL=<channel_id>  MM_HUMAN_ID=<admin_uid>
+    MM_USER_<角色>=<bot_username>
+    # Slack：SLACK_CHANNEL=C0...  SLACK_HUMAN_ID=U0...（可选覆盖默认值）
+
+用法（Windows Python，在 WH3 根目录）：
     python tools/agent_relay.py task "标题" [--brief "说明"]
     python tools/agent_relay.py run [--max-turns 8] [--once]
     python tools/agent_relay.py status
     python tools/agent_relay.py stop | resume
     python tools/agent_relay.py retry T-0001 [--owner 审计]          阻塞任务恢复到指定角色
     python tools/agent_relay.py close T-0001 [--status done|blocked] [--note "..."]   人工关闭任务
-Slack 频道里人类可发：STOP / 停止（编排器观察到的 STOP 不再派发新回合）、新任务：标题（建任务），其余顶层消息进当前任务的补充；在任务线程里回复 STOP / 停止同样生效。
+频道里人类可发：STOP / 停止（编排器观察到的 STOP 不再派发新回合）、新任务：标题（建任务）、@角色bot 文本（派任务给该角色），其余顶层消息进当前任务的补充；在任务线程里回复 STOP / 停止同样生效。
 """
 import argparse
 import json
@@ -38,10 +49,14 @@ HEARTBEAT = STATE / "heartbeat.json"
 STOP_FILE = STATE / "STOP"
 LOCK_FILE = STATE / "runner.lock"
 TURNS = STATE / "turns"
-ENV_FILE = Path(r"\\wsl.localhost\Ubuntu\home\sigeer\openab\openab.env")
+ENV_CANDIDATES = [STATE / "relay.env",
+                  Path(__file__).resolve().parent / "relay.env",
+                  Path(r"\\wsl.localhost\Ubuntu\home\sigeer\openab\openab.env")]
 DB = Path(os.environ["APPDATA"]) / "Devin" / "cli" / "sessions.db"
-DEVIN_FALLBACK = (r"E:\Users\22448\AppData\Local\Programs\Devin\resources\app"
-                  r"\extensions\windsurf\devin\bin\devin.exe")
+DEVIN_FALLBACKS = ([Path(os.environ["LOCALAPPDATA"]) / "devin/cli/bin/devin.exe"]
+                   if os.environ.get("LOCALAPPDATA") else []) + [
+                  Path(r"E:\Users\22448\AppData\Local\Programs\Devin\resources\app"
+                       r"\extensions\windsurf\devin\bin\devin.exe")]
 CHANNEL = "C0CBH3WDXBR"
 HUMAN_ID = "U0CBWG27THC"
 STATUSES = {"handoff", "done", "blocked"}
@@ -88,11 +103,67 @@ def heartbeat(**kw):
     HEARTBEAT.write_text(json.dumps({"ts": now(), "pid": os.getpid(), **kw}, ensure_ascii=False), encoding="utf-8")
 
 
+_ENV = None
+
+
+def env():
+    global _ENV, CHANNEL, HUMAN_ID
+    if _ENV is not None:
+        return _ENV
+    cands = ([Path(os.environ["AGENT_RELAY_ENV"])] if os.environ.get("AGENT_RELAY_ENV") else []) + ENV_CANDIDATES
+    for p in cands:
+        if not p.exists():
+            continue
+        e = {}
+        for line in p.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                e[k.strip()] = v.strip().strip("\"'")
+        CHANNEL = e.get("MM_CHANNEL") or e.get("SLACK_CHANNEL", CHANNEL)
+        HUMAN_ID = e.get("MM_HUMAN_ID") or e.get("SLACK_HUMAN_ID", HUMAN_ID)
+        _ENV = e
+        return e
+    raise SystemExit("找不到 Slack env：设 AGENT_RELAY_ENV，或建 tools/_agent_relay/relay.env")
+
+
 def token():
-    for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
-        if line.startswith("SLACK_BOT_TOKEN="):
-            return line.split("=", 1)[1].strip().strip("\"'")
-    raise SystemExit("openab.env 中没有 SLACK_BOT_TOKEN")
+    e = env()
+    for k in ("CHAT_BOT_TOKEN", "SLACK_BOT_TOKEN"):
+        if e.get(k):
+            return e[k]
+    raise SystemExit("env 中没有 CHAT_BOT_TOKEN / SLACK_BOT_TOKEN（编排器 token）")
+
+
+def role_tok(role):
+    """角色独立 bot token；未配时回退编排器 token。返回 (token, 是否独立身份)。"""
+    e = env()
+    own = e.get(f"CHAT_TOKEN_{role}") or e.get(f"SLACK_TOKEN_{role}")
+    return (own or token(), bool(own))
+
+
+def is_mm():
+    return env().get("CHAT_PLATFORM", "slack").lower() in ("mattermost", "mm")
+
+
+def mm(path, tok, method="GET", body=None, params=None):
+    url = env()["MM_URL"].rstrip("/") + "/api/v4" + path
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, method=method,
+                                 data=json.dumps(body).encode() if body is not None else None,
+                                 headers={"Authorization": f"Bearer {tok}",
+                                          "Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=20) as r:
+        return json.loads(r.read().decode() or "{}")
+
+
+def mm_msgs(j):
+    """MM posts 响应 → slack 风格 [{user,text,ts,id,root_id}]，按时间升序。"""
+    msgs = [{"user": p["user_id"], "text": p.get("message", ""),
+             "ts": str(p.get("create_at", 0) / 1000), "id": p["id"],
+             "root_id": p.get("root_id", "")} for p in j.get("posts", {}).values()]
+    return sorted(msgs, key=lambda m: float(m["ts"]))
 
 
 def slack(method, tok, **params):
@@ -109,13 +180,106 @@ def slack(method, tok, **params):
 
 
 def post(tok, text, thread=None):
+    if is_mm():
+        body = {"channel_id": CHANNEL, "message": text[:16000]}
+        if thread:
+            body["root_id"] = thread
+        return mm("/posts", tok, "POST", body)["id"]
     params = {"channel": CHANNEL, "text": text[:12000]}
     if thread:
         params["thread_ts"] = thread
     return slack("chat.postMessage", tok, **params)["ts"]
 
 
+def whoami(tok):
+    if is_mm():
+        return mm("/users/me", tok).get("id")
+    return slack("auth.test", tok).get("user_id")
+
+
+def join_channel(tok):
+    if is_mm():
+        try:
+            mm(f"/channels/{CHANNEL}/members", tok, "POST", {"user_id": whoami(tok)})
+        except Exception as e:
+            if "already" not in str(e).lower():
+                raise
+        return
+    try:
+        slack("conversations.join", tok, channel=CHANNEL)
+    except RuntimeError as e:
+        if "already_in_channel" not in str(e):
+            raise
+
+
+def identities(b):
+    """返回 (uid->发言标签, role->身份键)。Slack 身份键=bot uid；MM=用户名。"""
+    labels, role_uid, seen = {}, {}, {}
+    for role in b["roles"]:
+        tok, own = role_tok(role)
+        if tok not in seen:
+            try:
+                seen[tok] = whoami(tok) or ""
+            except Exception:
+                seen[tok] = ""
+        uid = seen[tok]
+        if own and uid:
+            labels[uid] = role
+            role_uid[role] = env().get(f"MM_USER_{role}", uid) if is_mm() else uid
+        elif uid:
+            labels.setdefault(uid, "编排")
+    try:
+        labels.setdefault(whoami(token()) or "", "编排")
+    except Exception:
+        pass
+    labels[HUMAN_ID] = "人类"
+    return labels, role_uid
+
+
+MENTION = re.compile(r"<@(U[A-Z0-9]+)>")
+MM_MENTION = re.compile(r"@([A-Za-z0-9._-]+)")
+
+
+def mentions(text):
+    if is_mm():
+        return MM_MENTION.findall(text or "")
+    return MENTION.findall(text or "")
+
+
+def strip_mentions(text):
+    return (MM_MENTION if is_mm() else MENTION).sub("", text or "").strip()
+
+
+def at(role, role_uid):
+    """mention 展示形式：Slack <@uid>；MM @username。"""
+    key = (role_uid or {}).get(role)
+    if not key:
+        return f"@{role}"
+    return f"@{key}" if is_mm() else f"<@{key}>"
+
+
+def assign_mention(b, t, uids, uid_role, role_uid, tok, src):
+    """uids 里命中角色 bot → 任务派给该角色。返回命中角色名或 None。"""
+    hit = next((uid_role[u] for u in uids if u in uid_role), None)
+    if hit and t and hit != t["owner"]:
+        t["history"].append({"ts": now(), "role": "人类", "status": "assign", "to": hit,
+                             "summary": f"@{hit} 指派（{src}）"})
+        t["owner"] = hit
+        post(tok, f"[编排] 收到 {at(hit, role_uid)} 指派，下一回合由「{hit}」处理。", thread=t.get("thread"))
+    return hit
+
+
+def linkify(text, uid_role):
+    """把 @角色名 转成平台 mention：Slack <@uid>；MM @username。"""
+    for key, role in uid_role.items():
+        rep = f"@{key}" if is_mm() else f"<@{key}>"
+        text = re.sub(rf"@{re.escape(role)}(?![A-Za-z0-9_一-鿿])", rep, text)
+    return text
+
+
 def thread_msgs(tok, thread_ts, page=200):
+    if is_mm():
+        return mm_msgs(mm(f"/posts/{thread_ts}/thread", tok, params={"perPage": page}))
     seen, cursor = {}, ""
     while True:
         j = slack("conversations.replies", tok, channel=CHANNEL, ts=thread_ts, limit=page,
@@ -127,14 +291,15 @@ def thread_msgs(tok, thread_ts, page=200):
             return sorted(seen.values(), key=lambda m: float(m["ts"]))
 
 
-def thread_context(tok, thread_ts, budget=16000, per_msg=8000):
+def thread_context(tok, thread_ts, labels=None, budget=16000, per_msg=8000):
+    labels = labels or {}
     msgs = thread_msgs(tok, thread_ts)
     picked, used = [], 0
     for m in reversed(msgs):
         body = m.get("text", "")
         if len(body) > per_msg:
             body = body[:per_msg] + "…（已截断，完整见 tools/_agent_relay/turns/）"
-        text = ("[人类] " if m.get("user") == HUMAN_ID else "[机器人] ") + body
+        text = f"[{labels.get(m.get('user'), '机器人')}] " + body
         if used + len(text) > budget:
             break
         picked.append(text)
@@ -150,7 +315,7 @@ def note(tok, t, text):
         post(tok, f"[编排] {text}", thread=t["thread"])
 
 
-def thread_stop(b, tok):
+def thread_human(b, tok, uid_role, role_uid=None):
     t = active(b)
     if not t or not t.get("thread"):
         return
@@ -158,37 +323,57 @@ def thread_stop(b, tok):
         if m.get("user") != HUMAN_ID or float(m["ts"]) <= float(t.get("seen", 0)):
             continue
         t["seen"] = m["ts"]
-        if m.get("text", "").strip().lower() in ("stop", "停止"):
+        text = m.get("text", "").strip()
+        if text.lower() in ("stop", "停止"):
             STOP_FILE.parent.mkdir(parents=True, exist_ok=True)
             STOP_FILE.touch()
             post(tok, "已收到线程内停止指令，编排器在下一轮前停下。", thread=t["thread"])
+        elif mentions(text):
+            if assign_mention(b, t, mentions(text), uid_role, role_uid, tok, "线程"):
+                t["inbox"].append(text)
 
 
 def active(b):
     return next((t for t in b["tasks"] if t["status"] == "doing"), None)
 
 
-def create_task(b, tok, title, brief="", owner="生产"):
+def create_task(b, tok, title, brief="", owner="生产", role_uid=None):
     b["seq"] += 1
     tid = f"T-{b['seq']:04d}"
-    thread = post(tok, f"[任务] {tid} {title}" + (f"\n{brief}" if brief else ""))
+    head = f"[任务] {tid} {title}" + (f" → {at(owner, role_uid)}" if role_uid and owner in role_uid else "")
+    thread = post(tok, head + (f"\n{brief}" if brief else ""))
     b["tasks"].append({"id": tid, "title": title, "brief": brief, "status": "doing", "owner": owner,
                        "round": 1, "max_rounds": 3, "thread": thread, "history": [], "inbox": [], "created": now()})
     return tid
 
 
-def poll_human(b, tok):
-    cursor = float(b["cursor"] or 0)
+def channel_msgs(tok, oldest, page=200):
+    """频道顶层消息（不含线程回复），按时间升序。"""
+    if is_mm():
+        out, pg = [], 0
+        while True:
+            j = mm(f"/channels/{CHANNEL}/posts", tok,
+                   params={"since": int(float(oldest) * 1000), "perPage": page, "page": pg})
+            msgs = mm_msgs(j)
+            out += [m for m in msgs if not m["root_id"]]
+            if len(msgs) < page:
+                return out
+            pg += 1
     seen, cur = {}, ""
     while True:
-        j = slack("conversations.history", tok, channel=CHANNEL, oldest=str(cursor), limit=200,
+        j = slack("conversations.history", tok, channel=CHANNEL, oldest=str(oldest), limit=page,
                   **({"cursor": cur} if cur else {}))
         for m in j["messages"]:
             seen.setdefault(m["ts"], m)
         cur = j.get("response_metadata", {}).get("next_cursor", "")
         if not cur:
-            break
-    for m in sorted(seen.values(), key=lambda m: float(m["ts"])):
+            return sorted(seen.values(), key=lambda m: float(m["ts"]))
+
+
+def poll_human(b, tok, uid_role=None, role_uid=None):
+    uid_role = uid_role or {}
+    cursor = float(b["cursor"] or 0)
+    for m in channel_msgs(tok, cursor):
         if float(m["ts"]) <= cursor or m.get("user") != HUMAN_ID:
             continue
         b["cursor"] = m["ts"]
@@ -198,9 +383,15 @@ def poll_human(b, tok):
             STOP_FILE.touch()
             post(tok, "已收到停止指令，编排器在下一轮前停下。")
         elif text.startswith(("新任务：", "新任务:")):
-            create_task(b, tok, text.split("：" if "：" in text else ":", 1)[1].strip())
+            create_task(b, tok, text.split("：" if "：" in text else ":", 1)[1].strip(), role_uid=role_uid)
         elif (t := active(b)):
+            assign_mention(b, t, mentions(text), uid_role, role_uid, tok, "频道")
             t["inbox"].append(text)
+        else:
+            role = next((uid_role[u] for u in mentions(text) if u in uid_role), None)
+            if role:
+                title = strip_mentions(text)[:80] or f"{role} 的任务"
+                create_task(b, tok, title, owner=role, role_uid=role_uid)
 
 
 def build_prompt(b, t, role, ctx):
@@ -251,7 +442,13 @@ def route(b, t, role, res):
 
 
 def devin_exe():
-    return shutil.which("devin") or DEVIN_FALLBACK
+    exe = shutil.which("devin")
+    if exe:
+        return exe
+    for p in DEVIN_FALLBACKS:
+        if p.exists():
+            return str(p)
+    raise SystemExit("找不到 devin CLI（PATH、LOCALAPPDATA\\devin\\cli\\bin、旧 Devin Desktop 路径均无）")
 
 
 def newest_session():
@@ -291,12 +488,23 @@ def cmd_run(a):
         raise SystemExit("存在 STOP 文件，先执行 resume")
     lock = lock_or_fail()
     tok, devin, b = token(), devin_exe(), load_board()
+    labels, role_uid = identities(b)
+    uid_role = {u: r for r, u in role_uid.items()}
+    for role in b["roles"]:  # 各角色 bot 自助进公共频道；私有频道需人工 /invite
+        rtok, own = role_tok(role)
+        if own:
+            try:
+                join_channel(rtok)
+            except Exception as e:
+                print(f"{role} bot 进频道失败（发言时可能报错）：{e}", flush=True)
+    own_list = "、".join(role_uid) or "无"
+    print(f"身份：编排={whoami(tok) or '?'}；角色独立身份 {own_list}", flush=True)
     b["cursor"] = b["cursor"] or f"{time.time():.6f}"
     turns = 0
     try:
         while turns < a.max_turns and not STOP_FILE.exists():
-            poll_human(b, tok)
-            thread_stop(b, tok)
+            poll_human(b, tok, uid_role, role_uid)
+            thread_human(b, tok, uid_role, role_uid)
             t = active(b)
             if t is None or STOP_FILE.exists():
                 print("没有进行中的任务" if t is None else "收到 STOP，本轮不再派发", flush=True)
@@ -310,13 +518,13 @@ def cmd_run(a):
             try:
                 r = b["roles"][role]
                 sid = t.setdefault("sids", {}).get(role, "")
-                prompt = build_prompt(b, t, role, thread_context(tok, t["thread"]))
+                prompt = build_prompt(b, t, role, thread_context(tok, t["thread"], labels))
                 inbox_seen = len(t["inbox"])
                 TURNS.mkdir(parents=True, exist_ok=True)
                 stem = TURNS / f"{t['id']}-{len(t['history']) + 1:02d}-{role}"
                 stem.with_suffix(".prompt.txt").write_text(prompt, encoding="utf-8")
-                poll_human(b, tok)
-                thread_stop(b, tok)
+                poll_human(b, tok, uid_role, role_uid)
+                thread_human(b, tok, uid_role, role_uid)
                 if STOP_FILE.exists():
                     break
                 out = turn(devin, sid, r["perm"], r.get("model", DEFAULT_MODEL), prompt)
@@ -331,7 +539,9 @@ def cmd_run(a):
             route(b, t, role, res)
             if ok:
                 del t["inbox"][:inbox_seen]
-            post(tok, f"【{role}】{res.get('summary', '')}\n\n{body[:11000]}".rstrip(), t["thread"])
+            rtok, own = role_tok(role)
+            text = linkify(f"{res.get('summary', '')}\n\n{body[:11000]}".rstrip(), uid_role)
+            post(rtok, (text if own else f"【{role}】" + text), t["thread"])
             if t["status"] == "blocked" and t["history"][-1]["role"] == "编排器":
                 note(tok, t, t["history"][-1]["summary"])
             save_board(b)
@@ -396,7 +606,8 @@ def cmd_task(a):
 
 def _task(a):
     b = load_board()
-    tid = create_task(b, token(), a.title, a.brief)
+    _, role_uid = identities(b)
+    tid = create_task(b, token(), a.title, a.brief, role_uid=role_uid)
     save_board(b)
     print(tid)
 
