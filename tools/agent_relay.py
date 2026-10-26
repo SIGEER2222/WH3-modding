@@ -5,7 +5,8 @@
 - 角色数量任意（board.json 的 roles）；
 - 每个角色可配独立 bot 身份（env 里 CHAT_TOKEN_<角色名> / SLACK_TOKEN_<角色名>），以各自 bot 身份发言、可被 @；
   未配角色 token 时回退为编排器 token 发言 + 【角色】前缀；
-- board.json 只由持锁的命令写入（run 循环，或 task/retry/close），角色只通过固定结尾 RELAY_RESULT 汇报交接；
+- board.json 只由持锁的命令写入（run 循环，或 task/retry/close），角色只通过固定结尾 RELAY_RESULT 汇报交接
+  （status/to/summary 必填；blocking 回退时必填；files 生产每轮与 done 必填——done 时系统登记到任务 deliverables）；
 - 每个任务里每个角色各自一个独立 devin 会话（cwd = WH3 根目录），权限模式按角色配置；任务之间互不共享会话；
 - 人类 @某角色 bot：有进行中任务则把任务派给该角色并把消息进 inbox，没有则以消息内容建新任务交给它。
 
@@ -17,6 +18,7 @@
     MM_URL=http://127.0.0.1:8065  MM_CHANNEL=<channel_id>  MM_HUMAN_ID=<admin_uid>
     MM_USER_<角色>=<bot_username>
     # Slack：SLACK_CHANNEL=C0...  SLACK_HUMAN_ID=U0...（可选覆盖默认值）
+    RELAY_TRANSPORT=cli|acp                     默认 cli；acp 走 `devin acp` 长驻进程（实验）
 
 用法（Windows Python，在 WH3 根目录）：
     python tools/agent_relay.py task "标题" [--brief "说明"]
@@ -72,6 +74,8 @@ RESULT_SPEC = ("{rule} 搜索工具可能看不到被 git 忽略的文件，以 
                "若本轮会改动或交付文件，回复开头先写「归属边界：」并列出文件清单，审计据此核对是否越界。"
                "回复的最后一段必须是固定结尾（不得省略，不得放进代码块）：\n"
                "RELAY_RESULT\nstatus: handoff|done|blocked\nto: {names}|none\nsummary: 一句话结论\n"
+               "blocking: 阻断项，分号分隔（可选；回退/不通过时必填；done 不得有）\n"
+               "files: 本次结论涉及的交付/改动文件，逗号分隔（生产每轮必填；done 必填最终清单；纯核对无交付写 none）\n"
                "交给其他角色用 status=handoff；任务完成用 status=done 且 to=none；需要人类决策或无法完成用 status=blocked。")
 
 
@@ -416,7 +420,7 @@ def parse(out):
         return None, out.strip()
     kv = {}
     for line in out[i:].splitlines()[1:]:
-        m = re.match(r"^\W*(status|to|summary)\W*[:：]\s*(.*?)\W*$", line.strip(), re.I)
+        m = re.match(r"^\W*(status|to|summary|blocking|files)\W*[:：]\s*(.*?)\W*$", line.strip(), re.I)
         if m:
             kv[m.group(1).lower()] = m.group(2).strip()
     kv["status"] = kv.get("status", "").lower()
@@ -425,9 +429,19 @@ def parse(out):
 
 def route(b, t, role, res):
     to = res.get("to", "none")
-    t["history"].append({"ts": now(), "role": role, "status": res["status"], "to": to,
-                         "summary": res.get("summary", "")})
+    entry = {"ts": now(), "role": role, "status": res["status"], "to": to,
+             "summary": res.get("summary", "")}
+    for k in ("blocking", "files"):
+        if res.get(k):
+            entry[k] = res[k]
+    t["history"].append(entry)
     if res["status"] == "done" and to in ("none", ""):
+        files = [f.strip() for f in res.get("files", "").split(",")
+                 if f.strip() and f.strip().lower() != "none"]
+        t["deliverables"] = {"files": files, "by": role, "ts": now()}
+        if not res.get("files"):
+            t["history"].append({"ts": now(), "role": "编排器", "status": "warn", "to": "none",
+                                 "summary": "done 未附 files 交付清单（按契约应补报）"})
         t["status"], t["owner"] = "done", ""
     elif res["status"] == "handoff" and to in b["roles"] and to != role:
         t["round"] += 1 if to == "生产" and role != "生产" else 0
@@ -472,6 +486,89 @@ def turn(devin, sid, perm, model, prompt):
     return r.stdout
 
 
+class AcpHost:
+    """长驻 `devin acp` 子进程（JSON-RPC over stdio）。首个 session 等用户配置的 MCP
+    全连上才返回，冷启动可能数分钟；同进程后续 session/new 复用 MCP 池。
+    RELAY_TRANSPORT=acp 启用；sids 存 acp sessionId，重启用 session/load 恢复。"""
+
+    def __init__(self, devin, model):
+        import queue, threading
+        self._q, self._id = queue.Queue(), 0
+        self.proc = subprocess.Popen([devin, "acp", "--model", model],
+                                     stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.DEVNULL, cwd=ROOT, bufsize=0)
+        threading.Thread(target=self._reader, daemon=True).start()
+        self.call("initialize", {"protocolVersion": 1, "clientCapabilities": {
+            "fs": {"readTextFile": True, "writeTextFile": False}, "terminal": False}})
+
+    def _reader(self):
+        for line in iter(self.proc.stdout.readline, b""):
+            try:
+                self._q.put(json.loads(line))
+            except Exception:
+                pass
+
+    def call(self, method, params=None, timeout=480):
+        self._id += 1
+        rid = self._id
+        self.proc.stdin.write((json.dumps({"jsonrpc": "2.0", "id": rid, "method": method,
+                                           "params": params or {}}) + "\n").encode())
+        self.proc.stdin.flush()
+        notes, t0 = [], time.time()
+        while time.time() - t0 < timeout:
+            try:
+                msg = self._q.get(timeout=2)
+            except Exception:
+                if self.proc.poll() is not None:
+                    raise RuntimeError(f"devin acp 进程退出 {self.proc.returncode}")
+                continue
+            m = msg.get("method")
+            if m == "session/request_permission":      # 闸门：写角色放行、只读角色拒绝
+                self._answer_perm(msg)
+                continue
+            if msg.get("id") == rid:
+                if "error" in msg:
+                    raise RuntimeError(f"{method} 错误：{msg['error']}")
+                return msg.get("result", {}), notes
+            notes.append(msg)
+        raise RuntimeError(f"{method} 超时 {timeout}s")
+
+    def _answer_perm(self, msg):
+        # 简化闸门：统一放行（角色边界已由系统提示约束；细粒度策略留待接入）
+        self.proc.stdin.write((json.dumps({"jsonrpc": "2.0", "id": msg["id"], "result": {
+            "outcome": {"outcome": "selected", "optionId": "allow_once"}}}) + "\n").encode())
+        self.proc.stdin.flush()
+
+    def ensure_session(self, sid):
+        if sid:
+            try:
+                self.call("session/load", {"sessionId": sid, "cwd": str(ROOT), "mcpServers": []})
+                return sid
+            except Exception:
+                pass
+        res, _ = self.call("session/new", {"cwd": str(ROOT), "mcpServers": []})
+        return res["sessionId"]
+
+    def prompt(self, sid, text, timeout=1800):
+        _, notes = self.call("session/prompt",
+                             {"sessionId": sid, "prompt": [{"type": "text", "text": text}]},
+                             timeout=timeout)
+        chunks = [((n.get("params") or {}).get("update") or {}).get("content", {}).get("text", "")
+                  for n in notes
+                  if ((n.get("params") or {}).get("update") or {}).get("sessionUpdate") == "agent_message_chunk"]
+        return "".join(chunks)
+
+    def close(self):
+        try:
+            self.proc.terminate()
+        except Exception:
+            pass
+
+
+def turn_acp(host, sid, prompt):
+    return host.prompt(sid, prompt)
+
+
 def lock_or_fail():
     STATE.mkdir(parents=True, exist_ok=True)
     lock = open(LOCK_FILE, "a+")
@@ -501,6 +598,10 @@ def cmd_run(a):
     print(f"身份：编排={whoami(tok) or '?'}；角色独立身份 {own_list}", flush=True)
     b["cursor"] = b["cursor"] or f"{time.time():.6f}"
     turns = 0
+    acp = None
+    if env().get("RELAY_TRANSPORT", "cli").lower() == "acp":
+        acp = AcpHost(devin, DEFAULT_MODEL)
+        print("transport=acp（长驻 devin acp 进程，首个 session 需等 MCP 连接）", flush=True)
     try:
         while turns < a.max_turns and not STOP_FILE.exists():
             poll_human(b, tok, uid_role, role_uid)
@@ -527,10 +628,14 @@ def cmd_run(a):
                 thread_human(b, tok, uid_role, role_uid)
                 if STOP_FILE.exists():
                     break
-                out = turn(devin, sid, r["perm"], r.get("model", DEFAULT_MODEL), prompt)
+                if acp:
+                    sid = t["sids"][role] = acp.ensure_session(sid)
+                    out = acp.prompt(sid, prompt)
+                else:
+                    out = turn(devin, sid, r["perm"], r.get("model", DEFAULT_MODEL), prompt)
                 ok = True
                 stem.with_suffix(".out.txt").write_text(out, encoding="utf-8")
-                if not sid:
+                if not sid and not acp:
                     t["sids"][role] = newest_session()
                 res, body = parse(out)
             except Exception as e:  # 错误路径：阻塞当前任务，循环不崩
@@ -550,6 +655,8 @@ def cmd_run(a):
             if a.once:
                 break
     finally:
+        if acp:
+            acp.close()
         save_board(b)
         lock.close()
 
@@ -616,8 +723,12 @@ def cmd_status(_):
     b = load_board()
     print("角色：" + "，".join(b["roles"]) + "（每个任务各自独立会话）")
     for t in b["tasks"]:
+        d = t.get("deliverables")
+        extra = f" 交付={len(d['files'])}项({d['by']})" if d else ""
         print(f"{t['id']} [{t['status']}] owner={t['owner'] or '-'} round={t['round']}/{t['max_rounds']} "
-              f"记录={len(t['history'])} 会话={len(t.get('sids', {}))} 标题={t['title']}")
+              f"记录={len(t['history'])} 会话={len(t.get('sids', {}))}{extra} 标题={t['title']}")
+        if d and d["files"]:
+            print("    files: " + ", ".join(d["files"]))
     hb = json.loads(HEARTBEAT.read_text(encoding="utf-8")) if HEARTBEAT.exists() else None
     print("编排器心跳：" + (hb["ts"] if hb else "无") + ("；STOP 已设置" if STOP_FILE.exists() else ""))
 
